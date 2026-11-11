@@ -50,7 +50,10 @@ A single user can hold different roles in different organisations (a lecturer ca
 - Participant profile: name, photo, bio, institution, skills, links, history of events and certificates
 - Email notifications for key moments (login link, application received, shortlisted, results, certificate ready)
 - CSV export of applications and scores
-- Mobile app (Expo, tested in Expo Go on iPhone): sign in with an emailed 6-digit code, browse and apply to challenges, my teams and statuses, my certificates, in-app notification list, push notifications for shortlist, results and certificate-ready
+- Discovery feed and alerts: participants follow organisations and pick interest topics (e.g. fintech, health, agritech, climate, AI). They get notified when a followed organisation or a matching topic has a new challenge, and when deadlines are close
+- Announcements: organisers post updates to their followers (new challenge, event dates, info sessions, winners). The platform admin can post platform-wide innovation news
+- Per-user notification settings: choose topics, choose channels (in-app, email digest, push)
+- Mobile app (Expo, tested in Expo Go on iPhone): sign in with an emailed 6-digit code, browse and apply to challenges, follow organisations and topics, discovery feed, my teams and statuses, my certificates, notification inbox
 
 ## Later phases (not in 8 days)
 
