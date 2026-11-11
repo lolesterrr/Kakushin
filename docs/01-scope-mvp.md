@@ -1,5 +1,15 @@
 # 01. Scope and MVP
 
+## Three surfaces
+
+| Surface | Who uses it | What it is |
+|---|---|---|
+| Public portal | Anyone, participants | Browse organisations and open challenges, sign in, apply, manage team, view profile and certificates |
+| Admin portal | Organisers, judges, platform admin | Organisation console at `/admin`: challenges, applications, judging, results, certificates |
+| Mobile app | Participants (judges later) | Expo app: browse challenges, apply, see team and status, receive push notifications, show certificates |
+
+The public and admin portals are one React web app with separate route areas, sharing one login and one API. The mobile app uses the same API.
+
 ## The one flow the MVP must nail
 
 1. An organiser creates an organisation and posts a challenge.
@@ -40,12 +50,14 @@ A single user can hold different roles in different organisations (a lecturer ca
 - Participant profile: name, photo, bio, institution, skills, links, history of events and certificates
 - Email notifications for key moments (login link, application received, shortlisted, results, certificate ready)
 - CSV export of applications and scores
+- Mobile app (Expo, tested in Expo Go on iPhone): sign in with an emailed 6-digit code, browse and apply to challenges, my teams and statuses, my certificates, in-app notification list, push notifications for shortlist, results and certificate-ready
 
 ## Later phases (not in 5 days)
 
 | Phase | Features |
 |---|---|
 | Phase 2 | Payments and plans (Flutterwave / Pesapal for mobile money), custom branding, multi-stage challenges (idea round, then build round), mentor booking |
+| Phase 2b | Store builds with EAS (needs a paid Apple Developer account, $99/year), judge scoring on mobile, deep links |
 | Phase 3 | Impact reports for development partners (demographics, gender split, institutions reached), announcements and messaging, Google sign-in, custom domains |
 | Phase 4 | Public talent directory for sponsors, team matchmaking by skills, API and webhooks, WhatsApp/SMS notifications (Africa's Talking) |
 
@@ -53,7 +65,9 @@ A single user can hold different roles in different organisations (a lecturer ca
 
 - No payments or billing. Plans are set manually by the platform admin.
 - No real-time chat.
-- No mobile app. The web app must work well on phones, since most participants will use one.
+- No app store release. The mobile app is tested in Expo Go only. Store builds come later.
+- The mobile app is participant-first. Organiser and judge tools stay in the web admin portal for now.
+- The web app must still work well on phones.
 - No custom domains per organisation.
 
 ## Assumptions (to confirm)

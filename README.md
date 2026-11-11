@@ -18,4 +18,4 @@ Built for universities, innovation hubs, corporates and development partners tha
 
 ## Stack (short version)
 
-Cloudflare Workers (Hono) for the API, D1 for the database, R2 for files, Pages for the React frontend, Resend for email.
+Cloudflare Workers (Hono) for the API, D1 for the database, R2 for files, Resend for email. One React web app serves both the public portal and the admin portal. A React Native app (Expo) covers participants on mobile, with push notifications. Everything runs on free tiers while it is just one tester.

@@ -7,6 +7,8 @@
 | API | Cloudflare Workers + Hono | Fast, tiny, edge-hosted. Hono is the standard router for Workers |
 | Database | Cloudflare D1 (SQLite) + Drizzle ORM | Generous free tier, zero ops, typed queries and migrations |
 | Files | Cloudflare R2 | 10 GB free and **zero egress fees**, which no S3-style competitor matches |
+| Mobile | Expo (React Native, TypeScript) + Expo Router, run in Expo Go | Test on a real iPhone with no build step; shares types and Zod schemas with the web app |
+| Push | Expo Push Service via `expo-notifications` | Free; one API for iOS and Android; no Apple or Firebase setup while using Expo Go |
 | Frontend | React + Vite + TanStack Router/Query + Tailwind + shadcn/ui | Fast to build forms and dashboards; served as Workers static assets |
 | Email | Resend | 3,000 emails/month free, simple API, good deliverability |
 | Bot protection | Cloudflare Turnstile | Free, no annoying puzzles, protects login and apply forms |
@@ -39,6 +41,8 @@ Browser ──► Worker (kakushin)
               │                              ──► Resend (email)
               └── everything else → static assets (React SPA)
 
+Expo app ──► same /api/* routes (bearer token) ──► Expo Push Service ──► iPhone
+
 Cron trigger (hourly) ──► same Worker: close deadlines, send reminders
 ```
 
@@ -57,10 +61,42 @@ kakushin/
 │   └── cron.ts
 ├── migrations/            D1 SQL migrations (drizzle-kit)
 ├── web/                   React app (Vite)
-│   └── src/routes/        public pages, participant dashboard, organiser console, judge view
+│   └── src/routes/        public portal, participant dashboard, /admin (organiser console, judge view)
+├── mobile/                Expo app (participants)
 ├── shared/                Zod schemas and types used by both sides
 └── wrangler.jsonc
 ```
+
+## Free tier only (current rule)
+
+Everything runs on free tiers while it is just joe testing:
+
+| Service | Free tier used | Cost |
+|---|---|---|
+| Workers, D1, R2, Turnstile | Cloudflare free plans | $0 |
+| Email | Resend free (100/day, 3,000/month) | $0 |
+| Push | Expo Push Service | $0 |
+| Mobile testing | Expo Go on iPhone | $0 |
+| Domain | Skipped; use `*.workers.dev` | $0 |
+
+Consequences to know about:
+- Resend without a verified domain can only send to your own account email. That is fine for solo testing. A domain (about $10 to $15/year) is needed before inviting anyone else.
+- The free Workers CPU cap (about 10 ms per request) may break certificate PDF generation. We write it to be cheap, test it, and only pay the $5/month plan if it actually fails.
+- Expo Go limits: push notifications work on iPhone in Expo Go with a physical device. Android push no longer works in Expo Go (needs a development build). Store releases need EAS builds, and iOS push in a real build needs a paid Apple Developer account ($99/year). All of that is later.
+
+Check the current Expo and Cloudflare docs on day 1 and day 5, since limits move.
+
+## Mobile app
+
+```
+mobile/                 Expo app (Expo Router)
+  app/                  screens: sign-in, explore, challenge, apply, my-teams, notifications, certificates, profile
+  lib/api.ts            typed client for the Worker API (shared Zod schemas)
+```
+
+- **Login on mobile:** emailed 6-digit code, not a magic link, because deep links are awkward inside Expo Go. The code is exchanged for a long-lived bearer token stored in `expo-secure-store`. The web keeps cookie sessions; the API accepts either.
+- **Push flow:** after login the app asks for notification permission, gets an Expo push token, and POSTs it to `/api/push-tokens`. When something happens (shortlisted, results published, certificate ready) the Worker writes a `notifications` row, then calls Expo's push API (`https://exp.host/--/api/v2/push/send`, batches of up to 100) and prunes tokens Expo reports as invalid.
+- **API target:** the app points at the deployed workers.dev URL, so the phone does not depend on the laptop being on the same network.
 
 ## Auth
 
