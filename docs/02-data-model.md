@@ -46,7 +46,8 @@ users ──< memberships >── organizations ──< challenges
 ### login_tokens
 | Column | Type | Notes |
 |---|---|---|
-| token_hash | text PK | |
+| token_hash | text PK | hash of the magic-link token or the 6-digit code |
+| kind | text | link (web) or code (mobile) |
 | email | text | |
 | expires_at | integer | 15 minutes, single use |
 
@@ -181,6 +182,30 @@ Rule: a user can only be in one team per challenge (checked in code with a query
 | pdf_key | text | R2 key |
 | issued_at | integer | |
 | revoked | integer | 0/1 |
+
+### push_tokens
+| Column | Type | Notes |
+|---|---|---|
+| id | text PK | |
+| user_id | text FK | |
+| token | text unique | Expo push token, looks like `ExponentPushToken[...]` |
+| platform | text | ios, android |
+| created_at | integer | |
+| last_seen_at | integer | stale tokens are removed when Expo reports them invalid |
+
+### notifications
+In-app inbox, also the source for push and email.
+
+| Column | Type | Notes |
+|---|---|---|
+| id | text PK | |
+| user_id | text FK | |
+| kind | text | application.shortlisted, results.published, certificate.ready, ... |
+| title | text | |
+| body | text | |
+| data | text (JSON) | ids for opening the right screen |
+| read_at | integer nullable | |
+| created_at | integer | |
 
 ### audit_log (cheap and useful for disputes)
 | Column | Type | Notes |
