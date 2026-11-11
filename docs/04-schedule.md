@@ -62,6 +62,8 @@ Each day ends with something deployed. Eight days leaves slack, so no day should
 ## Day 8: Hardening and demo
 - Mobile pass on the web app, error handling, audit log
 - Tests for scoring formula, permissions and tenant isolation
+- Limit wrong-guess attempts on 6-digit sign-in codes (currently only request rate is limited)
+- Turnstile on the sign-in form
 - Seed a demo organisation and challenge
 - Full dry run: run a fake hackathon from posting to certificates using web and phone
 - Fix whatever the dry run finds
