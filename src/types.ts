@@ -1,6 +1,6 @@
 export interface Env {
   DB: D1Database;
-  FILES?: R2Bucket; // not bound until R2 is enabled (Day 2)
+  FILES: R2Bucket;
   ASSETS: Fetcher;
   APP_URL: string;
   EMAIL_FROM: string;

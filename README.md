@@ -34,7 +34,7 @@ Without a `RESEND_API_KEY`, the sign-in link or code is printed in the `wrangler
 
 ## Live
 
-Day 1 runs at https://kakushin.kajjabantu.workers.dev (D1 database `kakushin`, secret `RESEND_API_KEY`).
+Day 1 runs at https://kakushin.kajjabantu.workers.dev (D1 database `kakushin`, R2 bucket `kakushin-files`, secret `RESEND_API_KEY`).
 
 ```
 npm run db:migrate:remote
@@ -43,5 +43,5 @@ npm run deploy
 
 Notes:
 - Resend has no verified domain yet, so it only delivers to the Resend account's own address. Any other email gets a 500 on sign-in request.
-- R2 is not bound yet. Enable R2 in the Cloudflare dashboard, run `wrangler r2 bucket create kakushin-files`, then add the `FILES` binding back to `wrangler.jsonc` (needed from Day 2 for logos and uploads).
+- Editing a secret in the dashboard saves a new version but may not deploy it. Check the Deployments tab.
 - Workers logs are on (`observability`), so errors show in the dashboard under the Worker's Logs tab.
