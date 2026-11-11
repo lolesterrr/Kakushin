@@ -20,7 +20,7 @@ The public and admin portals are one React web app with separate route areas, sh
 6. The organiser sees a live leaderboard, then publishes results.
 7. Every participant gets a certificate (participant, finalist or winner) with a public verification link.
 
-If this flow works end to end on day 5, the MVP is done. Everything else is a later phase.
+If this flow works end to end by day 8, the MVP is done. Everything else is a later phase.
 
 ## Roles
 
@@ -33,7 +33,7 @@ If this flow works end to end on day 5, the MVP is done. Everything else is a la
 
 A single user can hold different roles in different organisations (a lecturer can be a judge at one hub and a participant at another).
 
-## In the MVP (5 days)
+## In the MVP (8 days)
 
 - Magic-link email login (no passwords)
 - Organisation creation, with a public page at `/o/:slug`
@@ -52,7 +52,7 @@ A single user can hold different roles in different organisations (a lecturer ca
 - CSV export of applications and scores
 - Mobile app (Expo, tested in Expo Go on iPhone): sign in with an emailed 6-digit code, browse and apply to challenges, my teams and statuses, my certificates, in-app notification list, push notifications for shortlist, results and certificate-ready
 
-## Later phases (not in 5 days)
+## Later phases (not in 8 days)
 
 | Phase | Features |
 |---|---|
