@@ -1,8 +1,8 @@
-# 04. Five-day schedule
+# 04. Eight-day schedule
 
-Goal: a deployed, working system where a real organiser can run a small challenge end to end.
+Goal: a deployed, working system where a real organiser can run a small challenge end to end, with the admin portal, public portal and Expo mobile app all working.
 
-Each day ends with something deployed. If a day slips, cut from the "stretch" list, never from the core flow.
+Each day ends with something deployed. Eight days leaves slack, so no day should be rushed. If a day slips, cut from the "stretch" list, never from the core flow.
 
 ## Day 1: Foundations and auth
 - Scaffold Worker (Hono) + React (Vite) in one project, static assets wired up
@@ -10,7 +10,6 @@ Each day ends with something deployed. If a day slips, cut from the "stretch" li
 - Magic-link login with Resend + Turnstile, session middleware
 - Basic layout, nav, profile edit page
 - Deploy to workers.dev
-- Scaffold the Expo app and point it at the deployed API (sign-in comes on day 5)
 - **Done when:** you can sign in on your phone from the live URL and edit your profile.
 
 ## Day 2: Organisations and challenges
@@ -37,16 +36,33 @@ Each day ends with something deployed. If a day slips, cut from the "stretch" li
 - Organiser leaderboard with weighted totals and per-judge breakdown
 - **Done when:** two judges can score three teams and the leaderboard is correct.
 
-## Day 5: Results, certificates, mobile app
+## Day 5: Results and certificates
 - Mark winners and placements, publish results page
 - Certificate PDFs (pdf-lib), stored in R2, download from profile
 - Public `/verify/:code` page with QR code on the certificate
 - Participant profile shows events and certificates
-- Mobile pass on the web app, empty states, error handling, audit log
-- Mobile app in Expo Go: code sign-in, explore and apply, my teams, certificates, notification inbox
-- Push notifications: register token, send on shortlist, results and certificate-ready
-- Seed a demo organisation and challenge for showing to customers
-- **Done when:** the whole flow runs on production with a demo dataset, and your iPhone gets a push when a team is shortlisted.
+- In-app notifications table and inbox API
+- **Done when:** results publish and every participant can download a verifiable certificate.
+
+## Day 6: Mobile app
+- Expo app scaffolded with Expo Router, shared types and Zod schemas
+- 6-digit code sign-in, token in secure storage
+- Screens: explore, challenge detail, apply, my teams and status, certificates, profile
+- **Done when:** you can sign in on your iPhone in Expo Go and apply to a challenge.
+
+## Day 7: Push notifications and admin polish
+- Register Expo push token, send on shortlist, results published and certificate ready
+- Notification inbox screen, tap a push to open the right screen
+- Admin portal polish: dashboard stats, org admin invites, empty states
+- **Done when:** your iPhone gets a push when a team is shortlisted.
+
+## Day 8: Hardening and demo
+- Mobile pass on the web app, error handling, audit log
+- Tests for scoring formula, permissions and tenant isolation
+- Seed a demo organisation and challenge
+- Full dry run: run a fake hackathon from posting to certificates using web and phone
+- Fix whatever the dry run finds
+- **Done when:** the whole flow runs on production with a demo dataset, with no known blockers.
 
 ## Stretch (only if ahead)
 - Hourly cron to auto-close applications and send pitch reminders
@@ -60,7 +76,7 @@ Each day ends with something deployed. If a day slips, cut from the "stretch" li
 |---|---|
 | PDF generation hits the free CPU limit | Switch to Workers Paid ($5/month) on day 5 if needed |
 | Resend free only emails the account owner without a verified domain | Fine while joe is the only tester; buy a domain before inviting others |
-| Day 5 is overloaded (certificates plus mobile plus push) | Mobile screens are thin wrappers over the same API. If it slips, push notifications move to day 6 and everything else still ships |
+| Push notifications behave differently from the docs | Day 7 has slack; the in-app inbox works without push |
 | Scope creep | Anything not in docs/01 goes to the later-phase list |
 | Judging logic bugs | Unit tests for the scoring formula on day 4 |
 

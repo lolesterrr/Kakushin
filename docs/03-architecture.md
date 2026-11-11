@@ -84,7 +84,7 @@ Consequences to know about:
 - The free Workers CPU cap (about 10 ms per request) may break certificate PDF generation. We write it to be cheap, test it, and only pay the $5/month plan if it actually fails.
 - Expo Go limits: push notifications work on iPhone in Expo Go with a physical device. Android push no longer works in Expo Go (needs a development build). Store releases need EAS builds, and iOS push in a real build needs a paid Apple Developer account ($99/year). All of that is later.
 
-Check the current Expo and Cloudflare docs on day 1 and day 5, since limits move.
+Check the current Expo and Cloudflare docs on day 1, day 5 and day 6, since limits move.
 
 ## Mobile app
 
