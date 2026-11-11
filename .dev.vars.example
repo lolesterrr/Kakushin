@@ -1,2 +1,4 @@
 # Copy to .dev.vars for local dev. Never commit .dev.vars
+# Overrides the live APP_URL in wrangler.jsonc so magic links point at localhost.
+APP_URL=http://localhost:8787
 RESEND_API_KEY=
