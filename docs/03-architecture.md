@@ -98,6 +98,20 @@ mobile/                 Expo app (Expo Router)
 - **Push flow:** after login the app asks for notification permission, gets an Expo push token, and POSTs it to `/api/push-tokens`. When something happens (shortlisted, results published, certificate ready) the Worker writes a `notifications` row, then calls Expo's push API (`https://exp.host/--/api/v2/push/send`, batches of up to 100) and prunes tokens Expo reports as invalid.
 - **API target:** the app points at the deployed workers.dev URL, so the phone does not depend on the laptop being on the same network.
 
+## Discovery notifications
+
+Two kinds of notification flow through the same `notifications` table:
+
+1. **Personal** (about you): shortlisted, results published, certificate ready.
+2. **Discovery** (about the ecosystem): new challenge from an organisation you follow or in a topic you picked, deadline closing soon, organiser announcements, platform innovation news.
+
+Fan-out:
+- When a challenge is published, a job finds users who follow that org or share a topic, writes one `notifications` row each (respecting `notification_settings`), then sends push and queues email.
+- Announcements fan out the same way to the org's followers.
+- Fan-out runs in batches inside `ctx.waitUntil` or a Cloudflare Queue (Queues has a free tier). With only a handful of users now, a simple loop is fine; switch to Queues when audiences grow.
+- Email digests (daily or weekly) are built by the hourly cron so users do not get one email per event. Resend free is 100 emails/day, so digests are the right default.
+- Push is only a delivery channel for the same notifications. Users can turn it off while still seeing everything in the in-app feed.
+
 ## Auth
 
 - Magic links: user enters email, we store a hashed single-use token (15 min), email the link.

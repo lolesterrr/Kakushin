@@ -41,20 +41,23 @@ Each day ends with something deployed. Eight days leaves slack, so no day should
 - Certificate PDFs (pdf-lib), stored in R2, download from profile
 - Public `/verify/:code` page with QR code on the certificate
 - Participant profile shows events and certificates
-- In-app notifications table and inbox API
+- Notifications table, inbox API, follow organisation and interest topics
 - **Done when:** results publish and every participant can download a verifiable certificate.
 
 ## Day 6: Mobile app
 - Expo app scaffolded with Expo Router, shared types and Zod schemas
 - 6-digit code sign-in, token in secure storage
-- Screens: explore, challenge detail, apply, my teams and status, certificates, profile
+- Screens: explore, challenge detail, apply, my teams and status, certificates, profile, follow orgs and pick topics
 - **Done when:** you can sign in on your iPhone in Expo Go and apply to a challenge.
 
-## Day 7: Push notifications and admin polish
-- Register Expo push token, send on shortlist, results published and certificate ready
+## Day 7: Notifications and admin polish
+- Discovery fan-out: publishing a challenge notifies followers and topic matches
+- Organiser announcements and platform news posting
+- Notification settings screen (topics, push on/off, email digest)
+- Register Expo push token as a delivery channel; send on shortlist, results, certificate ready and new matching challenge
 - Notification inbox screen, tap a push to open the right screen
 - Admin portal polish: dashboard stats, org admin invites, empty states
-- **Done when:** your iPhone gets a push when a team is shortlisted.
+- **Done when:** publishing a challenge in a topic you follow shows up in your phone's feed and sends a push, and you can switch push off in settings.
 
 ## Day 8: Hardening and demo
 - Mobile pass on the web app, error handling, audit log

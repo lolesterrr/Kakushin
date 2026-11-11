@@ -86,6 +86,7 @@ users ──< memberships >── organizations ──< challenges
 | team_min / team_max | integer | |
 | applications_open_at / applications_close_at | integer | |
 | pitch_due_at | integer | |
+| topics | text (JSON array) | interest topics used for matching alerts |
 | questions | text (JSON) | `[{id, label, type, required, options}]` |
 | results_published | integer | 0/1 |
 | created_at | integer | |
@@ -182,6 +183,41 @@ Rule: a user can only be in one team per challenge (checked in code with a query
 | pdf_key | text | R2 key |
 | issued_at | integer | |
 | revoked | integer | 0/1 |
+
+### follows
+| Column | Type | Notes |
+|---|---|---|
+| user_id | text FK | |
+| org_id | text FK | |
+| created_at | integer | |
+| PK | (user_id, org_id) | |
+
+### interests
+| Column | Type | Notes |
+|---|---|---|
+| user_id | text FK | |
+| topic | text | from a fixed list: fintech, health, agritech, climate, education, ai, ... |
+| PK | (user_id, topic) | |
+
+Challenges also get a `topics` column (JSON array from the same list) so matching is a simple lookup.
+
+### announcements
+| Column | Type | Notes |
+|---|---|---|
+| id | text PK | |
+| org_id | text nullable | null means platform-wide news posted by a platform admin |
+| title | text | |
+| body | text | markdown |
+| link_url | text nullable | |
+| created_at | integer | |
+
+### notification_settings
+| Column | Type | Notes |
+|---|---|---|
+| user_id | text PK | |
+| in_app | integer | 0/1, default 1 |
+| email_digest | text | off, daily, weekly |
+| push | integer | 0/1, default 1 |
 
 ### push_tokens
 | Column | Type | Notes |
