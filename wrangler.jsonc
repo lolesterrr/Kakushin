@@ -2,6 +2,7 @@
   "name": "kakushin",
   "main": "src/index.ts",
   "compatibility_date": "2025-01-01",
+  "observability": { "enabled": true },
   "assets": {
     "directory": "./web/dist",
     "not_found_handling": "single-page-application",
@@ -11,15 +12,13 @@
     {
       "binding": "DB",
       "database_name": "kakushin",
-      "database_id": "REPLACE_AFTER_d1_create",
+      "database_id": "70c70330-1599-413f-a6e2-15feecaae1d1",
       "migrations_dir": "migrations"
     }
   ],
-  "r2_buckets": [
-    { "binding": "FILES", "bucket_name": "kakushin-files" }
-  ],
+  // R2 (FILES -> kakushin-files) comes back on Day 2 once R2 is enabled in the dashboard.
   "vars": {
-    "APP_URL": "http://localhost:8787",
+    "APP_URL": "https://kakushin.kajjabantu.workers.dev",
     "EMAIL_FROM": "Kakushin <onboarding@resend.dev>"
   }
 }
