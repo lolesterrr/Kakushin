@@ -46,7 +46,7 @@ auth.get("/turnstile", (c) => {
 <script src="https://challenges.cloudflare.com/turnstile/v0/api.js?onload=go&render=explicit" async defer></script></head>
 <body><div id="t"></div><script>
 function send(m){if(window.ReactNativeWebView)window.ReactNativeWebView.postMessage(JSON.stringify(m));}
-function go(){turnstile.render("#t",{sitekey:${key},theme:"auto",callback:function(token){send({token:token});},"error-callback":function(){send({error:true});},"expired-callback":function(){send({expired:true});}});}
+function go(){turnstile.render("#t",{sitekey:${key},action:"signin",theme:"auto",callback:function(token){send({token:token});},"error-callback":function(){send({error:true});},"expired-callback":function(){send({expired:true});}});}
 </script></body></html>`;
   return c.html(html, 200, { "Cache-Control": "no-store" });
 });
