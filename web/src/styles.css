@@ -195,3 +195,54 @@ input[type=range]{accent-color:var(--red);padding:0;border:0;background:none}
 .results li { display: flex; gap: 16px; align-items: baseline; padding: 14px 16px; border-bottom: 1px solid var(--line); }
 .results li:last-child { border-bottom: 0; }
 .results .place { font-family: var(--heavy); font-weight: 400; font-size: 28px; min-width: 56px; color: var(--red-text); }
+
+/* ---- polish: softer corners, depth and banner-first cards ---- */
+:root { --shadow: 0 18px 30px -20px rgba(17, 17, 17, 0.55); --ring: rgba(17, 17, 17, 0.12); }
+@media (prefers-color-scheme: dark) { :root { --shadow: 0 18px 30px -20px rgba(0, 0, 0, 0.9); --ring: rgba(246, 244, 238, 0.16); } }
+.hand { font-size: 28px; }
+
+/* forms: tall fields, plain labels, a clear focus ring */
+label { text-transform: none; letter-spacing: 0; font-size: 14px; font-weight: 700; color: var(--text); margin: 18px 0 6px; }
+input, textarea, select { min-height: 48px; padding: 12px 14px; border-radius: 12px; border: 1.5px solid var(--line); background: var(--card); transition: border-color .15s, box-shadow .15s; }
+input::placeholder, textarea::placeholder { color: var(--muted); }
+input:focus, textarea:focus, select:focus { outline: none; border-color: var(--ink); box-shadow: 0 0 0 4px var(--ring); }
+input[type=checkbox], input[type=radio], input[type=range] { min-height: 0; box-shadow: none; }
+input[type=file] { padding: 10px 12px; }
+.codeboxes input { height: 60px; width: 50px; border-radius: 12px; }
+.qcard { border-radius: 14px; background: var(--card); padding: 16px; }
+
+/* buttons */
+button, .btn { min-height: 46px; padding: 12px 22px; border-radius: 12px; box-shadow: 0 10px 18px -12px rgba(200, 50, 31, 0.9); transition: transform .12s, box-shadow .12s; }
+button:hover:not(:disabled), .btn:hover { transform: translateY(-1px); }
+button:active:not(:disabled), .btn:active { transform: none; }
+button.ghost, .btn.ghost { border: 1.5px solid var(--ink); box-shadow: none; }
+button.pill, button.link { min-height: 0; box-shadow: none; transform: none; }
+button.small { min-height: 34px; padding: 6px 12px; box-shadow: none; }
+.bar nav a.signin { border-radius: 10px; }
+
+/* challenge cards: the banner leads */
+.cell { padding: 16px; }
+.cell .ban { position: relative; aspect-ratio: 16 / 9; border-radius: 16px; overflow: hidden; box-shadow: var(--shadow); background: var(--paper-2); transition: transform .2s; }
+.cell .ban img, .cell .ban svg { width: 100%; height: 100%; object-fit: cover; display: block; }
+.card-link:hover { background: var(--card); }
+.card-link:hover .ban { transform: translateY(-3px); }
+.cell-body { padding: 14px 4px 4px; }
+.cell-body h3 { font-size: 22px; letter-spacing: -0.01em; }
+.corner { top: 28px; right: 28px; }
+.hero-ban { position: relative; aspect-ratio: 16 / 5; overflow: hidden; border-bottom: 1px solid var(--line); background: var(--paper-2); }
+.hero-ban img, .hero-ban svg { width: 100%; height: 100%; object-fit: cover; display: block; }
+.banner-preview { aspect-ratio: 16 / 6; border-radius: 18px; overflow: hidden; box-shadow: var(--shadow); background: var(--paper-2); }
+.banner-preview img, .banner-preview svg { width: 100%; height: 100%; object-fit: cover; display: block; }
+.note-box { background: var(--paper-2); border-radius: 12px; padding: 12px 14px; font-size: 14px; margin: 10px 0 0; }
+
+/* panels and tiles */
+.spec b { font-size: 28px; line-height: 1.1; }
+.next { border: 2px solid var(--ink); border-radius: 18px; overflow: hidden; box-shadow: var(--shadow); }
+.pipeline, .todo, .results { border-radius: 16px; overflow: hidden; }
+.pill { padding: 5px 12px; }
+table tbody tr:hover { background: var(--paper-2); }
+.band h1 { font-size: clamp(28px, 4vw, 44px); }
+@media (max-width: 640px) {
+  .hero-ban { aspect-ratio: 16 / 9; }
+  .actions .btn, .actions button { border-radius: 12px; }
+}
