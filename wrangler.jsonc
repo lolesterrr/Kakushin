@@ -5,8 +5,10 @@
   "observability": { "enabled": true },
   "assets": {
     "directory": "./web/dist",
+    "binding": "ASSETS",
     "not_found_handling": "single-page-application",
-    "run_worker_first": ["/api/*"]
+    // Pages go through the Worker so it can fill in link-preview tags (src/lib/meta.ts). Static files skip it.
+    "run_worker_first": ["/*", "!/assets/*", "!/hero/*", "!/favicon.svg", "!/og.jpg", "!/apple-touch-icon.png"]
   },
   "d1_databases": [
     {
@@ -19,8 +21,13 @@
   "r2_buckets": [
     { "binding": "FILES", "bucket_name": "kakushin-files" }
   ],
+  // Per-IP sign-in limits (src/routes/auth.ts). Periods can only be 10 or 60 seconds.
+  "ratelimits": [
+    { "name": "AUTH_REQUEST_LIMIT", "namespace_id": "2001", "simple": { "limit": 5, "period": 60 } },
+    { "name": "AUTH_VERIFY_LIMIT", "namespace_id": "2002", "simple": { "limit": 30, "period": 60 } }
+  ],
   "vars": {
-    "APP_URL": "https://kakushin.kajjabantu.workers.dev",
-    "EMAIL_FROM": "Kakushin <onboarding@resend.dev>"
+    "APP_URL": "https://kakushin.dpdns.org",
+    "EMAIL_FROM": "Kakushin <hello@kakushin.dpdns.org>"
   }
 }

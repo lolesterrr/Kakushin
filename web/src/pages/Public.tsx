@@ -155,6 +155,7 @@ export function ChallengePublic() {
   const [copied, setCopied] = useState(false);
   const { team, reload } = useMyTeam(slug ?? "", cslug ?? "");
   useEffect(() => { api<{ challenge: ChallengeFull; role: string | null }>(`/orgs/${slug}/challenges/${cslug}`).then(setData).catch((e: Error) => setErr(e.message)); }, [slug, cslug]);
+  useEffect(() => { if (data) document.title = `${data.challenge.title} · Kakushin`; }, [data]);
   if (err) return <div className="section"><Notice kind="err">{err === "Not found" ? "We could not find that challenge." : err}</Notice></div>;
   if (!data) return null;
   const { challenge: c, role } = data;
@@ -187,12 +188,12 @@ export function ChallengePublic() {
         </div>
       </div>
       <div className="spec">
-        <div><p className="label">Applications open</p><b>{fmtDate(c.applications_open_at)}</b></div>
-        <div><p className="label">Applications close</p><b>{fmtDate(c.applications_close_at)}</b></div>
+        {c.applications_open_at ? <div><p className="label">Applications open</p><b>{fmtDate(c.applications_open_at)}</b></div> : null}
+        {c.applications_close_at ? <div><p className="label">Applications close</p><b>{fmtDate(c.applications_close_at)}</b></div> : null}
         <div><p className="label">Team size</p><b>{c.team_min === c.team_max ? c.team_min : `${c.team_min} to ${c.team_max}`}</b></div>
-        <div><p className="label">Pitch due</p><b>{fmtDate(c.pitch_due_at)}</b></div>
+        {c.pitch_due_at ? <div><p className="label">Pitch due</p><b>{fmtDate(c.pitch_due_at)}</b></div> : null}
       </div>
-      {c.results_published && <PublicResults orgSlug={c.org.slug} cslug={c.slug} />}
+      {c.results_published ? <PublicResults orgSlug={c.org.slug} cslug={c.slug} /> : null}
       {c.description && <div className="section"><p className="label" style={{ marginTop: 0 }}>About</p><div className="prose">{c.description}</div></div>}
       {c.prizes && <div className="section"><p className="label" style={{ marginTop: 0 }}>Prizes</p><div className="prose">{c.prizes}</div></div>}
       {c.status !== "draft" && <div id="apply"><TeamPanel orgSlug={c.org.slug} cslug={c.slug} challenge={c} team={team} reload={reload} /></div>}

@@ -34,7 +34,7 @@ Without a `RESEND_API_KEY`, the sign-in link or code is printed in the `wrangler
 
 ## Live
 
-Day 1 runs at https://kakushin.kajjabantu.workers.dev (D1 database `kakushin`, R2 bucket `kakushin-files`, secret `RESEND_API_KEY`).
+Runs at https://kakushin.dpdns.org (a free DigitalPlat name on Cloudflare, attached to the Worker as a custom domain). The old https://kakushin.kajjabantu.workers.dev address still works. D1 database `kakushin`, R2 bucket `kakushin-files`.
 
 ```
 npm run db:migrate:remote
@@ -52,7 +52,8 @@ Day 5 (results and certificates): organisers place winners and publish at `.../r
 Day 6 (mobile app): `mobile/` is an Expo (SDK 58, Expo Router) app for participants: code sign-in, explore, apply with a team, my teams, inbox, certificates, profile and topics. See `mobile/README.md` for running it in Expo Go.
 
 Notes:
-- Resend has no verified domain yet, so it only delivers to the Resend account's own address. Any other email gets a 500 on sign-in request.
+- Email goes through Brevo when the `BREVO_API_KEY` secret is set, otherwise Resend (`RESEND_API_KEY`). Resend refuses free public-suffix names such as `.dpdns.org`, so it only delivers to its own account's address until Kakushin has a paid domain. `EMAIL_FROM` must be a sender the provider has verified.
+- `kakushin.dpdns.org` is free and must be renewed by hand in DigitalPlat. Move to a paid domain before issuing certificates to real participants, because a certificate's QR address never changes.
 - Editing a secret in the dashboard saves a new version but may not deploy it. Check the Deployments tab.
 - Workers logs are on (`observability`), so errors show in the dashboard under the Worker's Logs tab.
 
@@ -63,6 +64,13 @@ Notes:
 - `node scripts/dryrun.mjs` runs a whole fake hackathon (post, apply, shortlist, judge, results, certificates) against local. Add `--live` to run it on production; it cleans up after itself.
 - `node scripts/demo/seed-demo.mjs [--live]` builds the presentation dataset: 5 organisations with logos, 9 challenges with covers at every stage, teams, pitch decks, scores, winners and certificates. Run it again to rebuild from scratch, or add `--cleanup` to remove it. Images and decks live in `scripts/demo/media` (regenerate with `scripts/demo/make-media.mjs`).
 
-## Turnstile (bot check on the web sign-in form)
+## Sign-in protection
 
-It is built but off. To turn it on, create a Turnstile widget in the Cloudflare dashboard for `kakushin.kajjabantu.workers.dev`, then set `TURNSTILE_SITE_KEY` as a variable and `TURNSTILE_SECRET` as a secret (`npx wrangler secret put TURNSTILE_SECRET`) and redeploy. The phone app skips the widget and relies on the per-email limits (5 code requests an hour, 5 wrong codes then a lock).
+- **Per-IP limits** (Workers Rate Limiting, set in `wrangler.jsonc` under `ratelimits`): 5 sign-in requests and 30 code checks a minute from one IP. These sit on top of the per-email limits (5 code requests an hour, 5 wrong codes then a lock).
+- **Turnstile** (Cloudflare's bot check) is built but off until both keys exist. Once on, every sign-in request needs it: the web form shows the widget, and the phone app shows the same widget in a small web view loaded from `/api/auth/turnstile`. No header or client type skips it.
+
+To turn Turnstile on, create a widget in the Cloudflare dashboard (Turnstile, Add widget) with the site's hostname (and `kakushin.kajjabantu.workers.dev` while that address is still in use), then set `TURNSTILE_SITE_KEY` as a variable and `TURNSTILE_SECRET` as a secret (`npx wrangler secret put TURNSTILE_SECRET`) and redeploy.
+
+## Link previews
+
+Pages go through the Worker (`run_worker_first` in `wrangler.jsonc`), which fills in the title, description and image tags in `web/index.html` (`src/lib/meta.ts`). Challenge pages get their own title, summary and cover, organisation pages their name and logo, everything else the default card in `web/public/og.jpg`. Static files skip the Worker.

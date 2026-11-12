@@ -5,7 +5,7 @@ import { registerForPush, unregisterPush } from "./push";
 
 interface AuthState {
   ready: boolean; me: Me | null;
-  requestCode: (email: string) => Promise<void>;
+  requestCode: (email: string, turnstile?: string) => Promise<void>;
   verify: (email: string, code: string) => Promise<void>;
   reload: () => Promise<void>;
   signOut: () => Promise<void>;
@@ -31,7 +31,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   const value: AuthState = {
     ready, me, reload,
-    requestCode: async (email) => { await api("/auth/request", { method: "POST", json: { email: email.trim().toLowerCase(), kind: "code" } }); },
+    requestCode: async (email, turnstile) => { await api("/auth/request", { method: "POST", json: { email: email.trim().toLowerCase(), kind: "code", ...(turnstile ? { turnstile } : {}) } }); },
     verify: async (email, code) => {
       const r = await api<{ token: string }>("/auth/verify", { method: "POST", json: { email: email.trim().toLowerCase(), code } });
       await saveToken(r.token); await reload();

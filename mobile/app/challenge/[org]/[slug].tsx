@@ -55,9 +55,9 @@ export default function ChallengeScreen() {
           {c.summary ? <Body muted>{c.summary}</Body> : null}
           {c.topics.length ? <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 8 }}>{c.topics.map((x) => <Pill key={x} text={x} />)}</View> : null}
           <View style={{ flexDirection: "row", gap: 8 }}>
-            <View style={[{ flex: 1, backgroundColor: t.card, borderWidth: 1, borderColor: t.line, borderRadius: 14, padding: 12 }, shadow(0.06)]}><Label>Closes</Label><Text style={{ color: t.ink, fontFamily: F.display, fontSize: 19 }}>{fmtDate(c.applications_close_at)}</Text></View>
+            {c.applications_close_at ? <View style={[{ flex: 1, backgroundColor: t.card, borderWidth: 1, borderColor: t.line, borderRadius: 14, padding: 12 }, shadow(0.06)]}><Label>Closes</Label><Text style={{ color: t.ink, fontFamily: F.display, fontSize: 19 }}>{fmtDate(c.applications_close_at)}</Text></View> : null}
             <View style={[{ flex: 1, backgroundColor: t.card, borderWidth: 1, borderColor: t.line, borderRadius: 14, padding: 12 }, shadow(0.06)]}><Label>Team</Label><Text style={{ color: t.ink, fontFamily: F.display, fontSize: 19 }}>{teamSize(c.team_min, c.team_max)}</Text></View>
-            <View style={{ flex: 1, backgroundColor: "#111111", borderRadius: 14, padding: 12 }}><Label>Pitch</Label><Text style={{ color: "#F6F4EE", fontFamily: F.display, fontSize: 19 }}>{fmtDate(c.pitch_due_at)}</Text></View>
+            {c.pitch_due_at ? <View style={{ flex: 1, backgroundColor: "#111111", borderRadius: 14, padding: 12 }}><Label>Pitch</Label><Text style={{ color: "#F6F4EE", fontFamily: F.display, fontSize: 19 }}>{fmtDate(c.pitch_due_at)}</Text></View> : null}
           </View>
           {d !== null && d > 0 ? <View style={{ flexDirection: "row" }}><DaysStamp days={d} tilt={-2} /></View> : null}
 

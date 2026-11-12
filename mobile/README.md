@@ -1,6 +1,6 @@
 # Kakushin mobile app
 
-Expo SDK 58 with Expo Router. It talks to the deployed Worker at https://kakushin.kajjabantu.workers.dev, so the phone does not need to be on the same network as your laptop.
+Expo SDK 58 with Expo Router. It talks to the deployed Worker at https://kakushin.dpdns.org, so the phone does not need to be on the same network as your laptop.
 
 ## Run it on your iPhone
 

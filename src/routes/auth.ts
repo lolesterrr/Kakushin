@@ -1,4 +1,4 @@
-import { Hono } from "hono";
+import { Hono, type Context } from "hono";
 import { z } from "zod";
 import type { AppEnv } from "../types";
 import { newId, randomCode, randomToken, sha256Hex } from "../lib/crypto";
@@ -24,10 +24,38 @@ const MISS_WINDOW_MS = 15 * 60 * 1000;
 /** The web app asks this to know whether to show the Turnstile check. The site key is public by design. */
 auth.get("/config", (c) => c.json({ turnstile_site_key: turnstileOn(c) ? c.env.TURNSTILE_SITE_KEY : null }));
 
+/**
+ * Per-IP limits, on top of the per-email ones, so one machine cannot send codes to thousands of addresses
+ * (email bombing, and it burns the Resend quota) or spread code guesses across many emails.
+ */
+async function ipLimited(c: Context<AppEnv>, limiter: RateLimit | undefined): Promise<boolean> {
+  if (!limiter) return false;
+  const ip = c.req.header("CF-Connecting-IP") ?? "unknown";
+  try { return !(await limiter.limit({ key: ip })).success; } catch { return false; }
+}
+
+/**
+ * The Turnstile widget on its own page, for the phone app's web view. It posts the token back to the app.
+ * Turnstile only runs on hostnames the widget allows, so the page has to come from this Worker's own address.
+ */
+auth.get("/turnstile", (c) => {
+  if (!turnstileOn(c)) return c.json({ error: "Not found" }, 404);
+  const key = JSON.stringify(c.env.TURNSTILE_SITE_KEY).replace(/</g, "\\u003c");
+  const html = `<!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<style>html,body{margin:0;height:100%;background:transparent}body{display:flex;align-items:center;justify-content:center}</style>
+<script src="https://challenges.cloudflare.com/turnstile/v0/api.js?onload=go&render=explicit" async defer></script></head>
+<body><div id="t"></div><script>
+function send(m){if(window.ReactNativeWebView)window.ReactNativeWebView.postMessage(JSON.stringify(m));}
+function go(){turnstile.render("#t",{sitekey:${key},theme:"auto",callback:function(token){send({token:token});},"error-callback":function(){send({error:true});},"expired-callback":function(){send({expired:true});}});}
+</script></body></html>`;
+  return c.html(html, 200, { "Cache-Control": "no-store" });
+});
+
 auth.post("/request", async (c) => {
   const parsed = requestBody.safeParse(await c.req.json().catch(() => null));
   if (!parsed.success) return c.json({ error: "Enter a valid email" }, 400);
   const { email, kind } = parsed.data;
+  if (await ipLimited(c, c.env.AUTH_REQUEST_LIMIT)) return c.json({ error: "Too many sign-in requests from your network. Wait a minute and try again." }, 429);
   if (!(await turnstileOk(c, parsed.data.turnstile))) return c.json({ error: "Please complete the check and try again" }, 400);
 
   const recent = await c.env.DB.prepare(
@@ -81,6 +109,7 @@ const verifyBody = z.union([
 auth.post("/verify", async (c) => {
   const parsed = verifyBody.safeParse(await c.req.json().catch(() => null));
   if (!parsed.success) return c.json({ error: "Invalid request" }, 400);
+  if (await ipLimited(c, c.env.AUTH_VERIFY_LIMIT)) return c.json({ error: "Too many attempts from your network. Wait a minute and try again." }, 429);
 
   // A 6-digit code has only a million values, so cap wrong guesses per email. Links carry 256 bits and need no cap.
   const guessing = "code" in parsed.data ? parsed.data.email : null;
