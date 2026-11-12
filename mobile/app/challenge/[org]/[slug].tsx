@@ -5,14 +5,14 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Stack, useLocalSearchParams, useRouter } from "expo-router";
 import { api } from "../../../lib/api";
 import { API_URL } from "../../../lib/config";
-import { challengeDetail, follows as followsSchema, teamResponse, type ChallengeDetail, type Question, type Team } from "../../../lib/schemas";
+import { challengeDetail, follows as followsSchema, teamResponse, type ChallengeDetail, type Team } from "../../../lib/schemas";
 import { daysLeft, fmtDate, teamSize } from "../../../lib/format";
 import { useLoad } from "../../../lib/useLoad";
 import { useTheme } from "../../../lib/theme";
 import { Banner, Scrim } from "../../../components/Banner";
 import { F } from "../../../lib/fonts";
 import { shadow } from "../../../lib/theme";
-import { Body, Button, Card, DaysStamp, Field, H2, Label, Loading, Notice, Pill, Screen, StatusStamp } from "../../../components/ui";
+import { Body, Button, Card, DaysStamp, H2, Label, Loading, Notice, Pill, Screen, StatusStamp } from "../../../components/ui";
 
 export default function ChallengeScreen() {
   const { org, slug } = useLocalSearchParams<{ org: string; slug: string }>();
@@ -65,7 +65,7 @@ export default function ChallengeScreen() {
       {c.prizes ? <><H2>Prizes</H2><Body>{c.prizes}</Body></> : null}
 
       {msg ? <Notice kind={msg.kind}>{msg.text}</Notice> : null}
-      <TeamPanel base={base} c={c} team={tm.data} loaded={teamLoaded} onChange={refresh} />
+      <TeamPanel org={org} slug={slug} c={c} team={tm.data} loaded={teamLoaded} onChange={refresh} />
       {c.results_published ? <Button title="See results on the web" kind="ghost" onPress={() => void Linking.openURL(`${API_URL}/o/${org}/c/${slug}#results`)} /> : null}
         </View>
       </Screen>
@@ -74,12 +74,9 @@ export default function ChallengeScreen() {
   );
 }
 
-function TeamPanel({ base, c, team, loaded, onChange }: { base: string; c: ChallengeDetail; team: Team | null; loaded: boolean; onChange: () => Promise<void> }) {
+function TeamPanel({ org, slug, c, team, loaded, onChange }: { org: string; slug: string; c: ChallengeDetail; team: Team | null; loaded: boolean; onChange: () => Promise<void> }) {
   const t = useTheme();
   const router = useRouter();
-  const [name, setName] = useState("");
-  const [code, setCode] = useState("");
-  const [answers, setAnswers] = useState<Record<string, string> | null>(null);
   const [msg, setMsg] = useState<{ kind: "ok" | "err"; text: string } | null>(null);
   const [busy, setBusy] = useState(false);
   const run = async (fn: () => Promise<unknown>, ok: string) => {
@@ -92,23 +89,10 @@ function TeamPanel({ base, c, team, loaded, onChange }: { base: string; c: Chall
 
   if (!team) {
     if (!open) return <Card><Body muted>This challenge is not taking applications.</Body></Card>;
-    return (
-      <>
-        <H2>Create or join a team</H2>
-        <Body muted>Teams of {teamSize(c.team_min, c.team_max)}. Create a team and share the invite code, or join one with a code.</Body>
-        <Field label="Team name" value={name} onChangeText={setName} />
-        <Button title="Create team" busy={busy} disabled={name.trim().length < 2} onPress={() => void run(() => api(`${base}/team`, { method: "POST", json: { name } }), "Team created")} />
-        <Field label="Or join with an invite code" value={code} onChangeText={(v) => setCode(v.toUpperCase())} autoCapitalize="characters" autoCorrect={false} />
-        <Button title="Join team" kind="ghost" busy={busy} disabled={code.trim().length < 6} onPress={() => void run(() => api("/teams/join", { method: "POST", json: { code } }), "You joined the team")} />
-        {msg ? <Notice kind={msg.kind}>{msg.text}</Notice> : null}
-      </>
-    );
+    return <Button title="Apply now" onPress={() => router.push(`/apply/${org}/${slug}`)} />;
   }
 
-  const size = team.members.length;
-  const sizeOk = size >= c.team_min && size <= c.team_max;
   const canApply = team.is_lead && (team.status === "forming" || team.status === "applied") && open;
-  const form = answers ?? team.application?.answers ?? {};
   return (
     <>
       <H2>Your team</H2>
@@ -130,13 +114,7 @@ function TeamPanel({ base, c, team, loaded, onChange }: { base: string; c: Chall
       </Card>
 
       {canApply ? (
-        <>
-          <H2>{team.status === "applied" ? "Your application" : "Apply"}</H2>
-          {!sizeOk ? <Notice kind="err">This challenge needs teams of {teamSize(c.team_min, c.team_max)}. You have {size}.</Notice> : null}
-          {c.questions.map((q) => <QuestionField key={q.id} q={q} value={form[q.id] ?? ""} onChange={(v) => setAnswers({ ...form, [q.id]: v })} />)}
-          <Button title={team.status === "applied" ? "Update application" : "Send application"} busy={busy} disabled={!sizeOk}
-            onPress={() => void run(() => api(`/teams/${team.id}/application`, { method: "PUT", json: { answers: form } }), team.status === "applied" ? "Application updated" : "Application sent")} />
-        </>
+        <Button title={team.status === "applied" ? "Edit your application" : "Continue your application"} onPress={() => router.push(`/apply/${org}/${slug}`)} />
       ) : null}
       {!team.is_lead && team.status === "forming" ? <Body muted>Your team lead sends the application.</Body> : null}
       {team.status === "applied" && !canApply ? <Body muted>Received. The organisers will review your application.</Body> : null}
@@ -148,19 +126,6 @@ function TeamPanel({ base, c, team, loaded, onChange }: { base: string; c: Chall
       {msg ? <Notice kind={msg.kind}>{msg.text}</Notice> : null}
     </>
   );
-}
-
-function QuestionField({ q, value, onChange }: { q: Question; value: string; onChange: (v: string) => void }) {
-  const label = q.label + (q.required ? " *" : "");
-  if (q.type === "choice") {
-    return (
-      <View style={{ gap: 6 }}>
-        <Label>{label}</Label>
-        <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 8 }}>{q.options.map((o) => <Pill key={o} text={o} on={value === o} onPress={() => onChange(value === o ? "" : o)} />)}</View>
-      </View>
-    );
-  }
-  return <Field label={label} value={value} onChangeText={onChange} multiline={q.type === "long_text"} autoCapitalize={q.type === "url" ? "none" : "sentences"} keyboardType={q.type === "url" ? "url" : "default"} />;
 }
 
 /** Round back button floating over the banner. */
