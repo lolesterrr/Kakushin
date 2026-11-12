@@ -1,0 +1,28 @@
+{
+  "expo": {
+    "name": "Kakushin",
+    "slug": "kakushin",
+    "scheme": "kakushin",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "userInterfaceStyle": "automatic",
+    "plugins": [
+      "expo-router",
+      "expo-secure-store"
+    ],
+    "experiments": {
+      "typedRoutes": false
+    },
+    "ios": {
+      "supportsTablet": false,
+      "bundleIdentifier": "app.kakushin.mobile"
+    },
+    "android": {
+      "package": "app.kakushin.mobile"
+    },
+    "web": {
+      "bundler": "metro",
+      "output": "single"
+    }
+  }
+}
