@@ -33,6 +33,7 @@ export default function Root() {
         <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
         <Stack.Screen name="sign-in" options={{ headerShown: false }} />
         <Stack.Screen name="challenge/[org]/[slug]" options={{ title: "Challenge" }} />
+        <Stack.Screen name="pitch/[team]" options={{ title: "Your pitch" }} />
       </Stack>
     </AuthProvider>
   );
