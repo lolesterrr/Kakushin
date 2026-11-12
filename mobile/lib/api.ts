@@ -40,4 +40,16 @@ export async function api<T = unknown>(path: string, opts: { method?: string; js
   return data as T;
 }
 
+/** Headers every request carries, for calls that cannot go through api(), such as file uploads. */
+export const authHeaders = (): Record<string, string> => ({ "X-Kakushin-Client": "mobile", ...(token ? { Authorization: `Bearer ${token}` } : {}) });
+
+/** Turns a raw upload response into the same errors api() raises. */
+export async function uploadResult(status: number, text: string): Promise<unknown> {
+  let data: unknown = null;
+  try { data = text ? JSON.parse(text) : null; } catch { /* not JSON */ }
+  if (status === 401 && token) { await clearToken(); onSignedOut(); throw new SignedOut("Please sign in again"); }
+  if (status < 200 || status >= 300) throw new Error((data as { error?: string } | null)?.error ?? `Something went wrong (${status})`);
+  return data;
+}
+
 export const pdfUrl = (code: string) => `${API_URL}/api/certificates/${code}/pdf`;
