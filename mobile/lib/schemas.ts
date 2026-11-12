@@ -5,7 +5,7 @@ import { z } from "zod";
 export const org = z.object({ slug: z.string(), name: z.string(), logo_url: z.string().nullable().optional() });
 
 export const challengeCard = z.object({
-  slug: z.string(), title: z.string(), summary: z.string(), topics: z.array(z.string()),
+  slug: z.string(), title: z.string(), summary: z.string(), cover_url: z.string().nullable().optional(), topics: z.array(z.string()),
   team_min: z.number(), team_max: z.number(), status: z.string().optional(), prize: z.string().optional().nullable(),
   applications_close_at: z.number().nullable(), org,
 });
