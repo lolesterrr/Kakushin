@@ -11,6 +11,13 @@ export function parseFrom(from: string): { name?: string; email: string } {
  * domain or a single verified address), otherwise Resend. With neither key, local dev logs the email instead.
  */
 export async function sendEmail(env: Env, to: string, subject: string, html: string, text: string) {
+  // Addresses listed in RESEND_ONLY_TO (a comma-separated secret) go through Resend from its shared sender. Resend
+  // without a verified domain delivers only to its own account's address, which is the admin's, and Gmail blocks
+  // Brevo mail from the free domain, so this keeps the admin able to sign in.
+  const viaResend = (env.RESEND_ONLY_TO ?? "").split(",").map((x) => x.trim().toLowerCase()).filter(Boolean);
+  if (env.RESEND_API_KEY && viaResend.includes(to.trim().toLowerCase())) {
+    return sendResend(env.RESEND_API_KEY, "Kakushin <onboarding@resend.dev>", to, subject, html, text);
+  }
   if (env.BREVO_API_KEY) {
     const res = await fetch("https://api.brevo.com/v3/smtp/email", {
       method: "POST",
@@ -25,10 +32,14 @@ export async function sendEmail(env: Env, to: string, subject: string, html: str
     console.log(`[email:dev] to=${to}\nsubject=${subject}\n${text}`);
     return;
   }
+  return sendResend(env.RESEND_API_KEY, env.EMAIL_FROM, to, subject, html, text);
+}
+
+async function sendResend(key: string, from: string, to: string, subject: string, html: string, text: string) {
   const res = await fetch("https://api.resend.com/emails", {
     method: "POST",
-    headers: { Authorization: `Bearer ${env.RESEND_API_KEY}`, "Content-Type": "application/json" },
-    body: JSON.stringify({ from: env.EMAIL_FROM, to, subject, html, text }),
+    headers: { Authorization: `Bearer ${key}`, "Content-Type": "application/json" },
+    body: JSON.stringify({ from, to, subject, html, text }),
   });
   if (!res.ok) throw new Error(`Resend ${res.status}: ${await res.text()}`);
 }
