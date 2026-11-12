@@ -2,6 +2,7 @@ import React, { useEffect, useState } from "react";
 import { Link, useParams } from "react-router-dom";
 import { api, fmtDate } from "../api";
 import { useAuth } from "../auth";
+import { TeamPanel, type Question } from "./Team";
 import { ChallengeCard, type ChallengeCardData, DeadlineStamp, Logo, Notice, Stamp, StatusPill, TopicPills } from "../ui";
 
 export function Explore() {
@@ -70,7 +71,7 @@ export function OrgPublic() {
 }
 
 interface ChallengeFull extends ChallengeCardData {
-  description: string; prizes: string; status: string; applications_open_at: number | null; pitch_due_at: number | null;
+  description: string; prizes: string; status: string; applications_open_at: number | null; pitch_due_at: number | null; questions: Question[];
 }
 
 export function ChallengePublic() {
@@ -102,10 +103,9 @@ export function ChallengePublic() {
           <DeadlineStamp closeAt={c.applications_close_at} size="lg" />
         </div>
         <div className="actions">
-          <button disabled title="Applications arrive soon">{c.status === "open" ? "Apply (opens soon)" : "Applications closed"}</button>
+          {c.status === "open" && <a className="btn" href="#apply">Apply</a>}
           <button className="ghost" onClick={copy}>{copied ? "Link copied" : "Copy link"}</button>
           {role && <Link className="btn ghost" to={`/admin/o/${c.org.slug}/c/${c.slug}`}>Edit challenge</Link>}
-          {!me && <Link className="muted" to={`/login?next=/o/${c.org.slug}/c/${c.slug}`}>Sign in</Link>}
         </div>
       </div>
       <div className="spec">
@@ -116,6 +116,7 @@ export function ChallengePublic() {
       </div>
       {c.description && <div className="section"><p className="label" style={{ marginTop: 0 }}>About</p><div className="prose">{c.description}</div></div>}
       {c.prizes && <div className="section"><p className="label" style={{ marginTop: 0 }}>Prizes</p><div className="prose">{c.prizes}</div></div>}
+      {c.status !== "draft" && <div id="apply"><TeamPanel orgSlug={c.org.slug} cslug={c.slug} challenge={c} /></div>}
     </>
   );
 }

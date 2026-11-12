@@ -27,7 +27,7 @@ export function Layout({ children }: { children: React.ReactNode }) {
 }
 
 /** Postage-stamp badge: perforated edge, one big number, a short label. */
-export function Stamp({ big, small, tone = "red", size = "md" }: { big: string; small?: string; tone?: "red" | "indigo" | "gold" | "moss"; size?: "sm" | "md" | "lg" }) {
+export function Stamp({ big, small, tone = "red", size = "md" }: { big: string; small?: string; tone?: "red" | "indigo" | "gold" | "moss" | "ink"; size?: "sm" | "md" | "lg" }) {
   return (
     <div className={`stamp ${tone} ${size}`} role="img" aria-label={`${big} ${small ?? ""}`.trim()}>
       <b>{big}</b>{small && <span>{small}</span>}

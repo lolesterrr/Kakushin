@@ -7,6 +7,8 @@ import { ORG_TYPES } from "../lib/topics";
 import { fileUrl, loadOrg, type OrgRow } from "../lib/access";
 import { saveImage } from "../lib/upload";
 import { challengeOut, orgChallenges } from "./challenges";
+import { orgTeams } from "./teams";
+import { orgApplications } from "./applications";
 
 export const orgs = new Hono<AppEnv>();
 const MAX_ORGS_PER_USER = 5;
@@ -103,3 +105,5 @@ orgs.put("/:slug/logo", async (c) => {
 });
 
 orgs.route("/", orgChallenges);
+orgs.route("/", orgTeams);
+orgs.route("/", orgApplications);
