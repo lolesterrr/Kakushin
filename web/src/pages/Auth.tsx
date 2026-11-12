@@ -75,6 +75,8 @@ export function Login() {
         <form onSubmit={submit}>
           <label htmlFor="email">Email</label>
           <input id="email" type="email" required autoComplete="email" value={email} onChange={(e) => setEmail(e.target.value)} />
+          {/* Gmail is blocking mail from our current free domain, so steer people to an address that receives it. */}
+          <Notice kind="ok">Use your school or work email. Sign-in emails to Gmail addresses may not arrive at the moment.</Notice>
           {siteKey && <div ref={widget} style={{ margin: "12px 0" }} />}
           <div className="actions">
             <button type="submit" disabled={state === "sending" || (!!siteKey && !captcha)}>{state === "sending" ? "Sending..." : "Email me a link"}</button>
