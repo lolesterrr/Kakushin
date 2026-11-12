@@ -6,6 +6,8 @@ import { useAuth } from "./auth";
 export function Layout({ children }: { children: React.ReactNode }) {
   const { me, reload } = useAuth();
   const nav = useNavigate();
+  const [judging, setJudging] = React.useState(false);
+  React.useEffect(() => { if (me) api<{ challenges: unknown[] }>("/judge/challenges").then((r) => setJudging(r.challenges.length > 0)).catch(() => {}); else setJudging(false); }, [me?.id]);
   const admin = useLocation().pathname.startsWith("/admin");
   async function logout() { await api("/auth/logout", { method: "POST" }); await reload(); nav("/"); }
   return (
@@ -14,9 +16,10 @@ export function Layout({ children }: { children: React.ReactNode }) {
         <div className="bar">
           <Link to="/" className="brand"><span className="sun" aria-hidden />Kakushin</Link>
           <nav aria-label="Main">
-            <NavLink to="/challenges">Challenges</NavLink>
+            <NavLink to="/challenges" className={judging ? "hide-sm" : undefined}>Challenges</NavLink>
             {!me && <Link to="/#how" className="hide-sm">How it works</Link>}
             <NavLink to="/admin" className={me ? undefined : "hide-sm"}>{me ? "Organise" : "For organisers"}</NavLink>
+            {judging && <NavLink to="/judge">Judge</NavLink>}
             {me && <NavLink to="/profile">Profile</NavLink>}
             {me ? <button className="link" onClick={logout}>Sign out</button> : <NavLink to="/login" className="signin">Sign in</NavLink>}
           </nav>

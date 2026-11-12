@@ -11,7 +11,7 @@ interface App {
 }
 interface Data { questions: { id: string; label: string }[]; applications: App[] }
 type Msg = { kind: "ok" | "err"; text: string } | null;
-const FILTERS = [["all", "All"], ["applied", "New"], ["shortlisted", "Shortlisted"], ["rejected", "Rejected"]] as const;
+const FILTERS = [["all", "All"], ["applied", "New"], ["shortlisted", "Shortlisted"], ["rejected", "Rejected"], ["finalist", "Finalists"]] as const;
 const LABEL: Record<string, string> = { applied: "New", shortlisted: "Shortlisted", rejected: "Rejected", finalist: "Finalist", winner: "Winner" };
 const TONE: Record<string, string> = { applied: "sand", shortlisted: "moss", rejected: "ink", finalist: "gold", winner: "indigo" };
 
@@ -39,12 +39,12 @@ export function AdminApplications() {
   const allOn = rows.length > 0 && rows.every((r) => sel.has(r.team_id));
   const toggle = (id: string) => { const n = new Set(sel); n.has(id) ? n.delete(id) : n.add(id); setSel(n); };
 
-  async function setStatus(ids: string[], status: "applied" | "shortlisted" | "rejected") {
+  async function setStatus(ids: string[], status: "applied" | "shortlisted" | "rejected" | "finalist") {
     setMsg(null);
     try {
       const r = await api<{ updated: number }>(`${base}/status`, { method: "POST", json: { team_ids: ids, status } });
       setSel(new Set()); await load();
-      setMsg({ kind: "ok", text: status === "applied" ? `${r.updated} moved back to New` : `${r.updated} ${status}. Applicants were emailed.` });
+      setMsg({ kind: "ok", text: status === "applied" ? `${r.updated} moved back to New` : status === "finalist" ? `${r.updated} marked as finalist. Judges can now see them.` : `${r.updated} ${status}. Applicants were emailed.` });
     } catch (e) { setMsg({ kind: "err", text: (e as Error).message }); }
   }
 
@@ -59,6 +59,7 @@ export function AdminApplications() {
       <div className="bulkbar">
         <label className="check" style={{ margin: 0 }}><input type="checkbox" checked={allOn} onChange={() => setSel(allOn ? new Set() : new Set(rows.map((r) => r.team_id)))} />Select all</label>
         <button className="small" disabled={sel.size === 0} onClick={() => setStatus([...sel], "shortlisted")}>Shortlist ({sel.size})</button>
+        <button className="ghost small" disabled={sel.size === 0} onClick={() => setStatus([...sel], "finalist")}>Make finalist ({sel.size})</button>
         <button className="ghost small" disabled={sel.size === 0} onClick={() => setStatus([...sel], "rejected")}>Reject ({sel.size})</button>
         <button className="ghost small" disabled={sel.size === 0} onClick={() => setStatus([...sel], "applied")}>Move back to New</button>
         <input type="search" placeholder="Search teams, people, institutions" aria-label="Search applications" value={q} onChange={(e) => setQ(e.target.value)} />
@@ -72,7 +73,7 @@ export function AdminApplications() {
 
 function Row({ a, questions, checked, toggle, setStatus, base }: {
   a: App; questions: Data["questions"]; checked: boolean; toggle: () => void; base: string;
-  setStatus: (ids: string[], s: "applied" | "shortlisted" | "rejected") => Promise<void>;
+  setStatus: (ids: string[], s: "applied" | "shortlisted" | "rejected" | "finalist") => Promise<void>;
 }) {
   const [note, setNote] = useState(a.reviewer_note);
   const [saved, setSaved] = useState(false);
@@ -94,6 +95,7 @@ function Row({ a, questions, checked, toggle, setStatus, base }: {
         <textarea id={`n-${a.team_id}`} rows={3} maxLength={2000} value={note} onChange={(e) => setNote(e.target.value)} onBlur={saveNote} />
         <div className="actions">
           <button className="small" onClick={() => setStatus([a.team_id], "shortlisted")} disabled={a.status === "shortlisted"}>Shortlist</button>
+          <button className="ghost small" onClick={() => setStatus([a.team_id], "finalist")} disabled={a.status === "finalist"}>Make finalist</button>
           <button className="ghost small" onClick={() => setStatus([a.team_id], "rejected")} disabled={a.status === "rejected"}>Reject</button>
           {saved && <span className="ok" style={{ margin: 0 }}>Note saved</span>}
         </div>

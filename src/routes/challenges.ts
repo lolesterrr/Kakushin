@@ -127,6 +127,22 @@ orgChallenges.put("/:slug/challenges/:cslug", async (c) => {
   return c.json({ ok: true });
 });
 
+/** Moves a challenge to another stage without touching its other fields. */
+orgChallenges.put("/:slug/challenges/:cslug/status", async (c) => {
+  const user = c.get("user");
+  if (!user) return c.json({ error: "Not signed in" }, 401);
+  const access = await loadOrg(c, c.req.param("slug"));
+  if (!access) return c.json({ error: "Not found" }, 404);
+  if (!access.role) return c.json({ error: "Only organisation admins can do that" }, 403);
+  const parsed = z.object({ status: z.enum(CHALLENGE_STATUSES) }).safeParse(await c.req.json().catch(() => null));
+  if (!parsed.success) return c.json({ error: "Pick a stage" }, 400);
+  const row = await c.env.DB.prepare("SELECT summary, description FROM challenges WHERE org_id = ? AND slug = ?").bind(access.org.id, c.req.param("cslug")).first<{ summary: string; description: string }>();
+  if (!row) return c.json({ error: "Not found" }, 404);
+  if (parsed.data.status !== "draft" && (!row.summary || !row.description)) return c.json({ error: "Add a summary and a description before publishing" }, 400);
+  await c.env.DB.prepare("UPDATE challenges SET status = ? WHERE org_id = ? AND slug = ?").bind(parsed.data.status, access.org.id, c.req.param("cslug")).run();
+  return c.json({ ok: true });
+});
+
 orgChallenges.put("/:slug/challenges/:cslug/cover", async (c) => {
   const user = c.get("user");
   if (!user) return c.json({ error: "Not signed in" }, 401);

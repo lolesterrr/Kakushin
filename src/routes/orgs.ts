@@ -9,6 +9,7 @@ import { saveImage } from "../lib/upload";
 import { challengeOut, orgChallenges } from "./challenges";
 import { orgTeams } from "./teams";
 import { orgApplications } from "./applications";
+import { orgJudging } from "./judging";
 
 export const orgs = new Hono<AppEnv>();
 const MAX_ORGS_PER_USER = 5;
@@ -107,3 +108,4 @@ orgs.put("/:slug/logo", async (c) => {
 orgs.route("/", orgChallenges);
 orgs.route("/", orgTeams);
 orgs.route("/", orgApplications);
+orgs.route("/", orgJudging);
