@@ -41,3 +41,13 @@ export const toLocalInput = (ms: number | null) => {
   return d.toISOString().slice(0, 16);
 };
 export const fromLocalInput = (v: string) => (v ? new Date(v).getTime() : null);
+
+/** Challenge stages in order. The server only lets a stage move back with an explicit reopen (see stageMoveError). */
+export const STAGES = ["draft", "open", "reviewing", "judging", "completed"];
+const stageRank = (s: string) => STAGES.indexOf(s);
+/** Asks before moving a challenge back a stage. Returns null if the organiser cancels, else whether to send reopen. */
+export function confirmStageMove(from: string, to: string): boolean | null {
+  if (stageRank(to) >= stageRank(from)) return false;
+  const what = to === "draft" ? "take the challenge off the public site" : to === "open" ? "let teams apply and edit their applications again" : to === "reviewing" ? "stop judges from scoring" : "re-open an earlier stage";
+  return window.confirm(`Move this challenge back from ${from} to ${to}? This will ${what}. Participants may already have been told it moved on.`) ? true : null;
+}

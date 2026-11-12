@@ -8,6 +8,9 @@ export interface Env {
   TURNSTILE_SECRET?: string; // secret; sign-in check is off until both Turnstile values exist
   TURNSTILE_SITE_KEY?: string;
   TURNSTILE_VERIFY_URL?: string; // only set in tests
+  // Per-IP limits on sign-in (wrangler.jsonc "ratelimits"). Optional so a setup without them still runs.
+  AUTH_REQUEST_LIMIT?: RateLimit;
+  AUTH_VERIFY_LIMIT?: RateLimit;
   EXPO_PUSH_URL?: string; // only set in tests, to point pushes at a fake server
 }
 

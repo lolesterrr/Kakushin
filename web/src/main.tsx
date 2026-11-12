@@ -1,7 +1,7 @@
 import React from "react";
 import { createRoot } from "react-dom/client";
 import { BrowserRouter, Route, Routes } from "react-router-dom";
-import { AuthProvider } from "./auth";
+import { AuthProvider, SignedInOnly } from "./auth";
 import { Layout } from "./ui";
 import { Login, Verify } from "./pages/Auth";
 import { Profile } from "./pages/Profile";
@@ -27,29 +27,29 @@ function App() {
         <Route path="/challenges" element={<Explore />} />
         <Route path="/login" element={<Login />} />
         <Route path="/auth/verify" element={<Verify />} />
-        <Route path="/profile" element={<Profile />} />
+        <Route path="/profile" element={<SignedInOnly><Profile /></SignedInOnly>} />
         <Route path="/o/:slug" element={<OrgPublic />} />
         <Route path="/o/:slug/c/:cslug" element={<ChallengePublic />} />
         <Route path="/join/:code" element={<Join />} />
-        <Route path="/admin/o/:slug/c/:cslug/applications" element={<AdminApplications />} />
-        <Route path="/admin" element={<AdminHome />} />
-        <Route path="/admin/o/:slug" element={<AdminOrg />} />
-        <Route path="/admin/o/:slug/c/:cslug" element={<AdminOverview />} />
-        <Route path="/admin/o/:slug/c/:cslug/judging" element={<AdminJudging />} />
-        <Route path="/admin/o/:slug/c/:cslug/results" element={<AdminResults />} />
+        <Route path="/admin/o/:slug/c/:cslug/applications" element={<SignedInOnly><AdminApplications /></SignedInOnly>} />
+        <Route path="/admin" element={<SignedInOnly><AdminHome /></SignedInOnly>} />
+        <Route path="/admin/o/:slug" element={<SignedInOnly><AdminOrg /></SignedInOnly>} />
+        <Route path="/admin/o/:slug/c/:cslug" element={<SignedInOnly><AdminOverview /></SignedInOnly>} />
+        <Route path="/admin/o/:slug/c/:cslug/judging" element={<SignedInOnly><AdminJudging /></SignedInOnly>} />
+        <Route path="/admin/o/:slug/c/:cslug/results" element={<SignedInOnly><AdminResults /></SignedInOnly>} />
         <Route path="/verify/:code" element={<VerifyCert />} />
         <Route path="/credits" element={<Credits />} />
-        <Route path="/inbox" element={<Inbox />} />
-        <Route path="/platform" element={<PlatformOverview />} />
-        <Route path="/platform/review" element={<PlatformReview />} />
-        <Route path="/platform/orgs" element={<PlatformOrgs />} />
-        <Route path="/platform/users" element={<PlatformUsers />} />
-        <Route path="/platform/news" element={<PlatformNews />} />
-        <Route path="/platform/audit" element={<PlatformAudit />} />
-        <Route path="/judge" element={<JudgeHome />} />
-        <Route path="/judge/:slug/:cslug" element={<JudgeChallenge />} />
-        <Route path="/judge/:slug/:cslug/teams/:teamId" element={<JudgeTeam />} />
-        <Route path="/admin/o/:slug/c/:cslug/edit" element={<AdminChallenge />} />
+        <Route path="/inbox" element={<SignedInOnly><Inbox /></SignedInOnly>} />
+        <Route path="/platform" element={<SignedInOnly><PlatformOverview /></SignedInOnly>} />
+        <Route path="/platform/review" element={<SignedInOnly><PlatformReview /></SignedInOnly>} />
+        <Route path="/platform/orgs" element={<SignedInOnly><PlatformOrgs /></SignedInOnly>} />
+        <Route path="/platform/users" element={<SignedInOnly><PlatformUsers /></SignedInOnly>} />
+        <Route path="/platform/news" element={<SignedInOnly><PlatformNews /></SignedInOnly>} />
+        <Route path="/platform/audit" element={<SignedInOnly><PlatformAudit /></SignedInOnly>} />
+        <Route path="/judge" element={<SignedInOnly><JudgeHome /></SignedInOnly>} />
+        <Route path="/judge/:slug/:cslug" element={<SignedInOnly><JudgeChallenge /></SignedInOnly>} />
+        <Route path="/judge/:slug/:cslug/teams/:teamId" element={<SignedInOnly><JudgeTeam /></SignedInOnly>} />
+        <Route path="/admin/o/:slug/c/:cslug/edit" element={<SignedInOnly><AdminChallenge /></SignedInOnly>} />
         <Route path="*" element={<div className="empty"><p className="hand">Page not found</p></div>} />
       </Routes>
     </Layout>

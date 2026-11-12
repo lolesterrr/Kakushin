@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from "react";
 import { Navigate, useParams } from "react-router-dom";
-import { api } from "../api";
+import { api, confirmStageMove } from "../api";
 import { useAuth } from "../auth";
 import { Band, Notice, NumSection, Tag } from "../ui";
 import { challengeTabs } from "./Admin";
@@ -60,15 +60,21 @@ export function AdminJudging() {
   }
   async function stage(s: string) {
     setMsg(null);
-    try { await api(`${base}/status`, { method: "PUT", json: { status: s } }); setStatus(s); setMsg({ kind: "ok", text: `Stage is now ${s}` }); }
+    if (s === status) return;
+    const reopen = confirmStageMove(status, s);
+    if (reopen === null) return;
+    try { await api(`${base}/status`, { method: "PUT", json: { status: s, ...(reopen ? { reopen } : {}) } }); setStatus(s); setMsg({ kind: "ok", text: reopen ? `Reopened. Stage is now ${s}` : `Stage is now ${s}` }); }
     catch (err) { setMsg({ kind: "err", text: (err as Error).message }); }
   }
 
+  const locked = status === "judging" || status === "completed";
   return (
     <>
       <Band crumb="Back to organisation" to={`/admin/o/${slug}`} title={title} tags={<Tag status={status} />} tabs={challengeTabs(slug!, cslug!)} />
       <NumSection n="01" title="Criteria">
         <p className="muted" style={{ marginTop: 0, maxWidth: 640 }}>Judges score each finalist on every criterion. Weights are percentages and must add up to 100.</p>
+        {locked && <Notice kind="ok">The rubric is locked while the stage is {status}, so judges' scores stay comparable. To change it, move the stage back to reviewing.</Notice>}
+        <fieldset disabled={locked} style={{ border: 0, padding: 0, margin: 0, minWidth: 0 }}>
         {crit.map((r, i) => (
           <div className="qcard" key={r.id ?? `n${i}`}>
             <div className="row" style={{ gridTemplateColumns: "1fr 110px 110px", alignItems: "end" }}>
@@ -89,6 +95,7 @@ export function AdminJudging() {
           <button type="button" onClick={saveCriteria} disabled={crit.length === 0}>Save criteria</button>
           <span className={sum === 100 ? "ok" : "err"} style={{ margin: 0 }}>Weights total {sum}%</span>
         </div>
+        </fieldset>
         {cmsg && <Notice kind={cmsg.kind}>{cmsg.text}</Notice>}
       </NumSection>
 

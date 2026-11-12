@@ -4,14 +4,17 @@ import { api, dayMonth } from "./api";
 import { useAuth } from "./auth";
 
 export function Layout({ children }: { children: React.ReactNode }) {
-  const { me, reload } = useAuth();
+  const { me, ready, reload } = useAuth();
   const nav = useNavigate();
   const [judging, setJudging] = React.useState(false);
   React.useEffect(() => { if (me) api<{ challenges: unknown[] }>("/judge/challenges").then((r) => setJudging(r.challenges.length > 0)).catch(() => {}); else setJudging(false); }, [me?.id]);
   const [unread, setUnread] = React.useState(0);
   const loadUnread = React.useCallback(() => { if (me) api<{ unread: number }>("/inbox").then((r) => setUnread(r.unread)).catch(() => {}); else setUnread(0); }, [me?.id]);
   React.useEffect(() => { loadUnread(); window.addEventListener("kk-inbox", loadUnread); return () => window.removeEventListener("kk-inbox", loadUnread); }, [loadUnread]);
-  const admin = useLocation().pathname.startsWith("/admin");
+  const { pathname } = useLocation();
+  const admin = pathname.startsWith("/admin");
+  // The Worker puts a page's own title in the HTML for link previews; reset it as people move around the app.
+  React.useEffect(() => { document.title = "Kakushin"; }, [pathname]);
   async function logout() { await api("/auth/logout", { method: "POST" }); await reload(); nav("/"); }
   return (
     <>
@@ -26,7 +29,7 @@ export function Layout({ children }: { children: React.ReactNode }) {
             {me?.is_platform_admin ? <NavLink to="/platform" className="hide-sm">Platform</NavLink> : null}
             {me && <NavLink to="/inbox">Inbox{unread > 0 && <span className="badge" aria-label={`${unread} unread`}>{unread}</span>}</NavLink>}
             {me && <NavLink to="/profile">Profile</NavLink>}
-            {me ? <button className="link" onClick={logout}>Sign out</button> : <><NavLink to="/login">Sign in</NavLink><NavLink to="/login?mode=signup" className="signin">Sign up</NavLink></>}
+            {!ready ? null : me ? <button className="link" onClick={logout}>Sign out</button> : <><NavLink to="/login">Sign in</NavLink><NavLink to="/login?mode=signup" className="signin">Sign up</NavLink></>}
           </nav>
         </div>
       </header>

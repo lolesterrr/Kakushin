@@ -63,6 +63,13 @@ Notes:
 - `node scripts/dryrun.mjs` runs a whole fake hackathon (post, apply, shortlist, judge, results, certificates) against local. Add `--live` to run it on production; it cleans up after itself.
 - `node scripts/demo/seed-demo.mjs [--live]` builds the presentation dataset: 5 organisations with logos, 9 challenges with covers at every stage, teams, pitch decks, scores, winners and certificates. Run it again to rebuild from scratch, or add `--cleanup` to remove it. Images and decks live in `scripts/demo/media` (regenerate with `scripts/demo/make-media.mjs`).
 
-## Turnstile (bot check on the web sign-in form)
+## Sign-in protection
 
-It is built but off. To turn it on, create a Turnstile widget in the Cloudflare dashboard for `kakushin.kajjabantu.workers.dev`, then set `TURNSTILE_SITE_KEY` as a variable and `TURNSTILE_SECRET` as a secret (`npx wrangler secret put TURNSTILE_SECRET`) and redeploy. The phone app skips the widget and relies on the per-email limits (5 code requests an hour, 5 wrong codes then a lock).
+- **Per-IP limits** (Workers Rate Limiting, set in `wrangler.jsonc` under `ratelimits`): 5 sign-in requests and 30 code checks a minute from one IP. These sit on top of the per-email limits (5 code requests an hour, 5 wrong codes then a lock).
+- **Turnstile** (Cloudflare's bot check) is built but off until both keys exist. Once on, every sign-in request needs it: the web form shows the widget, and the phone app shows the same widget in a small web view loaded from `/api/auth/turnstile`. No header or client type skips it.
+
+To turn Turnstile on, create a widget in the Cloudflare dashboard (Turnstile, Add widget) with the site's hostname (and `kakushin.kajjabantu.workers.dev` while that address is still in use), then set `TURNSTILE_SITE_KEY` as a variable and `TURNSTILE_SECRET` as a secret (`npx wrangler secret put TURNSTILE_SECRET`) and redeploy.
+
+## Link previews
+
+Pages go through the Worker (`run_worker_first` in `wrangler.jsonc`), which fills in the title, description and image tags in `web/index.html` (`src/lib/meta.ts`). Challenge pages get their own title, summary and cover, organisation pages their name and logo, everything else the default card in `web/public/og.jpg`. Static files skip the Worker.

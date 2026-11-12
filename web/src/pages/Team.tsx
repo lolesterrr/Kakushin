@@ -81,7 +81,7 @@ interface Props {
 }
 
 export function TeamPanel({ orgSlug, cslug, challenge, team, reload }: Props) {
-  const { me } = useAuth();
+  const { me, ready } = useAuth();
   const [msg, setMsg] = useState<Msg>(null);
   const [name, setName] = useState("");
   const [code, setCode] = useState("");
@@ -99,6 +99,7 @@ export function TeamPanel({ orgSlug, cslug, challenge, team, reload }: Props) {
     catch (e) { setMsg({ kind: "err", text: (e as Error).message }); }
   }
 
+  if (!ready) return null;
   if (!me) {
     return (
       <div className="section">
