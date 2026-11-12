@@ -34,7 +34,7 @@ Without a `RESEND_API_KEY`, the sign-in link or code is printed in the `wrangler
 
 ## Live
 
-Day 1 runs at https://kakushin.kajjabantu.workers.dev (D1 database `kakushin`, R2 bucket `kakushin-files`, secret `RESEND_API_KEY`).
+Runs at https://kakushin.dpdns.org (a free DigitalPlat name on Cloudflare, attached to the Worker as a custom domain). The old https://kakushin.kajjabantu.workers.dev address still works. D1 database `kakushin`, R2 bucket `kakushin-files`.
 
 ```
 npm run db:migrate:remote
@@ -52,7 +52,8 @@ Day 5 (results and certificates): organisers place winners and publish at `.../r
 Day 6 (mobile app): `mobile/` is an Expo (SDK 58, Expo Router) app for participants: code sign-in, explore, apply with a team, my teams, inbox, certificates, profile and topics. See `mobile/README.md` for running it in Expo Go.
 
 Notes:
-- Resend has no verified domain yet, so it only delivers to the Resend account's own address. Any other email gets a 500 on sign-in request.
+- Email goes through Brevo when the `BREVO_API_KEY` secret is set, otherwise Resend (`RESEND_API_KEY`). Resend refuses free public-suffix names such as `.dpdns.org`, so it only delivers to its own account's address until Kakushin has a paid domain. `EMAIL_FROM` must be a sender the provider has verified.
+- `kakushin.dpdns.org` is free and must be renewed by hand in DigitalPlat. Move to a paid domain before issuing certificates to real participants, because a certificate's QR address never changes.
 - Editing a secret in the dashboard saves a new version but may not deploy it. Check the Deployments tab.
 - Workers logs are on (`observability`), so errors show in the dashboard under the Worker's Logs tab.
 
