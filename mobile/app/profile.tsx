@@ -1,14 +1,14 @@
 import React, { useEffect, useState } from "react";
 import { Switch, Text, View } from "react-native";
 import * as WebBrowser from "expo-web-browser";
-import { api, pdfUrl } from "../../lib/api";
-import { useAuth } from "../../lib/auth";
-import { registerForPush, type PushState } from "../../lib/push";
-import { certificates as certSchema, follows as followsSchema, topics as topicsSchema } from "../../lib/schemas";
-import { fmtDate } from "../../lib/format";
-import { useLoad } from "../../lib/useLoad";
-import { useTheme } from "../../lib/theme";
-import { Body, Button, Card, Field, H2, Notice, Pill, Screen } from "../../components/ui";
+import { api, pdfUrl } from "../lib/api";
+import { useAuth } from "../lib/auth";
+import { registerForPush, type PushState } from "../lib/push";
+import { certificates as certSchema, follows as followsSchema, topics as topicsSchema } from "../lib/schemas";
+import { fmtDate } from "../lib/format";
+import { useLoad } from "../lib/useLoad";
+import { useTheme } from "../lib/theme";
+import { Body, Button, Card, Field, H2, Notice, Pill, Screen } from "../components/ui";
 
 export default function Profile() {
   const { me, reload, signOut } = useAuth();
