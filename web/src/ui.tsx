@@ -21,7 +21,7 @@ export function Layout({ children }: { children: React.ReactNode }) {
             <NavLink to="/admin" className={me ? undefined : "hide-sm"}>{me ? "Organise" : "For organisers"}</NavLink>
             {judging && <NavLink to="/judge">Judge</NavLink>}
             {me && <NavLink to="/profile">Profile</NavLink>}
-            {me ? <button className="link" onClick={logout}>Sign out</button> : <NavLink to="/login" className="signin">Sign in</NavLink>}
+            {me ? <button className="link" onClick={logout}>Sign out</button> : <><NavLink to="/login">Sign in</NavLink><NavLink to="/login?mode=signup" className="signin">Sign up</NavLink></>}
           </nav>
         </div>
       </header>

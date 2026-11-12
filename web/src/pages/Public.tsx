@@ -22,7 +22,7 @@ export function Home() {
           <p className="hand" style={{ margin: 0 }}>Hackathons, without the spreadsheets</p>
           <h1>Find a challenge.<br />Build a team.<br />Pitch your idea.</h1>
           <p className="lead">Kakushin is where universities, hubs and companies run innovation challenges, and where you go to find them. One profile for every event.</p>
-          <div className="actions"><Link className="btn" to="/challenges">Browse open challenges</Link><Link className="btn ghost" to="/admin">I run events</Link></div>
+          <div className="actions"><Link className="btn" to="/login?mode=signup">Create your account</Link><Link className="btn ghost" to="/challenges">Browse challenges</Link><Link className="btn ghost" to="/admin">I run events</Link></div>
         </div>
         <div className="art" aria-hidden>
           <i style={{ left: -40, right: -40, bottom: 0, height: 250, background: "var(--sand)", borderRadius: "50% 50% 0 0", boxShadow: "0 -6px 12px rgba(0,0,0,.08)" }} />
