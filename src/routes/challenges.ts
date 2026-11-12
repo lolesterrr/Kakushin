@@ -160,13 +160,15 @@ orgChallenges.delete("/:slug/challenges/:cslug", async (c) => {
   return c.json({ ok: true });
 });
 
+const firstLine = (t: string) => (t.split("\n").map((l) => l.trim()).find(Boolean) ?? "").slice(0, 80);
+
 /** Public Explore feed: open challenges, soonest deadline first. */
 export const explore = new Hono<AppEnv>();
 
 explore.get("/", async (c) => {
   const topic = c.req.query("topic");
   const useTopic = topic && (TOPICS as readonly string[]).includes(topic);
-  const sql = `SELECT c.slug, c.title, c.summary, c.cover_key, c.topics, c.team_min, c.team_max,
+  const sql = `SELECT c.slug, c.title, c.summary, c.cover_key, c.topics, c.team_min, c.team_max, c.prizes, c.status,
         c.applications_close_at, o.slug AS org_slug, o.name AS org_name, o.logo_key
       FROM challenges c JOIN organizations o ON o.id = c.org_id
       WHERE c.status = 'open' ${useTopic ? "AND c.topics LIKE ?" : ""}
@@ -176,7 +178,8 @@ explore.get("/", async (c) => {
   return c.json({
     challenges: results.map((r) => ({
       slug: r.slug, title: r.title, summary: r.summary, cover_url: fileUrl(r.cover_key as string | null),
-      topics: JSON.parse(String(r.topics)), team_min: r.team_min, team_max: r.team_max,
+      topics: JSON.parse(String(r.topics)), team_min: r.team_min, team_max: r.team_max, status: r.status,
+      prize: firstLine(String(r.prizes ?? "")),
       applications_close_at: r.applications_close_at,
       org: { slug: r.org_slug, name: r.org_name, logo_url: fileUrl(r.logo_key as string | null) },
     })),

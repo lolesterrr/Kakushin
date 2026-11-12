@@ -5,8 +5,9 @@ import { AuthProvider } from "./auth";
 import { Layout } from "./ui";
 import { Login, Verify } from "./pages/Auth";
 import { Profile } from "./pages/Profile";
-import { ChallengePublic, Explore, OrgPublic } from "./pages/Public";
+import { ChallengePublic, Explore, Home, OrgPublic } from "./pages/Public";
 import { Join } from "./pages/Team";
+import { AdminOverview } from "./pages/Overview";
 import { AdminApplications } from "./pages/Applications";
 import { AdminChallenge, AdminHome, AdminOrg } from "./pages/Admin";
 import "./styles.css";
@@ -15,7 +16,8 @@ function App() {
   return (
     <Layout>
       <Routes>
-        <Route path="/" element={<Explore />} />
+        <Route path="/" element={<Home />} />
+        <Route path="/challenges" element={<Explore />} />
         <Route path="/login" element={<Login />} />
         <Route path="/auth/verify" element={<Verify />} />
         <Route path="/profile" element={<Profile />} />
@@ -25,7 +27,8 @@ function App() {
         <Route path="/admin/o/:slug/c/:cslug/applications" element={<AdminApplications />} />
         <Route path="/admin" element={<AdminHome />} />
         <Route path="/admin/o/:slug" element={<AdminOrg />} />
-        <Route path="/admin/o/:slug/c/:cslug" element={<AdminChallenge />} />
+        <Route path="/admin/o/:slug/c/:cslug" element={<AdminOverview />} />
+        <Route path="/admin/o/:slug/c/:cslug/edit" element={<AdminChallenge />} />
         <Route path="*" element={<div className="empty"><p className="hand">Page not found</p></div>} />
       </Routes>
     </Layout>

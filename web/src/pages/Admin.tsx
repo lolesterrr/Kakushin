@@ -2,10 +2,15 @@ import React, { useEffect, useRef, useState } from "react";
 import { Link, Navigate, useNavigate, useParams } from "react-router-dom";
 import { api, fmtDate, fromLocalInput, toLocalInput, uploadImage } from "../api";
 import { useAuth } from "../auth";
-import { Logo, Notice, StatusPill } from "../ui";
+import { Band, Logo, Notice, Tag } from "../ui";
 
 const ORG_TYPES = ["university", "hub", "corporate", "partner", "other"];
 const STATUSES = ["draft", "open", "reviewing", "judging", "completed"];
+export const challengeTabs = (slug: string, cslug: string) => [
+  { to: `/admin/o/${slug}/c/${cslug}`, label: "Overview", end: true },
+  { to: `/admin/o/${slug}/c/${cslug}/applications`, label: "Applications" },
+  { to: `/admin/o/${slug}/c/${cslug}/edit`, label: "Edit" },
+];
 type Msg = { kind: "ok" | "err"; text: string } | null;
 
 function useGuard(path: string) {
@@ -32,7 +37,7 @@ export function AdminHome() {
   }
   return (
     <>
-      <div className="hero"><p className="hand">Organiser console</p><h1>Your organisations</h1></div>
+      <Band title="Your organisations" tags={<span>Where your challenges live</span>} />
       {orgs && orgs.length > 0 && (
         <div className="grid">
           {orgs.map((o) => (
@@ -93,25 +98,20 @@ export function AdminOrg() {
   }
   async function createChallenge(e: React.FormEvent) {
     e.preventDefault();
-    try { const r = await api<{ slug: string }>(`/orgs/${slug}/challenges`, { method: "POST", json: { title: newTitle } }); nav(`/admin/o/${slug}/c/${r.slug}`); }
+    try { const r = await api<{ slug: string }>(`/orgs/${slug}/challenges`, { method: "POST", json: { title: newTitle } }); nav(`/admin/o/${slug}/c/${r.slug}/edit`); }
     catch (err) { setMsg({ kind: "err", text: (err as Error).message }); }
   }
   const { org, challenges } = data;
   return (
     <>
-      <div className="hero">
-        <div style={{ display: "flex", gap: 16, alignItems: "center" }}>
-          <Logo url={org.logo_url} name={org.name} size={64} />
-          <div><p className="label" style={{ margin: 0 }}>{org.type}</p><h1>{org.name}</h1><Link className="muted" to={`/o/${org.slug}`}>View public page</Link></div>
-        </div>
-      </div>
+      <Band crumb="All organisations" to="/admin" title={org.name} tags={<><span className="tag">{org.type}</span><Link to={`/o/${org.slug}`} style={{ color: "inherit" }}>View public page</Link></>} />
       <div className="section">
         <div className="head-row"><h2>Challenges</h2></div>
         {challenges.length > 0 && (
           <div className="table-wrap"><table>
             <thead><tr><th>Title</th><th>Status</th><th>Closes</th><th></th></tr></thead>
             <tbody>{challenges.map((c) => (
-              <tr key={c.slug}><td><Link to={`/admin/o/${slug}/c/${c.slug}`}>{c.title}</Link></td><td><StatusPill status={c.status} /></td><td>{fmtDate(c.applications_close_at)}</td><td>{c.status !== "draft" && <Link to={`/admin/o/${slug}/c/${c.slug}/applications`}>Applications</Link>}</td></tr>
+              <tr key={c.slug}><td><Link to={`/admin/o/${slug}/c/${c.slug}`}>{c.title}</Link></td><td><Tag status={c.status} /></td><td>{fmtDate(c.applications_close_at)}</td><td>{c.status !== "draft" && <Link to={`/admin/o/${slug}/c/${c.slug}/applications`}>Applications</Link>}</td></tr>
             ))}</tbody>
           </table></div>
         )}
@@ -146,7 +146,7 @@ interface Form {
 
 export function AdminChallenge() {
   const { slug, cslug } = useParams();
-  const guard = useGuard(`/admin/o/${slug}/c/${cslug}`);
+  const guard = useGuard(`/admin/o/${slug}/c/${cslug}/edit`);
   const nav = useNavigate();
   const [f, setF] = useState<Form | null>(null);
   const [allTopics, setAllTopics] = useState<string[]>([]);
@@ -205,15 +205,10 @@ export function AdminChallenge() {
 
   return (
     <>
-      <div className="hero">
-        <Link className="muted" to={`/admin/o/${slug}`}>← Back to organisation</Link>
-        <div className="head-row" style={{ marginTop: 8 }}>
-          <h1>{f.title || "Untitled challenge"}</h1><StatusPill status={f.status} />
-        </div>
-        {f.status !== "draft" && (
-          <div className="actions"><Link className="btn" to={`/admin/o/${slug}/c/${cslug}/applications`}>Applications</Link><input readOnly value={publicUrl} aria-label="Public link" style={{ maxWidth: 420 }} onFocus={(e) => e.target.select()} /><button className="ghost" onClick={copy}>{copied ? "Copied" : "Copy link"}</button><Link className="btn ghost" to={`/o/${slug}/c/${cslug}`}>View page</Link></div>
-        )}
-      </div>
+      <Band crumb="Back to organisation" to={`/admin/o/${slug}`} title={f.title || "Untitled challenge"} tags={<Tag status={f.status} />} tabs={challengeTabs(slug!, cslug!)} />
+      {f.status !== "draft" && (
+        <div className="section"><div className="actions" style={{ marginTop: 0 }}><input readOnly value={publicUrl} aria-label="Public link" style={{ maxWidth: 420 }} onFocus={(e) => e.target.select()} /><button className="ghost" onClick={copy}>{copied ? "Copied" : "Copy link"}</button><Link className="btn ghost" to={`/o/${slug}/c/${cslug}`}>View page</Link></div></div>
+      )}
 
       <div className="section form">
         <h2>Basics</h2>

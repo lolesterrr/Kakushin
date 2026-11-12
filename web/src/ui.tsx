@@ -1,11 +1,12 @@
 import React from "react";
-import { Link, NavLink, useNavigate } from "react-router-dom";
+import { Link, NavLink, useLocation, useNavigate } from "react-router-dom";
 import { api, dayMonth } from "./api";
 import { useAuth } from "./auth";
 
 export function Layout({ children }: { children: React.ReactNode }) {
   const { me, reload } = useAuth();
   const nav = useNavigate();
+  const admin = useLocation().pathname.startsWith("/admin");
   async function logout() { await api("/auth/logout", { method: "POST" }); await reload(); nav("/"); }
   return (
     <>
@@ -13,15 +14,16 @@ export function Layout({ children }: { children: React.ReactNode }) {
         <div className="bar">
           <Link to="/" className="brand"><span className="sun" aria-hidden />Kakushin</Link>
           <nav aria-label="Main">
-            <NavLink to="/" end>Explore</NavLink>
-            {me && <NavLink to="/admin">Organise</NavLink>}
+            <NavLink to="/challenges">Challenges</NavLink>
+            {!me && <Link to="/#how" className="hide-sm">How it works</Link>}
+            <NavLink to="/admin" className={me ? undefined : "hide-sm"}>{me ? "Organise" : "For organisers"}</NavLink>
             {me && <NavLink to="/profile">Profile</NavLink>}
             {me ? <button className="link" onClick={logout}>Sign out</button> : <NavLink to="/login" className="signin">Sign in</NavLink>}
           </nav>
         </div>
       </header>
-      <main className="page">{children}</main>
-      <footer className="foot"><span>Kakushin</span><span className="muted">Run innovation challenges end to end</span></footer>
+      <main className={admin ? "page admin" : "page"}>{children}</main>
+      <footer className="foot"><span><b>Kakushin</b> <span className="muted">Innovation challenges, end to end</span></span><span className="muted"><Link to="/challenges">Challenges</Link> · <Link to="/admin">For organisers</Link></span></footer>
     </>
   );
 }
@@ -56,7 +58,7 @@ export function Logo({ url, name, size = 40 }: { url: string | null; name: strin
 
 export interface ChallengeCardData {
   slug: string; title: string; summary: string; cover_url: string | null; topics: string[];
-  team_min: number; team_max: number; applications_close_at: number | null; status?: string;
+  team_min: number; team_max: number; applications_close_at: number | null; status?: string; prize?: string;
   org: { slug: string; name: string; logo_url: string | null };
 }
 
@@ -65,10 +67,11 @@ export function ChallengeCard({ c }: { c: ChallengeCardData }) {
     <Link to={`/o/${c.org.slug}/c/${c.slug}`} className="cell card-link">
       {c.cover_url ? <img className="cover" src={c.cover_url} alt="" loading="lazy" /> : <div className="cover ph" aria-hidden />}
       <div className="cell-body">
-        <div className="org-line"><Logo url={c.org.logo_url} name={c.org.name} size={22} /><span>{c.org.name}</span>{c.status && c.status !== "open" && <StatusPill status={c.status} />}</div>
+        <div className="org-line"><Logo url={c.org.logo_url} name={c.org.name} size={22} /><span>{c.org.name}</span>{c.status && <StatusPill status={c.status} />}</div>
         <h3>{c.title}</h3>
         {c.summary && <p className="muted">{c.summary}</p>}
         <TopicPills topics={c.topics} />
+        {c.prize && <div className="prize">Prize: {c.prize}</div>}
         <div className="meta">Teams of {c.team_min === c.team_max ? c.team_min : `${c.team_min} to ${c.team_max}`}</div>
       </div>
       <div className="corner"><DeadlineStamp closeAt={c.applications_close_at} size="sm" /></div>
@@ -79,3 +82,25 @@ export function ChallengeCard({ c }: { c: ChallengeCardData }) {
 export function Notice({ kind, children }: { kind: "ok" | "err"; children: React.ReactNode }) {
   return <p className={kind === "ok" ? "ok" : "err"} role={kind === "err" ? "alert" : "status"}>{children}</p>;
 }
+
+export const Tag = ({ status }: { status: string }) => {
+  const label: Record<string, string> = { draft: "Draft", open: "Open", reviewing: "Reviewing", judging: "Judging", completed: "Completed", applied: "New", shortlisted: "Shortlisted", rejected: "Rejected", finalist: "Finalist", winner: "Winner", forming: "Forming" };
+  const tone: Record<string, string> = { draft: "sand", open: "moss", reviewing: "gold", judging: "indigo", completed: "ink", applied: "gold", shortlisted: "moss", rejected: "ink", finalist: "gold", winner: "indigo", forming: "sand" };
+  return <span className={`tag ${tone[status] ?? "sand"}`}>{label[status] ?? status}</span>;
+};
+
+/** Ink band across the top of organiser pages, with the section tabs underlined in red. */
+export function Band({ crumb, to, title, tags, tabs }: { crumb?: string; to?: string; title: string; tags?: React.ReactNode; tabs?: { to: string; label: string; end?: boolean }[] }) {
+  return (
+    <div className="band">
+      {crumb && to && <Link className="crumb" to={to}>← {crumb}</Link>}
+      <h1>{title}</h1>
+      {tags && <div className="sub">{tags}</div>}
+      {tabs && <nav className="tabs" aria-label="Sections">{tabs.map((t) => <NavLink key={t.to} to={t.to} end={t.end}>{t.label}</NavLink>)}</nav>}
+    </div>
+  );
+}
+
+export const NumSection = ({ n, title, children }: { n: string; title: string; children: React.ReactNode }) => (
+  <section className="numsec"><div className="nh"><b>{n}</b><h2>{title}</h2></div>{children}</section>
+);

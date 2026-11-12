@@ -39,6 +39,17 @@ async function list(c: Parameters<typeof loadOrg>[0], challengeId: string) {
   }));
 }
 
+/** Numbers and the newest applications for the organiser's challenge overview. */
+orgApplications.get("/:slug/challenges/:cslug/overview", async (c) => {
+  const x = await load(c, c.req.param("slug"), c.req.param("cslug"));
+  if ("error" in x) return c.json({ error: x.error!.msg }, x.error!.code);
+  const { results } = await c.env.DB.prepare("SELECT status, COUNT(*) AS n FROM teams WHERE challenge_id = ? GROUP BY status").bind(x.ch.id).all<{ status: string; n: number }>();
+  const counts = Object.fromEntries(results.map((r) => [r.status, r.n]));
+  const newest = (await list(c, x.ch.id)).filter((a) => a.status === "applied").slice(0, 5)
+    .map((a) => ({ team_id: a.team_id, name: a.name, submitted_at: a.submitted_at, members: a.members.length }));
+  return c.json({ counts, newest });
+});
+
 orgApplications.get("/:slug/challenges/:cslug/applications", async (c) => {
   const x = await load(c, c.req.param("slug"), c.req.param("cslug"));
   if ("error" in x) return c.json({ error: x.error!.msg }, x.error!.code);

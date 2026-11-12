@@ -2,8 +2,54 @@ import React, { useEffect, useState } from "react";
 import { Link, useParams } from "react-router-dom";
 import { api, fmtDate } from "../api";
 import { useAuth } from "../auth";
-import { TeamPanel, type Question } from "./Team";
+import { NextStep, TeamPanel, useMyTeam, type Question } from "./Team";
 import { ChallengeCard, type ChallengeCardData, DeadlineStamp, Logo, Notice, Stamp, StatusPill, TopicPills } from "../ui";
+
+export function Home() {
+  const [items, setItems] = useState<ChallengeCardData[] | null>(null);
+  useEffect(() => { api<{ challenges: ChallengeCardData[] }>("/challenges").then((r) => setItems(r.challenges.slice(0, 3))).catch(() => setItems([])); }, []);
+  useEffect(() => { if (window.location.hash === "#how") document.getElementById("how")?.scrollIntoView(); }, []);
+  const steps: [string, string, string][] = [
+    ["01", "Pick", "Browse open challenges. Each one shows its deadline, team size and prize up front."],
+    ["02", "Apply", "Create a team, share the invite link and answer a few questions. Your lead sends it."],
+    ["03", "Pitch", "Shortlisted teams pitch to judges, who score against the organiser's criteria."],
+    ["04", "Certificate", "Everyone who takes part gets a certificate that anyone can verify online."],
+  ];
+  return (
+    <>
+      <section className="home-hero">
+        <div className="copy">
+          <p className="hand" style={{ margin: 0 }}>Hackathons, without the spreadsheets</p>
+          <h1>Find a challenge.<br />Build a team.<br />Pitch your idea.</h1>
+          <p className="lead">Kakushin is where universities, hubs and companies run innovation challenges, and where you go to find them. One profile for every event.</p>
+          <div className="actions"><Link className="btn" to="/challenges">Browse open challenges</Link><Link className="btn ghost" to="/admin">I run events</Link></div>
+        </div>
+        <div className="art" aria-hidden>
+          <i style={{ left: -40, right: -40, bottom: 0, height: 250, background: "var(--sand)", borderRadius: "50% 50% 0 0", boxShadow: "0 -6px 12px rgba(0,0,0,.08)" }} />
+          <i style={{ left: 20, right: -80, bottom: 0, height: 190, background: "var(--f-indigo)", borderRadius: "60% 40% 0 0", boxShadow: "0 -6px 12px rgba(0,0,0,.15)" }} />
+          <i style={{ left: -60, right: 60, bottom: 0, height: 110, background: "var(--ink)", borderRadius: "40% 60% 0 0", boxShadow: "0 -6px 12px rgba(0,0,0,.25)" }} />
+          <i style={{ top: 56, left: "50%", marginLeft: -64, width: 128, height: 128, borderRadius: "50%", background: "var(--f-red)", boxShadow: "0 8px 16px rgba(0,0,0,.2)" }} />
+        </div>
+      </section>
+      <section id="how" className="section" style={{ paddingBottom: 0 }}>
+        <p className="label" style={{ margin: 0 }}>How it works</p><h2 style={{ marginTop: 6, fontSize: 28 }}>From curious to certified in four steps</h2>
+        <div className="steps" style={{ margin: "28px -24px 0" }}>{steps.map(([n, t, d]) => <div key={n}><b className="n">{n}</b><h3>{t}</h3><p>{d}</p></div>)}</div>
+      </section>
+      <section style={{ borderBottom: "1px solid var(--line)" }}>
+        <div className="section" style={{ borderBottom: 0, paddingBottom: 20, display: "flex", justifyContent: "space-between", alignItems: "flex-end", flexWrap: "wrap", gap: 12 }}>
+          <div><p className="label" style={{ margin: 0 }}>Open now</p><h2 style={{ marginTop: 6, fontSize: 28 }}>Challenges accepting applications</h2></div>
+          <Link to="/challenges" style={{ fontWeight: 600 }}>See all challenges</Link>
+        </div>
+        {items && items.length > 0 && <div className="grid" style={{ borderTop: "1px solid var(--line)" }}>{items.map((c) => <ChallengeCard key={`${c.org.slug}/${c.slug}`} c={c} />)}</div>}
+        {items && items.length === 0 && <div className="empty" style={{ borderTop: "1px solid var(--line)" }}><p className="hand">No open challenges right now</p><p className="muted">Check back soon, or run your own.</p></div>}
+      </section>
+      <section className="split">
+        <div><p className="hand" style={{ margin: 0 }}>For participants</p><h2 style={{ margin: "6px 0 10px", fontSize: 26 }}>One profile for every event</h2><p>Keep your skills, teams and certificates in one place.</p><Link to="/login" style={{ fontWeight: 600 }}>Sign in with your email</Link></div>
+        <div><p className="hand" style={{ margin: 0 }}>For organisers</p><h2 style={{ margin: "6px 0 10px", fontSize: 26 }}>Run the whole challenge here</h2><p>Post a challenge, review applications, invite judges, score pitches and issue certificates.</p><Link className="btn" to="/admin">Set up your organisation</Link></div>
+      </section>
+    </>
+  );
+}
 
 export function Explore() {
   const [topics, setTopics] = useState<string[]>([]);
@@ -20,7 +66,7 @@ export function Explore() {
     <>
       <div className="hero">
         <p className="hand">Open now</p>
-        <h1>Challenges worth your next weekend</h1>
+        <h1>Challenges</h1>
         <p>Hackathons and innovation challenges from universities, hubs and companies. Find one, form a team, apply.</p>
         <div className="pills" style={{ marginTop: 20 }} role="group" aria-label="Filter by topic">
           <button className={`pill ${topic === null ? "on" : ""}`} onClick={() => setTopic(null)}>all</button>
@@ -80,6 +126,7 @@ export function ChallengePublic() {
   const [data, setData] = useState<{ challenge: ChallengeFull; role: string | null } | null>(null);
   const [err, setErr] = useState("");
   const [copied, setCopied] = useState(false);
+  const { team, reload } = useMyTeam(slug ?? "", cslug ?? "");
   useEffect(() => { api<{ challenge: ChallengeFull; role: string | null }>(`/orgs/${slug}/challenges/${cslug}`).then(setData).catch((e: Error) => setErr(e.message)); }, [slug, cslug]);
   if (err) return <div className="section"><Notice kind="err">{err === "Not found" ? "We could not find that challenge." : err}</Notice></div>;
   if (!data) return null;
@@ -99,13 +146,12 @@ export function ChallengePublic() {
             <h1>{c.title}</h1>
             {c.summary && <p>{c.summary}</p>}
             <div style={{ marginTop: 16, display: "flex", gap: 10, alignItems: "center", flexWrap: "wrap" }}><StatusPill status={c.status} /><TopicPills topics={c.topics} /></div>
-          </div>
-          <DeadlineStamp closeAt={c.applications_close_at} size="lg" />
-        </div>
-        <div className="actions">
-          {c.status === "open" && <a className="btn" href="#apply">Apply</a>}
+            <div className="actions">
           <button className="ghost" onClick={copy}>{copied ? "Link copied" : "Copy link"}</button>
-          {role && <Link className="btn ghost" to={`/admin/o/${c.org.slug}/c/${c.slug}`}>Edit challenge</Link>}
+          {role && <Link className="btn ghost" to={`/admin/o/${c.org.slug}/c/${c.slug}`}>Manage challenge</Link>}
+        </div>
+          </div>
+          {c.status !== "draft" && <NextStep orgSlug={c.org.slug} cslug={c.slug} challenge={c} team={team} />}
         </div>
       </div>
       <div className="spec">
@@ -116,7 +162,7 @@ export function ChallengePublic() {
       </div>
       {c.description && <div className="section"><p className="label" style={{ marginTop: 0 }}>About</p><div className="prose">{c.description}</div></div>}
       {c.prizes && <div className="section"><p className="label" style={{ marginTop: 0 }}>Prizes</p><div className="prose">{c.prizes}</div></div>}
-      {c.status !== "draft" && <div id="apply"><TeamPanel orgSlug={c.org.slug} cslug={c.slug} challenge={c} /></div>}
+      {c.status !== "draft" && <div id="apply"><TeamPanel orgSlug={c.org.slug} cslug={c.slug} challenge={c} team={team} reload={reload} /></div>}
     </>
   );
 }
