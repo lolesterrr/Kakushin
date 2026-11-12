@@ -2,6 +2,9 @@ import { Hono } from "hono";
 import type { AppEnv } from "./types";
 import { auth } from "./routes/auth";
 import { me } from "./routes/me";
+import { orgs } from "./routes/orgs";
+import { explore } from "./routes/challenges";
+import { files } from "./routes/files";
 import { readToken, userFromToken } from "./lib/session";
 
 const app = new Hono<AppEnv>();
@@ -16,6 +19,9 @@ app.use("/api/*", async (c, next) => {
 app.get("/api/health", (c) => c.json({ ok: true }));
 app.route("/api/auth", auth);
 app.route("/api/me", me);
+app.route("/api/orgs", orgs);
+app.route("/api/challenges", explore);
+app.route("/api/files", files);
 
 app.notFound((c) => (c.req.path.startsWith("/api/") ? c.json({ error: "Not found" }, 404) : c.env.ASSETS.fetch(c.req.raw)));
 app.onError((err, c) => {

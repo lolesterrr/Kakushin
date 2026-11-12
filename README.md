@@ -41,6 +41,8 @@ npm run db:migrate:remote
 npm run deploy
 ```
 
+Day 2 (organisations and challenges): create an org at `/admin`, add challenges, publish, and share `/o/<org>/c/<challenge>`. Open challenges list on Explore (`/`).
+
 Notes:
 - Resend has no verified domain yet, so it only delivers to the Resend account's own address. Any other email gets a 500 on sign-in request.
 - Editing a secret in the dashboard saves a new version but may not deploy it. Check the Deployments tab.
