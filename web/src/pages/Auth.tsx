@@ -1,5 +1,5 @@
 import React, { useEffect, useRef, useState } from "react";
-import { Navigate, useNavigate, useSearchParams } from "react-router-dom";
+import { Link, Navigate, useNavigate, useSearchParams } from "react-router-dom";
 import { api } from "../api";
 import { rememberNext, takeNext, useAuth } from "../auth";
 import { Notice } from "../ui";
@@ -14,6 +14,7 @@ export function Login() {
   const [digits, setDigits] = useState<string[]>(["", "", "", "", "", ""]);
   const boxes = useRef<(HTMLInputElement | null)[]>([]);
   const next = params.get("next");
+  const signup = params.get("mode") === "signup";
   useEffect(() => { if (next && next.startsWith("/")) rememberNext(next); }, [next]);
   if (me) return <Navigate to={next && next.startsWith("/") ? next : "/"} replace />;
 
@@ -40,9 +41,10 @@ export function Login() {
 
   return (
     <div className="narrow">
-      <p className="hand">Welcome</p>
-      <h1>Sign in</h1>
-      <p className="muted">There is no password. Enter your email and we send you a one-time link, or a 6-digit code if you prefer.</p>
+      <p className="hand">{signup ? "New here?" : "Welcome back"}</p>
+      <h1>{signup ? "Create your account" : "Sign in"}</h1>
+      <p className="muted">There is no password. Enter your email and we send you a one-time link, or a 6-digit code if you prefer.{signup ? " Your account is created the first time you confirm your email." : " New here? Enter your email and we create your account."}</p>
+      <p className="muted">{signup ? <>Already have an account? <Link to={next ? `/login?next=${encodeURIComponent(next)}` : "/login"}>Sign in</Link></> : <>Or <Link to={next ? `/login?mode=signup&next=${encodeURIComponent(next)}` : "/login?mode=signup"}>create an account</Link></>}</p>
       {state === "link" ? <Notice kind="ok">Check your inbox for the sign-in link. It works for 15 minutes.</Notice>
       : state === "code" ? (
         <div>
