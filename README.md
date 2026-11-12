@@ -49,6 +49,8 @@ Day 4 (pitches and judging): finalists add a pitch (PDF deck, video, demo link).
 
 Day 5 (results and certificates): organisers place winners and publish at `.../results`. Publishing issues one certificate per member of a shortlisted, finalist or winning team. The PDF (pdf-lib, QR code) is made on first download and kept in R2. Anyone can check a certificate at `/verify/<code>`. Also an inbox at `/inbox`, following organisations and topic interests (new-challenge notifications).
 
+Day 6 (mobile app): `mobile/` is an Expo (SDK 58, Expo Router) app for participants: code sign-in, explore, apply with a team, my teams, inbox, certificates, profile and topics. See `mobile/README.md` for running it in Expo Go.
+
 Notes:
 - Resend has no verified domain yet, so it only delivers to the Resend account's own address. Any other email gets a 500 on sign-in request.
 - Editing a secret in the dashboard saves a new version but may not deploy it. Check the Deployments tab.
