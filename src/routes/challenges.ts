@@ -1,4 +1,4 @@
-import { Hono } from "hono";
+import { Hono, type Context } from "hono";
 import { z } from "zod";
 import type { AppEnv } from "../types";
 import { newId } from "../lib/crypto";
@@ -6,6 +6,7 @@ import { slugify } from "../lib/slug";
 import { CHALLENGE_STATUSES, TOPICS } from "../lib/topics";
 import { fileUrl, loadOrg, type OrgRow } from "../lib/access";
 import { saveImage } from "../lib/upload";
+import { notifyFollowersOfChallenge } from "../lib/notify";
 
 interface ChallengeRow {
   id: string; org_id: string; slug: string; title: string; summary: string; description: string;
@@ -58,6 +59,14 @@ const challengeBody = z
     (b) => b.applications_open_at === null || b.applications_close_at === null || b.applications_open_at < b.applications_close_at,
     { message: "Applications must close after they open", path: ["applications_close_at"] },
   );
+
+/** The first time a challenge leaves draft, tell the organisation's followers and people with a matching topic. */
+async function announceOnce(c: Context<AppEnv>, org: { id: string; slug: string; name: string }, cslug: string) {
+  const claim = await c.env.DB.prepare("UPDATE challenges SET announced = 1 WHERE org_id = ? AND slug = ? AND announced = 0 AND status != 'draft'").bind(org.id, cslug).run();
+  if (!claim.meta.changes) return;
+  const ch = await c.env.DB.prepare("SELECT id, slug, title, topics FROM challenges WHERE org_id = ? AND slug = ?").bind(org.id, cslug).first<{ id: string; slug: string; title: string; topics: string }>();
+  if (ch) await notifyFollowersOfChallenge(c, { ...ch, topics: JSON.parse(ch.topics) as string[] }, org).catch((e) => console.error(`follower notification failed: ${e instanceof Error ? e.message : e}`));
+}
 
 /** Routes mounted under /api/orgs/:slug/challenges (organiser side, plus public reads of one challenge). */
 export const orgChallenges = new Hono<AppEnv>();
@@ -124,6 +133,7 @@ orgChallenges.put("/:slug/challenges/:cslug", async (c) => {
     access.org.id, c.req.param("cslug"),
   ).run();
   if (!res.meta.changes) return c.json({ error: "Not found" }, 404);
+  await announceOnce(c, access.org, c.req.param("cslug"));
   return c.json({ ok: true });
 });
 
@@ -140,6 +150,7 @@ orgChallenges.put("/:slug/challenges/:cslug/status", async (c) => {
   if (!row) return c.json({ error: "Not found" }, 404);
   if (parsed.data.status !== "draft" && (!row.summary || !row.description)) return c.json({ error: "Add a summary and a description before publishing" }, 400);
   await c.env.DB.prepare("UPDATE challenges SET status = ? WHERE org_id = ? AND slug = ?").bind(parsed.data.status, access.org.id, c.req.param("cslug")).run();
+  await announceOnce(c, access.org, c.req.param("cslug"));
   return c.json({ ok: true });
 });
 

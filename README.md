@@ -45,6 +45,10 @@ Day 2 (organisations and challenges): create an org at `/admin`, add challenges,
 
 Day 3 (teams and applications): participants create or join teams (invite link or code), the team lead applies, and organisers review at `/admin/o/<org>/c/<challenge>/applications` (shortlist, reject, bulk, notes, CSV). Emails go out on received, shortlisted and rejected.
 
+Day 4 (pitches and judging): finalists add a pitch (PDF deck, video, demo link). Organisers set weighted criteria, invite judges by email and start judging at `.../judging`. Judges score at `/judge`. The leaderboard averages the judges who finished each team.
+
+Day 5 (results and certificates): organisers place winners and publish at `.../results`. Publishing issues one certificate per member of a shortlisted, finalist or winning team. The PDF (pdf-lib, QR code) is made on first download and kept in R2. Anyone can check a certificate at `/verify/<code>`. Also an inbox at `/inbox`, following organisations and topic interests (new-challenge notifications).
+
 Notes:
 - Resend has no verified domain yet, so it only delivers to the Resend account's own address. Any other email gets a 500 on sign-in request.
 - Editing a secret in the dashboard saves a new version but may not deploy it. Check the Deployments tab.

@@ -8,6 +8,9 @@ export function Layout({ children }: { children: React.ReactNode }) {
   const nav = useNavigate();
   const [judging, setJudging] = React.useState(false);
   React.useEffect(() => { if (me) api<{ challenges: unknown[] }>("/judge/challenges").then((r) => setJudging(r.challenges.length > 0)).catch(() => {}); else setJudging(false); }, [me?.id]);
+  const [unread, setUnread] = React.useState(0);
+  const loadUnread = React.useCallback(() => { if (me) api<{ unread: number }>("/inbox").then((r) => setUnread(r.unread)).catch(() => {}); else setUnread(0); }, [me?.id]);
+  React.useEffect(() => { loadUnread(); window.addEventListener("kk-inbox", loadUnread); return () => window.removeEventListener("kk-inbox", loadUnread); }, [loadUnread]);
   const admin = useLocation().pathname.startsWith("/admin");
   async function logout() { await api("/auth/logout", { method: "POST" }); await reload(); nav("/"); }
   return (
@@ -18,8 +21,9 @@ export function Layout({ children }: { children: React.ReactNode }) {
           <nav aria-label="Main">
             <NavLink to="/challenges" className={judging ? "hide-sm" : undefined}>Challenges</NavLink>
             {!me && <Link to="/#how" className="hide-sm">How it works</Link>}
-            <NavLink to="/admin" className={me ? undefined : "hide-sm"}>{me ? "Organise" : "For organisers"}</NavLink>
+            <NavLink to="/admin" className="hide-sm">{me ? "Organise" : "For organisers"}</NavLink>
             {judging && <NavLink to="/judge">Judge</NavLink>}
+            {me && <NavLink to="/inbox">Inbox{unread > 0 && <span className="badge" aria-label={`${unread} unread`}>{unread}</span>}</NavLink>}
             {me && <NavLink to="/profile">Profile</NavLink>}
             {me ? <button className="link" onClick={logout}>Sign out</button> : <><NavLink to="/login">Sign in</NavLink><NavLink to="/login?mode=signup" className="signin">Sign up</NavLink></>}
           </nav>

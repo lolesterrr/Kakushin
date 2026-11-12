@@ -10,6 +10,7 @@ export const challengeTabs = (slug: string, cslug: string) => [
   { to: `/admin/o/${slug}/c/${cslug}`, label: "Overview", end: true },
   { to: `/admin/o/${slug}/c/${cslug}/applications`, label: "Applications" },
   { to: `/admin/o/${slug}/c/${cslug}/judging`, label: "Judging" },
+  { to: `/admin/o/${slug}/c/${cslug}/results`, label: "Results" },
   { to: `/admin/o/${slug}/c/${cslug}/edit`, label: "Edit" },
 ];
 type Msg = { kind: "ok" | "err"; text: string } | null;

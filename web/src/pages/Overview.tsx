@@ -38,6 +38,7 @@ export function AdminOverview() {
   if (n("shortlisted") > 0) todo.push({ text: `Pick finalists from ${n("shortlisted")} shortlisted ${n("shortlisted") === 1 ? "team" : "teams"}`, to: `${base}/applications?f=shortlisted`, cta: "Choose" });
   if (n("finalist") > 0 && ch.status !== "judging" && ch.status !== "completed") todo.push({ text: "Set up judging: criteria, judges, then start judging", to: `${base}/judging`, cta: "Open judging" });
   if (ch.status === "judging") todo.push({ text: "Judging is open. Watch the leaderboard", to: `${base}/judging`, cta: "Leaderboard" });
+  if (ch.status === "judging") todo.push({ text: "When scoring is done, choose the winners and publish results", to: `${base}/results`, cta: "Open results" });
   if (ch.status !== "draft") todo.push({ text: "Share the link with your audience", copy: true });
   if (todo.length === 0) todo.push({ text: "You are all caught up." });
 
