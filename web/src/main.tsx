@@ -6,6 +6,8 @@ import { Layout } from "./ui";
 import { Login, Verify } from "./pages/Auth";
 import { Profile } from "./pages/Profile";
 import { ChallengePublic, Explore, OrgPublic } from "./pages/Public";
+import { Join } from "./pages/Team";
+import { AdminApplications } from "./pages/Applications";
 import { AdminChallenge, AdminHome, AdminOrg } from "./pages/Admin";
 import "./styles.css";
 
@@ -19,6 +21,8 @@ function App() {
         <Route path="/profile" element={<Profile />} />
         <Route path="/o/:slug" element={<OrgPublic />} />
         <Route path="/o/:slug/c/:cslug" element={<ChallengePublic />} />
+        <Route path="/join/:code" element={<Join />} />
+        <Route path="/admin/o/:slug/c/:cslug/applications" element={<AdminApplications />} />
         <Route path="/admin" element={<AdminHome />} />
         <Route path="/admin/o/:slug" element={<AdminOrg />} />
         <Route path="/admin/o/:slug/c/:cslug" element={<AdminChallenge />} />

@@ -5,6 +5,7 @@ import { me } from "./routes/me";
 import { orgs } from "./routes/orgs";
 import { explore } from "./routes/challenges";
 import { files } from "./routes/files";
+import { teams } from "./routes/teams";
 import { readToken, userFromToken } from "./lib/session";
 
 const app = new Hono<AppEnv>();
@@ -22,6 +23,7 @@ app.route("/api/me", me);
 app.route("/api/orgs", orgs);
 app.route("/api/challenges", explore);
 app.route("/api/files", files);
+app.route("/api/teams", teams);
 
 app.notFound((c) => (c.req.path.startsWith("/api/") ? c.json({ error: "Not found" }, 404) : c.env.ASSETS.fetch(c.req.raw)));
 app.onError((err, c) => {

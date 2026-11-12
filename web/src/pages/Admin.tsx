@@ -109,9 +109,9 @@ export function AdminOrg() {
         <div className="head-row"><h2>Challenges</h2></div>
         {challenges.length > 0 && (
           <div className="table-wrap"><table>
-            <thead><tr><th>Title</th><th>Status</th><th>Closes</th></tr></thead>
+            <thead><tr><th>Title</th><th>Status</th><th>Closes</th><th></th></tr></thead>
             <tbody>{challenges.map((c) => (
-              <tr key={c.slug}><td><Link to={`/admin/o/${slug}/c/${c.slug}`}>{c.title}</Link></td><td><StatusPill status={c.status} /></td><td>{fmtDate(c.applications_close_at)}</td></tr>
+              <tr key={c.slug}><td><Link to={`/admin/o/${slug}/c/${c.slug}`}>{c.title}</Link></td><td><StatusPill status={c.status} /></td><td>{fmtDate(c.applications_close_at)}</td><td>{c.status !== "draft" && <Link to={`/admin/o/${slug}/c/${c.slug}/applications`}>Applications</Link>}</td></tr>
             ))}</tbody>
           </table></div>
         )}
@@ -211,7 +211,7 @@ export function AdminChallenge() {
           <h1>{f.title || "Untitled challenge"}</h1><StatusPill status={f.status} />
         </div>
         {f.status !== "draft" && (
-          <div className="actions"><input readOnly value={publicUrl} aria-label="Public link" style={{ maxWidth: 420 }} onFocus={(e) => e.target.select()} /><button className="ghost" onClick={copy}>{copied ? "Copied" : "Copy link"}</button><Link className="btn ghost" to={`/o/${slug}/c/${cslug}`}>View page</Link></div>
+          <div className="actions"><Link className="btn" to={`/admin/o/${slug}/c/${cslug}/applications`}>Applications</Link><input readOnly value={publicUrl} aria-label="Public link" style={{ maxWidth: 420 }} onFocus={(e) => e.target.select()} /><button className="ghost" onClick={copy}>{copied ? "Copied" : "Copy link"}</button><Link className="btn ghost" to={`/o/${slug}/c/${cslug}`}>View page</Link></div>
         )}
       </div>
 
