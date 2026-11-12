@@ -6,7 +6,7 @@ import { api } from "../lib/api";
 import { inbox } from "../lib/schemas";
 import { shadow } from "../lib/theme";
 
-type Props = { state: { index: number; routes: { key: string; name: string }[] }; navigation: { navigate: (name: string) => void; emit: (e: { type: "tabPress"; target: string; canPreventDefault: true }) => { defaultPrevented: boolean } } };
+type Props = { state: { index: number; routes: { key: string; name: string }[] }; emitter: { emit: (e: { type: "tabPress"; target: string; canPreventDefault: true }) => { defaultPrevented: boolean } }; navigateToTab: (routeKey: string) => void };
 
 const TABS = [
   { name: "index", label: "Explore" },
@@ -21,7 +21,7 @@ function Glyph({ name, color }: { name: string; color: string }) {
 }
 
 /** Floating dark bar: the open tab is a red tile with its name, the others are solid glyphs. Profile lives behind the avatar. */
-export function TabBar({ state, navigation }: Props) {
+export function TabBar({ state, emitter, navigateToTab }: Props) {
   const insets = useSafeAreaInsets();
   const [unread, setUnread] = React.useState(0);
   const current = state.routes[state.index]?.name;
@@ -30,7 +30,6 @@ export function TabBar({ state, navigation }: Props) {
     api("/inbox", { schema: inbox }).then((r) => { if (alive) setUnread(current === "inbox" ? 0 : r.unread); }).catch(() => {});
     return () => { alive = false; };
   }, [current]);
-  if (!TABS.some((t) => t.name === current)) return null; // Profile hides the bar's active tile but keeps the bar
   return (
     <View pointerEvents="box-none" style={{ position: "absolute", left: 20, right: 20, bottom: Math.max(insets.bottom, 12) + 4 }}>
       <View style={[{ height: 68, borderRadius: 24, backgroundColor: "#111111", flexDirection: "row", alignItems: "center", paddingHorizontal: 10, gap: 6 }, shadow(0.4)]}>
@@ -38,7 +37,7 @@ export function TabBar({ state, navigation }: Props) {
           const route = state.routes.find((r) => r.name === t.name);
           if (!route) return null;
           const on = current === t.name;
-          const press = () => { const e = navigation.emit({ type: "tabPress", target: route.key, canPreventDefault: true }); if (!on && !e.defaultPrevented) navigation.navigate(t.name); };
+          const press = () => { const e = emitter.emit({ type: "tabPress", target: route.key, canPreventDefault: true }); if (!on && !e.defaultPrevented) navigateToTab(route.key); };
           return (
             <Pressable key={t.name} onPress={press} accessibilityRole="tab" accessibilityState={{ selected: on }} accessibilityLabel={t.name === "inbox" && unread ? `Inbox, ${unread} unread` : t.label}
               style={{ flex: on ? 2 : 1, height: 48, borderRadius: 16, backgroundColor: on ? "#C8321F" : "transparent", flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 8 }}>
