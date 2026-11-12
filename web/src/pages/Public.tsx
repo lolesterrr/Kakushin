@@ -5,7 +5,7 @@ import { useAuth } from "../auth";
 import { NextStep, TeamPanel, useMyTeam, type Question } from "./Team";
 import { FollowButton } from "./Inbox";
 import { PublicResults } from "./Results";
-import { ChallengeCard, type ChallengeCardData, DeadlineStamp, Logo, Notice, Stamp, StatusPill, TopicPills } from "../ui";
+import { Banner, ChallengeCard, type ChallengeCardData, DeadlineStamp, Logo, Notice, Stamp, StatusPill, TopicPills } from "../ui";
 
 /**
  * Banner bulb: grows in once per page load, then loops a gentle turn. Reduced motion gets the still.
@@ -163,7 +163,7 @@ export function ChallengePublic() {
   }
   return (
     <>
-      {c.cover_url && <img className="cover" style={{ aspectRatio: "16 / 6" }} src={c.cover_url} alt="" />}
+      <div className="hero-ban"><Banner url={c.cover_url} seed={c.slug} /></div>
       {c.cover_credit && (
         <p className="muted" style={{ fontSize: 12, margin: "6px 24px 0", textAlign: "right" }}>
           Photo: <a href={c.cover_credit.source} target="_blank" rel="noreferrer">{c.cover_credit.author}</a>, {c.cover_credit.license_url ? <a href={c.cover_credit.license_url} target="_blank" rel="noreferrer">{c.cover_credit.license}</a> : c.cover_credit.license}

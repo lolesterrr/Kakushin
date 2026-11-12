@@ -64,6 +64,37 @@ export function Logo({ url, name, size = 40 }: { url: string | null; name: strin
     : <span className="logo ph" style={{ width: size, height: size, fontSize: size * 0.45 }} aria-hidden>{name.slice(0, 1).toUpperCase()}</span>;
 }
 
+const SCENES = [
+  { sky: ["#F4E4D2", "#E6E1D7"], sun: "#C8321F", sx: 470, hills: ["#CFC8BA", "#4A6AAE", "#2F4F8F", "#111111"] },
+  { sky: ["#F3E6BF", "#EBD9A8"], sun: "#F6F4EE", sx: 150, hills: ["#B9CFA0", "#6E9A55", "#4E7A3A", "#26421D"] },
+  { sky: ["#DCE6F6", "#C9D6EE"], sun: "#C9A15A", sx: 520, hills: ["#9DB4E2", "#5A7DC4", "#2F4F8F", "#111111"] },
+];
+const hashOf = (seed: string) => { let h = 0; for (const ch of seed) h = (h * 31 + ch.charCodeAt(0)) >>> 0; return h; };
+
+/** Paper-cut scene shown when a challenge has no banner yet. The colours come from the slug so each challenge keeps its own. */
+export function PaperScene({ seed }: { seed: string }) {
+  const s = SCENES[hashOf(seed) % SCENES.length]!;
+  const id = "sky" + React.useId().replace(/:/g, "");
+  const shade = (a: number) => ({ filter: `drop-shadow(0 -4px 7px rgba(17,17,17,${a}))` });
+  return (
+    <svg viewBox="0 0 640 280" preserveAspectRatio="xMidYMid slice" role="img" aria-label="Illustrated banner" style={{ display: "block", width: "100%", height: "100%" }}>
+      <defs><linearGradient id={id} x1="0" y1="0" x2="0" y2="1"><stop offset="0" stopColor={s.sky[0]} /><stop offset="1" stopColor={s.sky[1]} /></linearGradient></defs>
+      <rect width="640" height="280" fill={`url(#${id})`} />
+      <circle cx={s.sx} cy="108" r="74" fill={s.sun} opacity={0.16} /><circle cx={s.sx} cy="108" r="52" fill={s.sun} />
+      <ellipse cx="130" cy="70" rx="46" ry="12" fill="#F6F4EE" opacity={0.9} /><ellipse cx="190" cy="86" rx="34" ry="9" fill="#F6F4EE" opacity={0.9} />
+      <path d="M0 178Q110 112 230 166T470 150T640 140V280H0Z" fill={s.hills[0]} style={shade(0.18)} />
+      <path d="M0 214Q150 150 310 206T640 178V280H0Z" fill={s.hills[1]} style={shade(0.28)} />
+      <path d="M0 244Q190 200 380 238T640 222V280H0Z" fill={s.hills[2]} style={shade(0.3)} />
+      <path d="M0 266Q220 238 420 262T640 252V280H0Z" fill={s.hills[3]} style={shade(0.35)} />
+    </svg>
+  );
+}
+
+/** The challenge banner: the organiser's image, or the paper-cut scene when there is none. */
+export function Banner({ url, seed, alt = "", lazy = false }: { url: string | null; seed: string; alt?: string; lazy?: boolean }) {
+  return url ? <img src={url} alt={alt} loading={lazy ? "lazy" : undefined} style={{ display: "block", width: "100%", height: "100%", objectFit: "cover" }} /> : <PaperScene seed={seed} />;
+}
+
 export interface ChallengeCardData {
   slug: string; title: string; summary: string; cover_url: string | null; topics: string[];
   team_min: number; team_max: number; applications_close_at: number | null; status?: string; prize?: string;
@@ -73,7 +104,7 @@ export interface ChallengeCardData {
 export function ChallengeCard({ c }: { c: ChallengeCardData }) {
   return (
     <Link to={`/o/${c.org.slug}/c/${c.slug}`} className="cell card-link">
-      {c.cover_url ? <img className="cover" src={c.cover_url} alt="" loading="lazy" /> : <div className="cover ph" aria-hidden />}
+      <div className="ban"><Banner url={c.cover_url} seed={c.slug} lazy /></div>
       <div className="cell-body">
         <div className="org-line"><Logo url={c.org.logo_url} name={c.org.name} size={22} /><span>{c.org.name}</span>{c.status && <StatusPill status={c.status} />}</div>
         <h3>{c.title}</h3>
