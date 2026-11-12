@@ -27,7 +27,7 @@ export function Home() {
           <div className="actions"><Link className="btn" to="/login?mode=signup">Create your account</Link><Link className="btn ghost" to="/challenges">Browse challenges</Link><Link className="btn ghost" to="/admin">I run events</Link></div>
         </div>
         <div className="art" aria-hidden>
-          <img className="glyph" src="/hero/rocket.webp" width={322} height={569} alt="" decoding="async" />
+          <img className="glyph" src="/hero/bulb.webp" width={408} height={574} alt="" decoding="async" />
         </div>
       </section>
       <section id="how" className="section" style={{ paddingBottom: 0 }}>
