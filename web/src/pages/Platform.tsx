@@ -3,12 +3,14 @@ import { Link, Navigate } from "react-router-dom";
 import { api, fmtDate } from "../api";
 import { useAuth } from "../auth";
 import { Band, Notice, NumSection } from "../ui";
+import { AnnounceBox } from "./OrgTeam";
 
 const tabs = [
   { to: "/platform", label: "Overview", end: true },
   { to: "/platform/review", label: "Review" },
   { to: "/platform/orgs", label: "Organisations" },
   { to: "/platform/users", label: "Users" },
+  { to: "/platform/news", label: "News" },
   { to: "/platform/audit", label: "Activity" },
 ];
 type Msg = { kind: "ok" | "err"; text: string } | null;
@@ -212,6 +214,15 @@ export function PlatformAudit() {
           </table></div>
         )}
       </div>
+    </Shell>
+  );
+}
+
+export function PlatformNews() {
+  return (
+    <Shell title="News">
+      <AnnounceBox listPath="/platform/news" postPath="/platform/news" heading="Platform news" hint="A note for every active user, in their inbox and as a phone push. Use it sparingly."
+        audience={() => "It goes to everyone who is not suspended."} />
     </Shell>
   );
 }

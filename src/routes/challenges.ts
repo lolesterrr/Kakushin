@@ -7,6 +7,7 @@ import { CHALLENGE_STATUSES, TOPICS } from "../lib/topics";
 import { fileUrl, loadOrg, type OrgRow } from "../lib/access";
 import { saveImage } from "../lib/upload";
 import { notifyFollowersOfChallenge } from "../lib/notify";
+import { pushLater } from "../lib/push";
 
 interface ChallengeRow {
   id: string; org_id: string; slug: string; title: string; summary: string; description: string;
@@ -87,6 +88,7 @@ async function submitForReview(c: Context<AppEnv>, org: OrgRow, cslug: string) {
        SELECT lower(hex(randomblob(12))), u.id, 'review.requested', ?, ?, '/platform/review', ? FROM users u WHERE u.is_platform_admin = 1 AND u.suspended = 0`,
     ).bind(`Event waiting for review: ${row.title}`, `${org.name} wants to publish a challenge.`, now),
   ]);
+  pushLater(c);
 }
 
 /** The first time a challenge leaves draft, tell the organisation's followers and people with a matching topic. */
@@ -94,7 +96,7 @@ async function announceOnce(c: Context<AppEnv>, org: { id: string; slug: string;
   const claim = await c.env.DB.prepare("UPDATE challenges SET announced = 1 WHERE org_id = ? AND slug = ? AND announced = 0 AND status != 'draft'").bind(org.id, cslug).run();
   if (!claim.meta.changes) return;
   const ch = await c.env.DB.prepare("SELECT id, slug, title, topics FROM challenges WHERE org_id = ? AND slug = ?").bind(org.id, cslug).first<{ id: string; slug: string; title: string; topics: string }>();
-  if (ch) await notifyFollowersOfChallenge(c, { ...ch, topics: JSON.parse(ch.topics) as string[] }, org).catch((e) => console.error(`follower notification failed: ${e instanceof Error ? e.message : e}`));
+  if (ch) { await notifyFollowersOfChallenge(c, { ...ch, topics: JSON.parse(ch.topics) as string[] }, org).catch((e) => console.error(`follower notification failed: ${e instanceof Error ? e.message : e}`)); pushLater(c); }
 }
 
 /** Routes mounted under /api/orgs/:slug/challenges (organiser side, plus public reads of one challenge). */

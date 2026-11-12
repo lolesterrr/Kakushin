@@ -1,6 +1,7 @@
 import React, { createContext, useCallback, useContext, useEffect, useState } from "react";
 import { api, clearToken, loadToken, saveToken, setSignedOutHandler } from "./api";
 import { me as meSchema, type Me } from "./schemas";
+import { registerForPush, unregisterPush } from "./push";
 
 interface AuthState {
   ready: boolean; me: Me | null;
@@ -25,6 +26,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     (async () => { if (await loadToken()) await reload(); setReady(true); })();
   }, [reload]);
 
+  // Once signed in, make sure the server knows this phone so pushes can reach it. The server honours the on/off setting.
+  useEffect(() => { if (me) void registerForPush(); }, [me?.id]); // eslint-disable-line react-hooks/exhaustive-deps
+
   const value: AuthState = {
     ready, me, reload,
     requestCode: async (email) => { await api("/auth/request", { method: "POST", json: { email: email.trim().toLowerCase(), kind: "code" } }); },
@@ -32,7 +36,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       const r = await api<{ token: string }>("/auth/verify", { method: "POST", json: { email: email.trim().toLowerCase(), code } });
       await saveToken(r.token); await reload();
     },
-    signOut: async () => { try { await api("/auth/logout", { method: "POST" }); } catch { /* already gone */ } await clearToken(); setMe(null); },
+    signOut: async () => { await unregisterPush(); try { await api("/auth/logout", { method: "POST" }); } catch { /* already gone */ } await clearToken(); setMe(null); },
   };
   return <Ctx.Provider value={value}>{children}</Ctx.Provider>;
 }

@@ -6,6 +6,7 @@ import { Notice } from "../ui";
 import { StatusStamp } from "./Team";
 import { CertificatesList } from "./Certificates";
 import { TopicPicker } from "./Inbox";
+import { PushSetting } from "./OrgTeam";
 
 export function Profile() {
   const { me, reload } = useAuth();
@@ -49,6 +50,7 @@ export function Profile() {
       </form>
     </div>
     <TopicPicker />
+    <PushSetting />
     </>
   );
 }

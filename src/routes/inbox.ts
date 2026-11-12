@@ -63,3 +63,44 @@ follows.put("/topics", async (c) => {
   ]);
   return c.json({ ok: true });
 });
+
+/** Per-person notification settings and phone push registration. Mounted at /api/inbox too, under /settings and /push-token. */
+inbox.get("/settings", async (c) => {
+  const user = c.get("user");
+  if (!user) return c.json({ error: "Not signed in" }, 401);
+  const s = await c.env.DB.prepare("SELECT push FROM notification_settings WHERE user_id = ?").bind(user.id).first<{ push: number }>();
+  const d = await c.env.DB.prepare("SELECT COUNT(*) AS n FROM push_tokens WHERE user_id = ?").bind(user.id).first<{ n: number }>();
+  return c.json({ push: (s?.push ?? 1) === 1, devices: d?.n ?? 0 });
+});
+
+inbox.put("/settings", async (c) => {
+  const user = c.get("user");
+  if (!user) return c.json({ error: "Not signed in" }, 401);
+  const parsed = z.object({ push: z.boolean() }).safeParse(await c.req.json().catch(() => null));
+  if (!parsed.success) return c.json({ error: "Check the settings" }, 400);
+  await c.env.DB.prepare("INSERT INTO notification_settings (user_id, push) VALUES (?, ?) ON CONFLICT(user_id) DO UPDATE SET push = excluded.push").bind(user.id, parsed.data.push ? 1 : 0).run();
+  return c.json({ ok: true });
+});
+
+inbox.post("/push-token", async (c) => {
+  const user = c.get("user");
+  if (!user) return c.json({ error: "Not signed in" }, 401);
+  const parsed = z.object({ token: z.string().regex(/^Expo(nent)?PushToken\[[^\]]{10,}\]$/, "That is not an Expo push token"), platform: z.enum(["ios", "android"]).default("ios") }).safeParse(await c.req.json().catch(() => null));
+  if (!parsed.success) return c.json({ error: parsed.error.issues[0]?.message ?? "Check the token" }, 400);
+  const now = Date.now();
+  // A phone token belongs to whoever signed in on it last.
+  await c.env.DB.prepare(
+    `INSERT INTO push_tokens (id, user_id, token, platform, created_at, last_seen_at) VALUES (lower(hex(randomblob(12))), ?, ?, ?, ?, ?)
+     ON CONFLICT(token) DO UPDATE SET user_id = excluded.user_id, platform = excluded.platform, last_seen_at = excluded.last_seen_at`,
+  ).bind(user.id, parsed.data.token, parsed.data.platform, now, now).run();
+  return c.json({ ok: true });
+});
+
+inbox.delete("/push-token", async (c) => {
+  const user = c.get("user");
+  if (!user) return c.json({ error: "Not signed in" }, 401);
+  const parsed = z.object({ token: z.string() }).safeParse(await c.req.json().catch(() => null));
+  if (!parsed.success) return c.json({ error: "Check the request" }, 400);
+  await c.env.DB.prepare("DELETE FROM push_tokens WHERE user_id = ? AND token = ?").bind(user.id, parsed.data.token).run();
+  return c.json({ ok: true });
+});

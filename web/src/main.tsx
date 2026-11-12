@@ -11,7 +11,7 @@ import { AdminJudging } from "./pages/Judging";
 import { AdminResults } from "./pages/Results";
 import { Verify as VerifyCert } from "./pages/Certificates";
 import { Inbox } from "./pages/Inbox";
-import { PlatformAudit, PlatformOrgs, PlatformOverview, PlatformReview, PlatformUsers } from "./pages/Platform";
+import { PlatformAudit, PlatformNews, PlatformOrgs, PlatformOverview, PlatformReview, PlatformUsers } from "./pages/Platform";
 import { JudgeChallenge, JudgeHome, JudgeTeam } from "./pages/Judge";
 import { AdminOverview } from "./pages/Overview";
 import { AdminApplications } from "./pages/Applications";
@@ -42,6 +42,7 @@ function App() {
         <Route path="/platform/review" element={<PlatformReview />} />
         <Route path="/platform/orgs" element={<PlatformOrgs />} />
         <Route path="/platform/users" element={<PlatformUsers />} />
+        <Route path="/platform/news" element={<PlatformNews />} />
         <Route path="/platform/audit" element={<PlatformAudit />} />
         <Route path="/judge" element={<JudgeHome />} />
         <Route path="/judge/:slug/:cslug" element={<JudgeChallenge />} />

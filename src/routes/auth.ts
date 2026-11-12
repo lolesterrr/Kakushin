@@ -90,6 +90,12 @@ auth.post("/verify", async (c) => {
     user = { id };
   }
 
+  // Admin invites sent to this address become memberships now.
+  await c.env.DB.batch([
+    c.env.DB.prepare("INSERT OR IGNORE INTO memberships (org_id, user_id, role) SELECT org_id, ?, role FROM org_invites WHERE email = ?").bind(user.id, row.email),
+    c.env.DB.prepare("DELETE FROM org_invites WHERE email = ?").bind(row.email),
+  ]);
+
   const token = await createSession(c, user.id);
   setSessionCookie(c, token);
   // The token is also returned so the mobile app can store it in secure storage.

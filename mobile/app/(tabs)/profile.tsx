@@ -1,8 +1,9 @@
 import React, { useEffect, useState } from "react";
-import { Text, View } from "react-native";
+import { Switch, Text, View } from "react-native";
 import * as WebBrowser from "expo-web-browser";
 import { api, pdfUrl } from "../../lib/api";
 import { useAuth } from "../../lib/auth";
+import { registerForPush, type PushState } from "../../lib/push";
 import { certificates as certSchema, follows as followsSchema, topics as topicsSchema } from "../../lib/schemas";
 import { fmtDate } from "../../lib/format";
 import { useLoad } from "../../lib/useLoad";
@@ -38,10 +39,21 @@ export default function Profile() {
     } catch (e) { setMsg({ kind: "err", text: (e as Error).message }); }
     finally { setBusy(false); }
   }
+  const settings = useLoad(() => api<{ push: boolean; devices: number }>("/inbox/settings"), []);
+  const [pushOn, setPushOn] = useState<boolean | null>(null);
+  const [pushState, setPushState] = useState<PushState | null>(null);
+  const pushNow = pushOn ?? settings.data?.push ?? true;
+  async function setPush(on: boolean) {
+    setPushOn(on); setMsg(null);
+    try {
+      await api("/inbox/settings", { method: "PUT", json: { push: on } });
+      if (on) setPushState(await registerForPush());
+    } catch (e) { setPushOn(!on); setMsg({ kind: "err", text: (e as Error).message }); }
+  }
   const set = (k: keyof typeof form) => (v: string) => setForm({ ...form, [k]: v });
 
   return (
-    <Screen onRefresh={() => { void certs.refresh(); void fol.refresh(); }} refreshing={certs.refreshing}>
+    <Screen onRefresh={() => { void certs.refresh(); void fol.refresh(); void settings.refresh(); }} refreshing={certs.refreshing}>
       <Text style={{ color: t.muted }}>{me?.email}</Text>
 
       {certs.data && certs.data.certificates.length > 0 ? (
@@ -57,6 +69,17 @@ export default function Profile() {
           <Body muted style={{ fontSize: 13 }}>The name on a certificate is the one on your profile when you first open it, so set your name first.</Body>
         </>
       ) : null}
+
+      <H2>Notifications</H2>
+      <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between", gap: 12 }}>
+        <View style={{ flex: 1 }}>
+          <Text style={{ color: t.ink, fontSize: 16, fontWeight: "700" }}>Push notifications</Text>
+          <Body muted>Get a ping on this phone for results, shortlists, certificates and new challenges. They always land in your inbox either way.</Body>
+        </View>
+        <Switch value={pushNow} onValueChange={(v) => void setPush(v)} />
+      </View>
+      {pushNow && pushState === "denied" ? <Notice kind="err">Notifications are blocked for Kakushin on this phone. Turn them on in your phone settings.</Notice> : null}
+      {pushNow && pushState === "unsupported" ? <Notice kind="err">This phone could not register for push. It needs a real device, not a simulator or browser.</Notice> : null}
 
       <H2>What you want to hear about</H2>
       <Body muted>Pick topics and you get a note in your inbox when a new challenge matches.</Body>

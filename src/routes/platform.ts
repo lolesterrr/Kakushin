@@ -4,6 +4,8 @@ import type { AppEnv } from "../types";
 import { audit } from "../lib/audit";
 import { sendEmail } from "../lib/email";
 import { notifyFollowersOfChallenge } from "../lib/notify";
+import { pushLater } from "../lib/push";
+import { postNews } from "./announcements";
 
 /** Platform admin console. Mounted at /api/platform. Every route needs a signed-in platform admin. */
 export const platform = new Hono<AppEnv>();
@@ -58,6 +60,7 @@ async function tellOrgAdmins(c: Context<AppEnv>, orgId: string, title: string, b
     `INSERT INTO notifications (id, user_id, kind, title, body, link, created_at)
      SELECT lower(hex(randomblob(12))), m.user_id, 'review.result', ?, ?, ?, ? FROM memberships m WHERE m.org_id = ?`,
   ).bind(title, body, link, now, orgId).run();
+  pushLater(c);
   const { results } = await c.env.DB.prepare("SELECT u.email FROM memberships m JOIN users u ON u.id = m.user_id WHERE m.org_id = ? LIMIT 20").bind(orgId).all<{ email: string }>();
   const text = `${title}\n\n${body}\n\n${c.env.APP_URL}${link}`;
   const html = `<p><b>${title.replace(/</g, "&lt;")}</b></p><p>${body.replace(/</g, "&lt;")}</p><p><a href="${c.env.APP_URL}${link}">Open it on Kakushin</a></p>`;
@@ -73,7 +76,7 @@ platform.post("/challenges/:id/approve", async (c) => {
   const claim = await c.env.DB.prepare("UPDATE challenges SET announced = 1 WHERE id = ? AND announced = 0").bind(t.id).run();
   if (claim.meta.changes) {
     const ch = await c.env.DB.prepare("SELECT id, slug, title, topics FROM challenges WHERE id = ?").bind(t.id).first<{ id: string; slug: string; title: string; topics: string }>();
-    if (ch) await notifyFollowersOfChallenge(c, { ...ch, topics: JSON.parse(ch.topics) as string[] }, { id: t.org_id, slug: t.oslug, name: t.oname }).catch((e) => console.error(`follower notification failed: ${e instanceof Error ? e.message : e}`));
+    if (ch) { await notifyFollowersOfChallenge(c, { ...ch, topics: JSON.parse(ch.topics) as string[] }, { id: t.org_id, slug: t.oslug, name: t.oname }).catch((e) => console.error(`follower notification failed: ${e instanceof Error ? e.message : e}`)); pushLater(c); }
   }
   await audit(c, "challenge.approved", "challenge", t.id, `${t.oname}: ${t.title}`);
   await tellOrgAdmins(c, t.org_id, `Approved: ${t.title}`, "Your challenge passed review and is now public.", `/o/${t.oslug}/c/${t.slug}`, `Your challenge is live: ${t.title}`);
@@ -149,6 +152,12 @@ platform.put("/users/:id", async (c) => {
     await audit(c, is_platform_admin ? "user.made_admin" : "user.removed_admin", "user", u.id, u.email);
   }
   return c.json({ ok: true });
+});
+
+platform.post("/news", postNews);
+platform.get("/news", async (c) => {
+  const { results } = await c.env.DB.prepare("SELECT id, title, body, link, recipients, created_at FROM announcements WHERE org_id IS NULL ORDER BY created_at DESC LIMIT 20").all();
+  return c.json({ items: results });
 });
 
 platform.get("/audit", async (c) => {

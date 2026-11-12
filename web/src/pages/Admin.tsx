@@ -3,6 +3,7 @@ import { Link, Navigate, useNavigate, useParams } from "react-router-dom";
 import { api, fmtDate, fromLocalInput, toLocalInput, uploadImage } from "../api";
 import { useAuth } from "../auth";
 import { Band, Logo, Notice, Tag } from "../ui";
+import { AnnounceBox, OrgMembers } from "./OrgTeam";
 
 const ORG_TYPES = ["university", "hub", "corporate", "partner", "other"];
 const STATUSES = ["draft", "open", "reviewing", "judging", "completed"];
@@ -117,11 +118,15 @@ export function AdminOrg() {
             ))}</tbody>
           </table></div>
         )}
+        {challenges.length === 0 && <p className="muted">No challenges yet. Give your first one a title below, then fill in the details.</p>}
         <form onSubmit={createChallenge} className="form" style={{ marginTop: 16 }}>
           <label htmlFor="ct">New challenge title</label>
           <div style={{ display: "flex", gap: 8 }}><input id="ct" required minLength={3} value={newTitle} onChange={(e) => setNewTitle(e.target.value)} placeholder="Fintech for farmers" /><button type="submit">Create</button></div>
         </form>
       </div>
+      <AnnounceBox listPath={`/orgs/${slug}/announcements`} postPath={`/orgs/${slug}/announcements`} heading="Announcements" hint="Send a note to everyone who follows this organisation. It shows in their inbox and pings their phone. Up to 5 a day."
+        audience={(r) => `${r.followers ?? 0} ${r.followers === 1 ? "person follows" : "people follow"} you right now.`} />
+      <OrgMembers slug={slug!} />
       <div className="section form">
         <h2>Organisation settings</h2>
         <form onSubmit={save}>

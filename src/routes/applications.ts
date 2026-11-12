@@ -2,6 +2,7 @@ import { Hono } from "hono";
 import { z } from "zod";
 import type { AppEnv } from "../types";
 import { loadOrg } from "../lib/access";
+import { pushLater } from "../lib/push";
 import { notifyTeam } from "../lib/mail";
 
 /** Organiser side: /api/orgs/:slug/challenges/:cslug/applications... */
@@ -80,6 +81,20 @@ orgApplications.post("/:slug/challenges/:cslug/applications/status", async (c) =
       const { results: ms } = await c.env.DB.prepare("SELECT u.email FROM team_members m JOIN users u ON u.id = m.user_id WHERE m.team_id = ?").bind(t.id).all<{ email: string }>();
       notifyTeam(c, status, ms.map((m) => m.email), { team: t.name, challenge: x.ch.title, org: x.org.name, url: `${c.env.APP_URL}/o/${x.org.slug}/c/${x.ch.slug}` });
     }
+  }
+  if (changing.length && (status === "shortlisted" || status === "finalist" || status === "rejected")) {
+    const title = status === "shortlisted" ? `You are shortlisted: ${x.ch.title}` : status === "finalist" ? `You are a finalist: ${x.ch.title}` : `Update on your application: ${x.ch.title}`;
+    const body = status === "shortlisted" ? "Open the challenge for your next step." : status === "finalist" ? "Judges can now see your pitch." : "Thank you for applying. Plenty of other challenges are open.";
+    const stmts = [];
+    for (let i = 0; i < changing.length; i += 90) {
+      const ids = changing.slice(i, i + 90).map((t) => t.id);
+      stmts.push(c.env.DB.prepare(
+        `INSERT INTO notifications (id, user_id, kind, title, body, link, created_at)
+         SELECT lower(hex(randomblob(12))), m.user_id, 'application.${status}', ?, ?, ?, ? FROM team_members m WHERE m.team_id IN (${ids.map(() => "?").join(",")})`,
+      ).bind(title, body, `/o/${x.org.slug}/c/${x.ch.slug}`, Date.now(), ...ids));
+    }
+    await c.env.DB.batch(stmts);
+    pushLater(c);
   }
   return c.json({ ok: true, updated: changing.length });
 });
