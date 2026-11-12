@@ -138,9 +138,19 @@ teams.post("/join", async (c) => {
   if (why) return c.json({ error: why }, 409);
   if (t.status !== "forming") return c.json({ error: "This team has already applied, so it is closed to new members" }, 409);
   if (await myTeamFor(c, ch.id, user.id)) return c.json({ error: "You are already in a team for this challenge" }, 409);
-  const size = (await c.env.DB.prepare("SELECT COUNT(*) AS n FROM team_members WHERE team_id = ?").bind(t.id).first<{ n: number }>())?.n ?? 0;
-  if (size >= ch.team_max) return c.json({ error: `This team is full (max ${ch.team_max})` }, 409);
-  await c.env.DB.prepare("INSERT INTO team_members (team_id, user_id, joined_at) VALUES (?, ?, ?)").bind(t.id, user.id, Date.now()).run();
+  // One statement checks and inserts, so two people joining at the same moment cannot push the team past its maximum,
+  // and one person cannot land in two teams of the same challenge. The checks above only give friendlier errors.
+  const ins = await c.env.DB.prepare(
+    `INSERT INTO team_members (team_id, user_id, joined_at)
+     SELECT ?, ?, ? WHERE
+       (SELECT COUNT(*) FROM team_members WHERE team_id = ?) < ?
+       AND (SELECT status FROM teams WHERE id = ?) = 'forming'
+       AND NOT EXISTS (SELECT 1 FROM team_members m JOIN teams t2 ON t2.id = m.team_id WHERE m.user_id = ? AND t2.challenge_id = ?)`,
+  ).bind(t.id, user.id, Date.now(), t.id, ch.team_max, t.id, user.id, ch.id).run();
+  if (!ins.meta.changes) {
+    if (await myTeamFor(c, ch.id, user.id)) return c.json({ error: "You are already in a team for this challenge" }, 409);
+    return c.json({ error: `This team is full (max ${ch.team_max})` }, 409);
+  }
   const org = await c.env.DB.prepare("SELECT slug FROM organizations WHERE id = ?").bind(ch.org_id).first<{ slug: string }>();
   return c.json({ ok: true, org: org?.slug, challenge: ch.slug });
 });

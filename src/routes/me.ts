@@ -21,8 +21,9 @@ const profile = z.object({
   institution: z.string().trim().max(120).default(""),
   location: z.string().trim().max(120).default(""),
   skills: z.array(z.string().trim().min(1).max(30)).max(20).default([]),
-  links: z.record(z.string().url().max(300)).default({}),
-  gender: z.enum(["female", "male", "other", "prefer_not_to_say"]).nullable().default(null),
+  // Only web addresses: z.string().url() alone would let javascript: and data: links through.
+  links: z.record(z.string().trim().max(300).url().regex(/^https?:\/\/[^\s/]/i, "Links must start with http:// or https://")).refine((l) => Object.keys(l).length <= 10).optional(),
+  gender: z.enum(["female", "male", "other", "prefer_not_to_say"]).nullable().optional(),
 });
 
 me.put("/", async (c) => {
@@ -31,8 +32,17 @@ me.put("/", async (c) => {
   const parsed = profile.safeParse(await c.req.json().catch(() => null));
   if (!parsed.success) return c.json({ error: "Check the profile fields", issues: parsed.error.issues }, 400);
   const p = parsed.data;
+  // links and gender are kept as they are unless the request sends them, so a form without those fields cannot wipe them.
   await c.env.DB.prepare(
-    "UPDATE users SET name=?, bio=?, institution=?, location=?, skills=?, links=?, gender=? WHERE id=?",
-  ).bind(p.name, p.bio, p.institution, p.location, JSON.stringify(p.skills), JSON.stringify(p.links), p.gender, u.id).run();
+    `UPDATE users SET name=?, bio=?, institution=?, location=?, skills=?,
+       links = CASE WHEN ? THEN ? ELSE links END,
+       gender = CASE WHEN ? THEN ? ELSE gender END
+     WHERE id=?`,
+  ).bind(
+    p.name, p.bio, p.institution, p.location, JSON.stringify(p.skills),
+    p.links !== undefined ? 1 : 0, JSON.stringify(p.links ?? {}),
+    p.gender !== undefined ? 1 : 0, p.gender ?? null,
+    u.id,
+  ).run();
   return c.json({ ok: true });
 });

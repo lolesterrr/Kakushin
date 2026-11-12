@@ -2,14 +2,14 @@ import type { Context } from "hono";
 import type { AppEnv } from "../types";
 
 /**
- * Cloudflare Turnstile on the web sign-in form. Off until TURNSTILE_SECRET is set, so nothing breaks before keys exist.
- * The phone app cannot show the widget, so it identifies itself and relies on the per-email limits instead.
+ * Cloudflare Turnstile on sign-in. Off until TURNSTILE_SECRET and TURNSTILE_SITE_KEY are set, so nothing breaks before keys exist.
+ * Once on, every sign-in request needs a token: the web form shows the widget, and the phone app shows the same widget
+ * in a small web view (GET /api/auth/turnstile). There is no client header that skips it, because anyone can send a header.
  */
 export const turnstileOn = (c: Context<AppEnv>) => !!c.env.TURNSTILE_SECRET && !!c.env.TURNSTILE_SITE_KEY;
 
 export async function turnstileOk(c: Context<AppEnv>, token: string | undefined): Promise<boolean> {
   if (!turnstileOn(c)) return true;
-  if (c.req.header("X-Kakushin-Client") === "mobile") return true;
   if (!token) return false;
   const form = new URLSearchParams({ secret: c.env.TURNSTILE_SECRET!, response: token });
   const ip = c.req.header("CF-Connecting-IP");

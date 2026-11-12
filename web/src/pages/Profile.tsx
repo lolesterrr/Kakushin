@@ -19,7 +19,7 @@ export function Profile() {
   async function save(e: React.FormEvent) {
     e.preventDefault();
     try {
-      await api("/me", { method: "PUT", json: { ...form, skills: form.skills.split(",").map((s) => s.trim()).filter(Boolean), links: {}, gender: null } });
+      await api("/me", { method: "PUT", json: { ...form, skills: form.skills.split(",").map((s) => s.trim()).filter(Boolean) } });
       await reload(); setMsg({ kind: "ok", text: "Saved" });
     } catch (err) { setMsg({ kind: "err", text: (err as Error).message }); }
   }

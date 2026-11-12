@@ -45,6 +45,10 @@ const criteriaBody = z.object({
 
 orgJudging.put("/:slug/challenges/:cslug/criteria", async (c) => {
   const x = await adminLoad(c); if ("err" in x) return x.err;
+  // Judges score against the rubric, so changing it mid-judging would silently change or clamp their scores.
+  if (x.ch.status === "judging" || x.ch.status === "completed") {
+    return c.json({ error: "The rubric is locked once judging starts. To change it, move the stage back to reviewing first." }, 409);
+  }
   const parsed = criteriaBody.safeParse(await c.req.json().catch(() => null));
   if (!parsed.success) return c.json({ error: parsed.error.issues[0]?.message ?? "Check the criteria" }, 400);
   const list = parsed.data.criteria;

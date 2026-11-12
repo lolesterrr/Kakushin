@@ -6,10 +6,11 @@ import { loadOrg } from "../lib/access";
 import { audit } from "../lib/audit";
 import { pushLater } from "../lib/push";
 
+// A link is a path on Kakushin ("/x", never "//host" or "/\\host", which browsers treat as another site) or an http(s) address.
 export const body = z.object({
   title: z.string().trim().min(3, "Give the announcement a title").max(100),
   body: z.string().trim().max(500).default(""),
-  link: z.string().trim().max(300).refine((v) => v === "" || v.startsWith("/") || /^https?:\/\/\S+$/i.test(v), { message: "A link must be a page on Kakushin or start with https://" }).default(""),
+  link: z.string().trim().max(300).refine((v) => v === "" || /^\/(?![/\\])/.test(v) || /^https?:\/\/\S+$/i.test(v), { message: "A link must be a page on Kakushin or start with https://" }).default(""),
 });
 
 /** Organiser announcements to their followers. Mounted under /api/orgs. */

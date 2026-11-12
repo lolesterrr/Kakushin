@@ -1,10 +1,12 @@
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 import { Text, View } from "react-native";
 import { Redirect } from "expo-router";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useAuth } from "../lib/auth";
 import { useTheme } from "../lib/theme";
 import { Banner } from "../components/Banner";
+import { Turnstile } from "../components/Turnstile";
+import { api } from "../lib/api";
 import { Body, Button, Field, H1, Hand, Notice } from "../components/ui";
 import { shadow } from "../lib/theme";
 
@@ -16,14 +18,23 @@ export default function SignIn() {
   const [step, setStep] = useState<"email" | "code">("email");
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState("");
+  // When the server has Turnstile on, a request needs a fresh one-use token from the widget. `check` remounts it.
+  const [needsCheck, setNeedsCheck] = useState(false);
+  const [token, setToken] = useState<string | null>(null);
+  const [check, setCheck] = useState(0);
+  useEffect(() => {
+    api<{ turnstile_site_key: string | null }>("/auth/config").then((r) => setNeedsCheck(!!r.turnstile_site_key)).catch(() => {});
+  }, []);
+  const newCheck = () => { setToken(null); setCheck((n) => n + 1); };
 
   if (ready && me) return <Redirect href="/" />;
 
   async function send() {
+    if (needsCheck && !token) { setErr("Wait for the check below to finish, then try again."); return; }
     setErr(""); setBusy(true);
-    try { await requestCode(email); setStep("code"); }
+    try { await requestCode(email, token ?? undefined); setStep("code"); }
     catch (e) { setErr((e as Error).message); }
-    finally { setBusy(false); }
+    finally { setBusy(false); if (needsCheck) newCheck(); }
   }
   async function confirm(c = code) {
     if (c.length !== 6) return;
@@ -49,8 +60,9 @@ export default function SignIn() {
           <>
             <Body muted>No password. We email you a 6-digit code. New here? Your account is created when you confirm it.</Body>
             <Field label="Email" value={email} onChangeText={setEmail} autoCapitalize="none" autoCorrect={false} keyboardType="email-address" textContentType="emailAddress" autoComplete="email" onSubmitEditing={send} />
+            {needsCheck ? <Turnstile key={check} onToken={setToken} /> : null}
             {err ? <Notice kind="err">{err}</Notice> : null}
-            <Button title="Email me a code" onPress={send} busy={busy} disabled={!email.includes("@")} />
+            <Button title="Email me a code" onPress={send} busy={busy} disabled={!email.includes("@") || (needsCheck && !token)} />
           </>
         ) : (
           <>

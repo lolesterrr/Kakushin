@@ -12,6 +12,7 @@ import { certificates } from "./routes/certificates";
 import { inbox, follows } from "./routes/inbox";
 import { platform } from "./routes/platform";
 import { readToken, userFromToken } from "./lib/session";
+import { withMeta } from "./lib/meta";
 
 const app = new Hono<AppEnv>();
 
@@ -45,7 +46,8 @@ app.route("/api/inbox", inbox);
 app.route("/api/follows", follows);
 app.route("/api/platform", platform);
 
-app.notFound((c) => (c.req.path.startsWith("/api/") ? c.json({ error: "Not found" }, 404) : c.env.ASSETS.fetch(c.req.raw)));
+// Everything outside /api is the web app. Pages come through here (see run_worker_first) so their link-preview tags can be filled in.
+app.notFound(async (c) => (c.req.path.startsWith("/api/") ? c.json({ error: "Not found" }, 404) : withMeta(c, await c.env.ASSETS.fetch(c.req.raw))));
 app.onError((err, c) => {
   console.error(`${c.req.method} ${c.req.path} failed: ${err instanceof Error ? err.message : String(err)}`);
   return c.json({ error: "Something went wrong" }, 500);

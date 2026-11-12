@@ -35,7 +35,9 @@ const t0 = Date.now();
 async function person(label, name) {
   const em = email(label);
   sql(`INSERT INTO login_tokens (token_hash, kind, email, expires_at) VALUES ('${crypto.createHash("sha256").update(`${em}:123456`).digest("hex")}', 'code', '${em}', ${Date.now() + 600000})`);
-  const r = await fetch(`${U}/api/auth/verify`, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ email: em, code: "123456" }) });
+  let r = await fetch(`${U}/api/auth/verify`, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ email: em, code: "123456" }) });
+  // Sign-in is rate limited per IP, so wait and retry when many people sign in at once.
+  for (let i = 0; r.status === 429 && i < 12; i++) { await new Promise((ok) => setTimeout(ok, 10000)); r = await fetch(`${U}/api/auth/verify`, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ email: em, code: "123456" }) }); }
   const tok = /kk_session=([^;]+)/.exec(r.headers.get("set-cookie") ?? "")?.[1];
   if (!tok) throw new Error(`could not sign in ${em}: ${r.status}`);
   const call = async (path, method = "GET", json, raw) => {

@@ -15,7 +15,9 @@ const denied = (r) => r.s === 401 || r.s === 403 || r.s === 404;
 async function person(label) {
   const email = `${P}-${label}@example.com`;
   sql(`INSERT INTO login_tokens (token_hash, kind, email, expires_at) VALUES ('${crypto.createHash("sha256").update(`${email}:123456`).digest("hex")}', 'code', '${email}', ${Date.now() + 600000})`);
-  const r = await fetch(`${U}/api/auth/verify`, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ email, code: "123456" }) });
+  let r = await fetch(`${U}/api/auth/verify`, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ email, code: "123456" }) });
+  // Sign-in is rate limited per IP, so wait and retry when many people sign in at once.
+  for (let i = 0; r.status === 429 && i < 12; i++) { await new Promise((ok) => setTimeout(ok, 10000)); r = await fetch(`${U}/api/auth/verify`, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ email, code: "123456" }) }); }
   const tok = /kk_session=([^;]+)/.exec(r.headers.get("set-cookie") ?? "")?.[1];
   if (!tok) throw new Error(`could not sign in ${email}`);
   const call = async (path, method = "GET", json) => {
@@ -99,6 +101,37 @@ ok("judge cannot change results", denied(await nobody(`/orgs/${A}/challenges/ope
 ok("inbox is private", (await alice("/inbox")).d.items?.every?.((i) => !JSON.stringify(i).includes(bob.email)) ?? true);
 ok("push token cannot be hijacked silently", (await alice("/inbox/push-token", "POST", { token: `ExponentPushToken[${P}-alice-token-0001]` })).s === 200);
 ok("bob taking over the token moves it", (await bob("/inbox/push-token", "POST", { token: `ExponentPushToken[${P}-alice-token-0001]` })).s === 200 && (await alice("/inbox/settings")).d.devices === 0);
+
+// ---- day 1 fixes: profile links, announcement links, team size, stages, rubric, link previews, sign-in limits ----
+ok("profile rejects a javascript: link", (await alice("/me", "PUT", { name: "Alice", links: { site: "javascript:alert(1)" } })).s === 400);
+ok("profile accepts an https link", (await alice("/me", "PUT", { name: "Alice", links: { site: "https://example.com" }, gender: "female" })).s === 200);
+ok("a save without links or gender keeps them", (await alice("/me", "PUT", { name: "Alice A" })).s === 200
+  && (await alice("/me")).d.user?.links?.site === "https://example.com" && (await alice("/me")).d.user?.gender === "female");
+ok("announcement link to //host is refused", (await aOwner(`/orgs/${A}/announcements`, "POST", { title: "Look here", link: "//evil.example" })).s === 400);
+ok("announcement link to /\\host is refused", (await aOwner(`/orgs/${A}/announcements`, "POST", { title: "Look here", link: "/\\evil.example" })).s === 400);
+
+// Alice's team allows 2. Three people try to join at the same moment: exactly one gets in.
+const code = (await alice(`/orgs/${A}/challenges/open-challenge/team`)).d.team?.invite_code;
+const joiners = [await person("j1"), await person("j2"), await person("j3")];
+const joins = await Promise.all(joiners.map((j) => j("/teams/join", "POST", { code })));
+ok("concurrent joins never pass the team maximum", !!code && joins.filter((r) => r.s === 200).length === 1, joins.map((r) => r.s));
+
+const st = `/orgs/${A}/challenges/open-challenge/status`;
+ok("stage can move forward", (await aOwner(st, "PUT", { status: "judging" })).s === 200);
+ok("rubric is locked while judging", (await aOwner(`/orgs/${A}/challenges/open-challenge/criteria`, "PUT", { criteria: [{ name: "Impact", weight: 100, max_score: 10 }] })).s === 409);
+const back = await aOwner(st, "PUT", { status: "open" });
+ok("stage cannot move back without reopen", back.s === 409 && back.d.reopen_needed === true, back);
+ok("stage can move back with reopen", (await aOwner(st, "PUT", { status: "open", reopen: true })).s === 200);
+ok("rubric can change again after reopening", (await aOwner(`/orgs/${A}/challenges/open-challenge/criteria`, "PUT", { criteria: [{ name: "Impact", weight: 100, max_score: 10 }] })).s === 200);
+
+const page = await (await fetch(`${U}/o/${A}/c/open-challenge`)).text();
+ok("challenge page carries its own preview title", page.includes(`<meta property="og:title" content="Open Challenge · ${P} A"`), page.slice(0, 600));
+ok("preview image is an absolute URL", /<meta property="og:image" content="https?:\/\//.test(page));
+ok("a draft does not leak into previews", !(await (await fetch(`${U}/o/${A}/c/secret-draft`)).text()).includes("Secret Draft"));
+
+const asks = [];
+for (let i = 0; i < 7; i++) asks.push((await fetch(`${U}/api/auth/request`, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ email: `${P}-flood${i}@example.com`, kind: "code" }) })).status);
+ok("sign-in requests are limited per IP", asks.includes(429), asks);
 
 console.log(`${failed === 0 ? "ALL PASS" : "FAILURES"}: ${passed} passed, ${failed} failed (prefix ${P})`);
 process.exit(failed ? 1 : 0);
