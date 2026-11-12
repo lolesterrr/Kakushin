@@ -15,7 +15,7 @@ import { fileURLToPath } from "node:url";
 import { CHALLENGES, JUDGES, ORGS, PEOPLE, QUESTIONS, slugOf } from "./data.mjs";
 
 const live = process.argv.includes("--live");
-const U = live ? "https://kakushin.kajjabantu.workers.dev" : "http://localhost:8787";
+const U = live ? "https://kakushin.dpdns.org" : "http://localhost:8787";
 const where = live ? "--remote" : "--local";
 const MEDIA = path.join(path.dirname(fileURLToPath(import.meta.url)), "media");
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../..");
@@ -58,7 +58,9 @@ await cleanup();
 }
 const sessions = {};
 async function signIn(name) {
-  const r = await fetch(`${U}/api/auth/verify`, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ email: emailOf(name), code: "123456" }) });
+  let r = await fetch(`${U}/api/auth/verify`, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ email: emailOf(name), code: "123456" }) });
+  // Sign-in is rate limited per IP, so wait and retry when many people sign in at once.
+  for (let i = 0; r.status === 429 && i < 12; i++) { await new Promise((ok) => setTimeout(ok, 10000)); r = await fetch(`${U}/api/auth/verify`, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ email: emailOf(name), code: "123456" }) }); }
   const tok = /kk_session=([^;]+)/.exec(r.headers.get("set-cookie") ?? "")?.[1];
   if (!tok) throw new Error(`could not sign in ${name}: ${r.status}`);
   const call = async (p, method = "GET", json) => {

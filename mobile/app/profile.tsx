@@ -34,7 +34,7 @@ export default function Profile() {
   async function save() {
     setMsg(null); setBusy(true);
     try {
-      await api("/me", { method: "PUT", json: { name: form.name, institution: form.institution, location: form.location, bio: form.bio, skills: form.skills.split(",").map((x) => x.trim()).filter(Boolean), links: {}, gender: null } });
+      await api("/me", { method: "PUT", json: { name: form.name, institution: form.institution, location: form.location, bio: form.bio, skills: form.skills.split(",").map((x) => x.trim()).filter(Boolean) } });
       await reload(); setMsg({ kind: "ok", text: "Saved" });
     } catch (e) { setMsg({ kind: "err", text: (e as Error).message }); }
     finally { setBusy(false); }

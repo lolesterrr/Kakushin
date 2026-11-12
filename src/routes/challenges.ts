@@ -3,7 +3,8 @@ import { z } from "zod";
 import type { AppEnv } from "../types";
 import { newId } from "../lib/crypto";
 import { slugify } from "../lib/slug";
-import { CHALLENGE_STATUSES, TOPICS } from "../lib/topics";
+import { CHALLENGE_STATUSES, TOPICS, stageMoveError } from "../lib/topics";
+import { audit } from "../lib/audit";
 import { fileUrl, loadOrg, type OrgRow } from "../lib/access";
 import { saveImage } from "../lib/upload";
 import { notifyFollowersOfChallenge } from "../lib/notify";
@@ -59,6 +60,7 @@ const challengeBody = z
     pitch_due_at: ms.default(null),
     topics: z.array(z.enum(TOPICS)).max(5).default([]),
     questions: z.array(question).max(20).default([]),
+    reopen: z.boolean().optional(),
   })
   .refine((b) => b.team_min <= b.team_max, { message: "Minimum team size cannot be bigger than the maximum", path: ["team_min"] })
   .refine(
@@ -150,6 +152,11 @@ orgChallenges.put("/:slug/challenges/:cslug", async (c) => {
   if (b.status !== "draft" && (!b.summary || !b.description)) {
     return c.json({ error: "Add a summary and a description before publishing" }, 400);
   }
+  const now = await c.env.DB.prepare("SELECT status FROM challenges WHERE org_id = ? AND slug = ?").bind(access.org.id, c.req.param("cslug")).first<{ status: string }>();
+  if (!now) return c.json({ error: "Not found" }, 404);
+  const back = stageMoveError(now.status, b.status, b.reopen);
+  if (back) return c.json({ error: back, reopen_needed: true }, 409);
+  if (b.reopen && now.status !== b.status) await audit(c, "challenge.reopened", "challenge", c.req.param("cslug"), `${now.status} to ${b.status}`);
   const gate = await publishGate(c, access.org, c.req.param("cslug"), b.status);
   if ("error" in gate) return c.json({ error: gate.error }, gate.code);
   const questions = b.questions.map((q) => ({
@@ -181,10 +188,13 @@ orgChallenges.put("/:slug/challenges/:cslug/status", async (c) => {
   const access = await loadOrg(c, c.req.param("slug"));
   if (!access) return c.json({ error: "Not found" }, 404);
   if (!access.role) return c.json({ error: "Only organisation admins can do that" }, 403);
-  const parsed = z.object({ status: z.enum(CHALLENGE_STATUSES) }).safeParse(await c.req.json().catch(() => null));
+  const parsed = z.object({ status: z.enum(CHALLENGE_STATUSES), reopen: z.boolean().optional() }).safeParse(await c.req.json().catch(() => null));
   if (!parsed.success) return c.json({ error: "Pick a stage" }, 400);
-  const row = await c.env.DB.prepare("SELECT summary, description FROM challenges WHERE org_id = ? AND slug = ?").bind(access.org.id, c.req.param("cslug")).first<{ summary: string; description: string }>();
+  const row = await c.env.DB.prepare("SELECT summary, description, status FROM challenges WHERE org_id = ? AND slug = ?").bind(access.org.id, c.req.param("cslug")).first<{ summary: string; description: string; status: string }>();
   if (!row) return c.json({ error: "Not found" }, 404);
+  const back = stageMoveError(row.status, parsed.data.status, parsed.data.reopen);
+  if (back) return c.json({ error: back, reopen_needed: true }, 409);
+  if (parsed.data.reopen && row.status !== parsed.data.status) await audit(c, "challenge.reopened", "challenge", c.req.param("cslug"), `${row.status} to ${parsed.data.status}`);
   if (parsed.data.status !== "draft" && (!row.summary || !row.description)) return c.json({ error: "Add a summary and a description before publishing" }, 400);
   const gate = await publishGate(c, access.org, c.req.param("cslug"), parsed.data.status);
   if ("error" in gate) return c.json({ error: gate.error }, gate.code);

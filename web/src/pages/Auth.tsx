@@ -1,7 +1,7 @@
 import React, { useEffect, useRef, useState } from "react";
 import { Link, Navigate, useNavigate, useSearchParams } from "react-router-dom";
 import { api } from "../api";
-import { rememberNext, takeNext, useAuth } from "../auth";
+import { isLocalPath, rememberNext, takeNext, useAuth } from "../auth";
 import { Notice } from "../ui";
 
 export function Login() {
@@ -29,8 +29,8 @@ export function Login() {
     return () => { const t = (window as unknown as { turnstile?: { remove: (id: string) => void } }).turnstile; if (t && id) t.remove(id); };
   }, [siteKey, state]);
   const signup = params.get("mode") === "signup";
-  useEffect(() => { if (next && next.startsWith("/")) rememberNext(next); }, [next]);
-  if (me) return <Navigate to={next && next.startsWith("/") ? next : "/"} replace />;
+  useEffect(() => { if (isLocalPath(next)) rememberNext(next); }, [next]);
+  if (me) return <Navigate to={isLocalPath(next) ? next : "/"} replace />;
 
   async function send(kind: "link" | "code") {
     setState("sending"); setMsg("");

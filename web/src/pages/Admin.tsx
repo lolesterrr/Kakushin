@@ -1,6 +1,6 @@
 import React, { useEffect, useRef, useState } from "react";
 import { Link, Navigate, useNavigate, useParams } from "react-router-dom";
-import { api, fmtDate, fromLocalInput, toLocalInput, uploadImage } from "../api";
+import { api, confirmStageMove, fmtDate, fromLocalInput, toLocalInput, uploadImage } from "../api";
 import { useAuth } from "../auth";
 import { Band, Banner, Logo, Notice, Tag } from "../ui";
 import { AnnounceBox, OrgMembers } from "./OrgTeam";
@@ -161,6 +161,7 @@ export function AdminChallenge() {
   const [saving, setSaving] = useState(false);
   const [copied, setCopied] = useState(false);
   const [wasDraft, setWasDraft] = useState(true);
+  const [liveStatus, setLiveStatus] = useState("draft"); // the stage as last saved, to spot a move back
   const [review, setReview] = useState<{ state: string; note: string }>({ state: "none", note: "" });
   useEffect(() => {
     if (guard) return;
@@ -168,7 +169,7 @@ export function AdminChallenge() {
     api<{ challenge: any; role: string | null }>(`/orgs/${slug}/challenges/${cslug}`).then(({ challenge: c, role }) => {
       if (!role) { setMsg({ kind: "err", text: "You are not an admin of this organisation." }); return; }
       setReview({ state: c.review_state ?? "none", note: c.review_note ?? "" });
-      setWasDraft(c.status === "draft");
+      setWasDraft(c.status === "draft"); setLiveStatus(c.status);
       setF({
         title: c.title, summary: c.summary, description: c.description, prizes: c.prizes, status: c.status, team_min: c.team_min, team_max: c.team_max,
         opens: toLocalInput(c.applications_open_at), closes: toLocalInput(c.applications_close_at), pitch: toLocalInput(c.pitch_due_at),
@@ -187,6 +188,8 @@ export function AdminChallenge() {
 
   async function save(status = f!.status) {
     if (wasDraft && status !== "draft" && !f!.cover_url) { setMsg({ kind: "err", text: "Add a banner before publishing. It is the first thing people see." }); return; }
+    const reopen = confirmStageMove(liveStatus, status);
+    if (reopen === null) return;
     setSaving(true); setMsg(null);
     try {
       const res = await api<{ pending?: boolean }>(`/orgs/${slug}/challenges/${cslug}`, { method: "PUT", json: {
@@ -195,12 +198,13 @@ export function AdminChallenge() {
         applications_open_at: fromLocalInput(f!.opens), applications_close_at: fromLocalInput(f!.closes), pitch_due_at: fromLocalInput(f!.pitch),
         topics: f!.topics,
         questions: f!.questions.map((q) => ({ ...q, options: q.type === "choice" ? q.options.filter(Boolean) : [] })),
+        ...(reopen ? { reopen } : {}),
       } });
       if (res.pending) {
         setF({ ...f!, status: "draft" }); setReview({ state: "pending", note: "" });
         setMsg({ kind: "ok", text: "Sent for review. The Kakushin team checks new challenges before they go public, and you will get a note in your inbox." });
       } else {
-        setF({ ...f!, status }); if (status !== "draft") setWasDraft(false);
+        setF({ ...f!, status }); setLiveStatus(status); if (status !== "draft") setWasDraft(false);
         setMsg({ kind: "ok", text: status === "open" && f!.status !== "open" ? "Published. Share the link below." : "Saved" });
       }
     } catch (err) { setMsg({ kind: "err", text: (err as Error).message }); }
