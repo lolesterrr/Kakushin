@@ -15,6 +15,14 @@ import { readToken, userFromToken } from "./lib/session";
 
 const app = new Hono<AppEnv>();
 
+// Basic hardening on every API response. Certificate PDFs and uploads are served by their own routes and keep their own types.
+app.use("/api/*", async (c, next) => {
+  await next();
+  c.res.headers.set("X-Content-Type-Options", "nosniff");
+  c.res.headers.set("Referrer-Policy", "strict-origin-when-cross-origin");
+  if (!c.res.headers.has("Cache-Control")) c.res.headers.set("Cache-Control", "no-store");
+});
+
 // Attach the current user (or null) to every API request.
 app.use("/api/*", async (c, next) => {
   const token = readToken(c);

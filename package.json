@@ -10,7 +10,8 @@
     "db:migrate:local": "wrangler d1 migrations apply kakushin --local",
     "db:migrate:remote": "wrangler d1 migrations apply kakushin --remote",
     "typecheck": "tsc --noEmit",
-    "test": "vitest run"
+    "test": "vitest run",
+    "test:e2e": "node tests/e2e/isolation.mjs"
   },
   "dependencies": {
     "hono": "^4.6.0",

@@ -62,8 +62,8 @@ const STATUS = z.enum(["applied", "shortlisted", "rejected", "finalist"]);
 orgApplications.post("/:slug/challenges/:cslug/applications/status", async (c) => {
   const x = await load(c, c.req.param("slug"), c.req.param("cslug"));
   if ("error" in x) return c.json({ error: x.error!.msg }, x.error!.code);
-  const parsed = z.object({ team_ids: z.array(z.string()).min(1).max(200), status: STATUS }).safeParse(await c.req.json().catch(() => null));
-  if (!parsed.success) return c.json({ error: "Pick at least one team and a status" }, 400);
+  const parsed = z.object({ team_ids: z.array(z.string()).min(1).max(90), status: STATUS }).safeParse(await c.req.json().catch(() => null));
+  if (!parsed.success) return c.json({ error: "Pick between 1 and 90 teams and a status" }, 400);
   const { team_ids, status } = parsed.data;
 
   // Only teams of this challenge that have an application and are not already past review (finalist, winner).
@@ -76,10 +76,14 @@ orgApplications.post("/:slug/challenges/:cslug/applications/status", async (c) =
   if (changing.length) {
     await c.env.DB.batch(changing.map((t) => c.env.DB.prepare("UPDATE teams SET status = ? WHERE id = ?").bind(status, t.id)));
   }
-  if (status === "shortlisted" || status === "rejected") {
+  if (changing.length && (status === "shortlisted" || status === "rejected")) {
+    // One query for everyone's emails (the free plan allows few queries per request), then one note per team.
+    const ids = changing.map((t) => t.id);
+    const { results: ms } = await c.env.DB.prepare(
+      `SELECT m.team_id, u.email FROM team_members m JOIN users u ON u.id = m.user_id WHERE m.team_id IN (${ids.map(() => "?").join(",")})`,
+    ).bind(...ids).all<{ team_id: string; email: string }>();
     for (const t of changing) {
-      const { results: ms } = await c.env.DB.prepare("SELECT u.email FROM team_members m JOIN users u ON u.id = m.user_id WHERE m.team_id = ?").bind(t.id).all<{ email: string }>();
-      notifyTeam(c, status, ms.map((m) => m.email), { team: t.name, challenge: x.ch.title, org: x.org.name, url: `${c.env.APP_URL}/o/${x.org.slug}/c/${x.ch.slug}` });
+      notifyTeam(c, status, ms.filter((m) => m.team_id === t.id).map((m) => m.email), { team: t.name, challenge: x.ch.title, org: x.org.name, url: `${c.env.APP_URL}/o/${x.org.slug}/c/${x.ch.slug}` });
     }
   }
   if (changing.length && (status === "shortlisted" || status === "finalist" || status === "rejected")) {

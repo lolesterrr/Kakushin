@@ -42,7 +42,9 @@ export function AdminApplications() {
   async function setStatus(ids: string[], status: "applied" | "shortlisted" | "rejected" | "finalist") {
     setMsg(null);
     try {
-      const r = await api<{ updated: number }>(`${base}/status`, { method: "POST", json: { team_ids: ids, status } });
+      // The server takes up to 90 teams per request, so large selections go in batches.
+      const r = { updated: 0 };
+      for (let i = 0; i < ids.length; i += 90) r.updated += (await api<{ updated: number }>(`${base}/status`, { method: "POST", json: { team_ids: ids.slice(i, i + 90), status } })).updated;
       setSel(new Set()); await load();
       setMsg({ kind: "ok", text: status === "applied" ? `${r.updated} moved back to New` : status === "finalist" ? `${r.updated} marked as finalist. Judges can now see them.` : `${r.updated} ${status}. Applicants were emailed.` });
     } catch (e) { setMsg({ kind: "err", text: (e as Error).message }); }

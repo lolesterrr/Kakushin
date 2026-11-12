@@ -55,3 +55,13 @@ Notes:
 - Resend has no verified domain yet, so it only delivers to the Resend account's own address. Any other email gets a 500 on sign-in request.
 - Editing a secret in the dashboard saves a new version but may not deploy it. Check the Deployments tab.
 - Workers logs are on (`observability`), so errors show in the dashboard under the Worker's Logs tab.
+
+## Tests and demo data
+
+- `npm test` runs the unit tests (scoring formula).
+- `npm run test:e2e` runs 50+ permission and tenant-isolation checks against a local `npm run dev`. It only talks to localhost.
+- `node scripts/dryrun.mjs` runs a whole fake hackathon (post, apply, shortlist, judge, results, certificates) against local. Add `--live` to run it on production, which also leaves a demo organisation ("Kampala Demo Hub") behind. `--live --cleanup` removes it again.
+
+## Turnstile (bot check on the web sign-in form)
+
+It is built but off. To turn it on, create a Turnstile widget in the Cloudflare dashboard for `kakushin.kajjabantu.workers.dev`, then set `TURNSTILE_SITE_KEY` as a variable and `TURNSTILE_SECRET` as a secret (`npx wrangler secret put TURNSTILE_SECRET`) and redeploy. The phone app skips the widget and relies on the per-email limits (5 code requests an hour, 5 wrong codes then a lock).
