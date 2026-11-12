@@ -28,6 +28,6 @@
   ],
   "vars": {
     "APP_URL": "https://kakushin.dpdns.org",
-    "EMAIL_FROM": "Kakushin <onboarding@resend.dev>"
+    "EMAIL_FROM": "Kakushin <hello@kakushin.dpdns.org>"
   }
 }
