@@ -27,10 +27,7 @@ export function Home() {
           <div className="actions"><Link className="btn" to="/login?mode=signup">Create your account</Link><Link className="btn ghost" to="/challenges">Browse challenges</Link><Link className="btn ghost" to="/admin">I run events</Link></div>
         </div>
         <div className="art" aria-hidden>
-          <i style={{ left: -40, right: -40, bottom: 0, height: 250, background: "var(--sand)", borderRadius: "50% 50% 0 0", boxShadow: "0 -6px 12px rgba(0,0,0,.08)" }} />
-          <i style={{ left: 20, right: -80, bottom: 0, height: 190, background: "var(--f-indigo)", borderRadius: "60% 40% 0 0", boxShadow: "0 -6px 12px rgba(0,0,0,.15)" }} />
-          <i style={{ left: -60, right: 60, bottom: 0, height: 110, background: "var(--ink)", borderRadius: "40% 60% 0 0", boxShadow: "0 -6px 12px rgba(0,0,0,.25)" }} />
-          <i style={{ top: 56, left: "50%", marginLeft: -64, width: 128, height: 128, borderRadius: "50%", background: "var(--f-red)", boxShadow: "0 8px 16px rgba(0,0,0,.2)" }} />
+          <img className="glyph" src="/hero/rocket.webp" width={322} height={569} alt="" decoding="async" />
         </div>
       </section>
       <section id="how" className="section" style={{ paddingBottom: 0 }}>
