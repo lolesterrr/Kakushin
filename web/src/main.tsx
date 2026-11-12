@@ -16,6 +16,7 @@ import { JudgeChallenge, JudgeHome, JudgeTeam } from "./pages/Judge";
 import { AdminOverview } from "./pages/Overview";
 import { AdminApplications } from "./pages/Applications";
 import { AdminChallenge, AdminHome, AdminOrg } from "./pages/Admin";
+import { Credits } from "./pages/Credits";
 import "./styles.css";
 
 function App() {
@@ -37,6 +38,7 @@ function App() {
         <Route path="/admin/o/:slug/c/:cslug/judging" element={<AdminJudging />} />
         <Route path="/admin/o/:slug/c/:cslug/results" element={<AdminResults />} />
         <Route path="/verify/:code" element={<VerifyCert />} />
+        <Route path="/credits" element={<Credits />} />
         <Route path="/inbox" element={<Inbox />} />
         <Route path="/platform" element={<PlatformOverview />} />
         <Route path="/platform/review" element={<PlatformReview />} />
