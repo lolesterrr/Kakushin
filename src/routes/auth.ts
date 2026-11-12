@@ -37,19 +37,26 @@ auth.post("/request", async (c) => {
     .bind(hash, kind, email, Date.now() + TOKEN_MS)
     .run();
 
-  if (kind === "code") {
-    await sendEmail(
-      c.env, email, "Your Kakushin sign-in code",
-      `<p>Your sign-in code is <b style="font-size:20px">${secret}</b></p><p>It expires in 15 minutes.</p>`,
-      `Your Kakushin sign-in code is ${secret}. It expires in 15 minutes.`,
-    );
-  } else {
-    const url = `${c.env.APP_URL}/auth/verify?token=${secret}`;
-    await sendEmail(
-      c.env, email, "Sign in to Kakushin",
-      `<p><a href="${url}">Sign in to Kakushin</a></p><p>The link expires in 15 minutes.</p>`,
-      `Sign in to Kakushin: ${url}\nThe link expires in 15 minutes.`,
-    );
+  try {
+    if (kind === "code") {
+      await sendEmail(
+        c.env, email, "Your Kakushin sign-in code",
+        `<p>Your sign-in code is <b style="font-size:20px">${secret}</b></p><p>It expires in 15 minutes.</p>`,
+        `Your Kakushin sign-in code is ${secret}. It expires in 15 minutes.`,
+      );
+    } else {
+      const url = `${c.env.APP_URL}/auth/verify?token=${secret}`;
+      await sendEmail(
+        c.env, email, "Sign in to Kakushin",
+        `<p><a href="${url}">Sign in to Kakushin</a></p><p>The link expires in 15 minutes.</p>`,
+        `Sign in to Kakushin: ${url}\nThe link expires in 15 minutes.`,
+      );
+    }
+  } catch (e) {
+    // Do not let a failed send use up the person's hourly allowance.
+    await c.env.DB.prepare("DELETE FROM login_tokens WHERE token_hash = ?").bind(hash).run();
+    console.error(`sign-in email failed: ${e instanceof Error ? e.message : e}`);
+    return c.json({ error: "We could not send an email to that address right now. Try again later or use a different address." }, 502);
   }
   // Same response whether or not the account exists.
   return c.json({ ok: true });
