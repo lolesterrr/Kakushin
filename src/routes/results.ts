@@ -3,6 +3,7 @@ import { z } from "zod";
 import type { AppEnv } from "../types";
 import { loadOrg } from "../lib/access";
 import { sendEmail } from "../lib/email";
+import { pushLater } from "../lib/push";
 
 /** Organiser side: winners, publishing, certificates. Mounted under /api/orgs. */
 export const orgResults = new Hono<AppEnv>();
@@ -82,6 +83,7 @@ orgResults.post("/:slug/challenges/:cslug/results/publish", async (c) => {
     ).bind(`Results are out: ${x.ch.title}`, "Your certificate is ready to download.", now, x.ch.id, `Results are out: ${x.ch.title}`),
   ]);
 
+  pushLater(c);
   // Email the first 40 people; the rest still see it in their inbox (the free plan allows 50 outgoing calls per request).
   const { results: people } = await db.prepare(
     "SELECT DISTINCT u.email FROM certificates ce JOIN users u ON u.id = ce.user_id WHERE ce.challenge_id = ? LIMIT 40",

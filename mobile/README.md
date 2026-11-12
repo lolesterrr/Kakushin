@@ -33,3 +33,7 @@ lib/auth.tsx          sign-in state
 ## Checks
 
 `npm run typecheck`. `npx expo export --platform ios` bundles the app without a device. `npx expo export --platform web` plus a static server gives a browser preview (secure storage does not exist on the web, so a page reload signs you out there; on a phone it persists).
+
+## Push notifications
+
+The app registers an Expo push token after sign-in and the Worker sends pushes for announcements, platform news, shortlists, results, certificates and new challenges that match your topics. Turn it off under Profile > Notifications. Push needs a real phone. In Expo Go on iPhone it works for testing; a standalone build needs an EAS project id in `app.json` (`extra.eas.projectId`) and Apple push credentials.
