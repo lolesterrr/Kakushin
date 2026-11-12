@@ -82,7 +82,8 @@ auth.post("/verify", async (c) => {
     .first<{ email: string }>();
   if (!row) return c.json({ error: "This link or code is invalid or expired" }, 401);
 
-  let user = await c.env.DB.prepare("SELECT id FROM users WHERE email = ?").bind(row.email).first<{ id: string }>();
+  let user = await c.env.DB.prepare("SELECT id, suspended FROM users WHERE email = ?").bind(row.email).first<{ id: string; suspended?: number }>();
+  if (user?.suspended) return c.json({ error: "This account has been suspended. Contact the Kakushin team." }, 403);
   if (!user) {
     const id = newId();
     await c.env.DB.prepare("INSERT INTO users (id, email, created_at) VALUES (?, ?, ?)").bind(id, row.email, Date.now()).run();

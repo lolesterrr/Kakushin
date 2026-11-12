@@ -10,6 +10,7 @@ import { pitch, decks } from "./routes/pitch";
 import { judge } from "./routes/judging";
 import { certificates } from "./routes/certificates";
 import { inbox, follows } from "./routes/inbox";
+import { platform } from "./routes/platform";
 import { readToken, userFromToken } from "./lib/session";
 
 const app = new Hono<AppEnv>();
@@ -34,6 +35,7 @@ app.route("/api/judge", judge);
 app.route("/api/certificates", certificates);
 app.route("/api/inbox", inbox);
 app.route("/api/follows", follows);
+app.route("/api/platform", platform);
 
 app.notFound((c) => (c.req.path.startsWith("/api/") ? c.json({ error: "Not found" }, 404) : c.env.ASSETS.fetch(c.req.raw)));
 app.onError((err, c) => {

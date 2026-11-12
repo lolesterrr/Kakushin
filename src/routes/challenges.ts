@@ -13,6 +13,7 @@ interface ChallengeRow {
   cover_key: string | null; prizes: string; status: string; team_min: number; team_max: number;
   applications_open_at: number | null; applications_close_at: number | null; pitch_due_at: number | null;
   topics: string; questions: string; results_published: number; created_at: number;
+  review_state: string; review_note: string;
 }
 
 export function challengeOut(r: ChallengeRow, org: Pick<OrgRow, "slug" | "name" | "logo_key">) {
@@ -23,6 +24,7 @@ export function challengeOut(r: ChallengeRow, org: Pick<OrgRow, "slug" | "name" 
     applications_open_at: r.applications_open_at, applications_close_at: r.applications_close_at, pitch_due_at: r.pitch_due_at,
     topics: JSON.parse(r.topics) as string[], questions: JSON.parse(r.questions) as unknown[],
     results_published: r.results_published, created_at: r.created_at,
+    review_state: r.review_state, review_note: r.review_note,
     org: { slug: org.slug, name: org.name, logo_url: fileUrl(org.logo_key) },
   };
 }
@@ -59,6 +61,33 @@ const challengeBody = z
     (b) => b.applications_open_at === null || b.applications_close_at === null || b.applications_open_at < b.applications_close_at,
     { message: "Applications must close after they open", path: ["applications_close_at"] },
   );
+
+/**
+ * Leaving draft needs the platform team's approval, unless the organisation is verified or this challenge was approved before.
+ * Returns the status to store, whether it was sent for review instead, or an error.
+ */
+async function publishGate(c: Context<AppEnv>, org: OrgRow, cslug: string, want: string): Promise<{ status: string; pending: boolean } | { error: string; code: 403 | 404 }> {
+  const cur = await c.env.DB.prepare("SELECT status, review_state, approved_at FROM challenges WHERE org_id = ? AND slug = ?").bind(org.id, cslug).first<{ status: string; review_state: string; approved_at: number | null }>();
+  if (!cur) return { error: "Not found", code: 404 };
+  if (want === "draft" || cur.status !== "draft") return { status: want, pending: false }; // saving a draft, or already live
+  if (org.suspended) return { error: "Your organisation is suspended, so it cannot publish challenges.", code: 403 };
+  if (org.verified || cur.approved_at) return { status: want, pending: false };
+  return { status: "draft", pending: true };
+}
+
+/** Records that a draft is waiting for review and tells the platform admins. */
+async function submitForReview(c: Context<AppEnv>, org: OrgRow, cslug: string) {
+  const now = Date.now();
+  const row = await c.env.DB.prepare("SELECT id, title, review_state FROM challenges WHERE org_id = ? AND slug = ?").bind(org.id, cslug).first<{ id: string; title: string; review_state: string }>();
+  if (!row || row.review_state === "pending") return;
+  await c.env.DB.batch([
+    c.env.DB.prepare("UPDATE challenges SET review_state = 'pending', review_note = '', submitted_at = ? WHERE id = ?").bind(now, row.id),
+    c.env.DB.prepare(
+      `INSERT INTO notifications (id, user_id, kind, title, body, link, created_at)
+       SELECT lower(hex(randomblob(12))), u.id, 'review.requested', ?, ?, '/platform/review', ? FROM users u WHERE u.is_platform_admin = 1 AND u.suspended = 0`,
+    ).bind(`Event waiting for review: ${row.title}`, `${org.name} wants to publish a challenge.`, now),
+  ]);
+}
 
 /** The first time a challenge leaves draft, tell the organisation's followers and people with a matching topic. */
 async function announceOnce(c: Context<AppEnv>, org: { id: string; slug: string; name: string }, cslug: string) {
@@ -116,6 +145,8 @@ orgChallenges.put("/:slug/challenges/:cslug", async (c) => {
   if (b.status !== "draft" && (!b.summary || !b.description)) {
     return c.json({ error: "Add a summary and a description before publishing" }, 400);
   }
+  const gate = await publishGate(c, access.org, c.req.param("cslug"), b.status);
+  if ("error" in gate) return c.json({ error: gate.error }, gate.code);
   const questions = b.questions.map((q) => ({
     id: q.id ?? newId().slice(-8),
     label: q.label, type: q.type, required: q.required,
@@ -127,14 +158,15 @@ orgChallenges.put("/:slug/challenges/:cslug", async (c) => {
        applications_open_at=?, applications_close_at=?, pitch_due_at=?, topics=?, questions=?
      WHERE org_id = ? AND slug = ?`,
   ).bind(
-    b.title, b.summary, b.description, b.prizes, b.status, b.team_min, b.team_max,
+    b.title, b.summary, b.description, b.prizes, gate.status, b.team_min, b.team_max,
     b.applications_open_at, b.applications_close_at, b.pitch_due_at,
     JSON.stringify([...new Set(b.topics)]), JSON.stringify(questions),
     access.org.id, c.req.param("cslug"),
   ).run();
   if (!res.meta.changes) return c.json({ error: "Not found" }, 404);
-  await announceOnce(c, access.org, c.req.param("cslug"));
-  return c.json({ ok: true });
+  if (gate.pending) await submitForReview(c, access.org, c.req.param("cslug"));
+  else await announceOnce(c, access.org, c.req.param("cslug"));
+  return c.json({ ok: true, pending: gate.pending });
 });
 
 /** Moves a challenge to another stage without touching its other fields. */
@@ -149,9 +181,12 @@ orgChallenges.put("/:slug/challenges/:cslug/status", async (c) => {
   const row = await c.env.DB.prepare("SELECT summary, description FROM challenges WHERE org_id = ? AND slug = ?").bind(access.org.id, c.req.param("cslug")).first<{ summary: string; description: string }>();
   if (!row) return c.json({ error: "Not found" }, 404);
   if (parsed.data.status !== "draft" && (!row.summary || !row.description)) return c.json({ error: "Add a summary and a description before publishing" }, 400);
-  await c.env.DB.prepare("UPDATE challenges SET status = ? WHERE org_id = ? AND slug = ?").bind(parsed.data.status, access.org.id, c.req.param("cslug")).run();
-  await announceOnce(c, access.org, c.req.param("cslug"));
-  return c.json({ ok: true });
+  const gate = await publishGate(c, access.org, c.req.param("cslug"), parsed.data.status);
+  if ("error" in gate) return c.json({ error: gate.error }, gate.code);
+  await c.env.DB.prepare("UPDATE challenges SET status = ? WHERE org_id = ? AND slug = ?").bind(gate.status, access.org.id, c.req.param("cslug")).run();
+  if (gate.pending) await submitForReview(c, access.org, c.req.param("cslug"));
+  else await announceOnce(c, access.org, c.req.param("cslug"));
+  return c.json({ ok: true, pending: gate.pending });
 });
 
 orgChallenges.put("/:slug/challenges/:cslug/cover", async (c) => {
@@ -198,7 +233,7 @@ explore.get("/", async (c) => {
   const sql = `SELECT c.slug, c.title, c.summary, c.cover_key, c.topics, c.team_min, c.team_max, c.prizes, c.status,
         c.applications_close_at, o.slug AS org_slug, o.name AS org_name, o.logo_key
       FROM challenges c JOIN organizations o ON o.id = c.org_id
-      WHERE c.status = 'open' ${useTopic ? "AND c.topics LIKE ?" : ""}
+      WHERE c.status = 'open' AND o.suspended = 0 ${useTopic ? "AND c.topics LIKE ?" : ""}
       ORDER BY (c.applications_close_at IS NULL), c.applications_close_at ASC, c.created_at DESC LIMIT 60`;
   const stmt = c.env.DB.prepare(sql);
   const { results } = await (useTopic ? stmt.bind(`%"${topic}"%`) : stmt).all<Record<string, unknown>>();

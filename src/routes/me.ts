@@ -8,7 +8,7 @@ me.get("/", async (c) => {
   const u = c.get("user");
   if (!u) return c.json({ user: null });
   const full = await c.env.DB.prepare(
-    "SELECT id, email, name, bio, institution, location, skills, links, gender FROM users WHERE id = ?",
+    "SELECT id, email, name, bio, institution, location, skills, links, gender, is_platform_admin FROM users WHERE id = ?",
   ).bind(u.id).first<Record<string, unknown>>();
   return c.json({
     user: { ...full, skills: JSON.parse(String(full?.skills ?? "[]")), links: JSON.parse(String(full?.links ?? "{}")) },

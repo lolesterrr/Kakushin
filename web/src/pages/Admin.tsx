@@ -70,7 +70,7 @@ export function AdminHome() {
 interface OrgData {
   org: { slug: string; name: string; type: string; website: string | null; logo_url: string | null };
   role: string | null;
-  challenges: { slug: string; title: string; status: string; applications_close_at: number | null }[];
+  challenges: { slug: string; title: string; status: string; applications_close_at: number | null; review_state?: string }[];
 }
 
 export function AdminOrg() {
@@ -113,7 +113,7 @@ export function AdminOrg() {
           <div className="table-wrap"><table>
             <thead><tr><th>Title</th><th>Status</th><th>Closes</th><th></th></tr></thead>
             <tbody>{challenges.map((c) => (
-              <tr key={c.slug}><td><Link to={`/admin/o/${slug}/c/${c.slug}`}>{c.title}</Link></td><td><Tag status={c.status} /></td><td>{fmtDate(c.applications_close_at)}</td><td>{c.status !== "draft" && <Link to={`/admin/o/${slug}/c/${c.slug}/applications`}>Applications</Link>}</td></tr>
+              <tr key={c.slug}><td><Link to={`/admin/o/${slug}/c/${c.slug}`}>{c.title}</Link></td><td><Tag status={c.status === "draft" && c.review_state === "pending" ? "pending" : c.status === "draft" && c.review_state === "rejected" ? "rejected_review" : c.status} /></td><td>{fmtDate(c.applications_close_at)}</td><td>{c.status !== "draft" && <Link to={`/admin/o/${slug}/c/${c.slug}/applications`}>Applications</Link>}</td></tr>
             ))}</tbody>
           </table></div>
         )}
@@ -155,11 +155,13 @@ export function AdminChallenge() {
   const [msg, setMsg] = useState<Msg>(null);
   const [saving, setSaving] = useState(false);
   const [copied, setCopied] = useState(false);
+  const [review, setReview] = useState<{ state: string; note: string }>({ state: "none", note: "" });
   useEffect(() => {
     if (guard) return;
     api<{ topics: string[] }>("/challenges/topics").then((r) => setAllTopics(r.topics)).catch(() => {});
     api<{ challenge: any; role: string | null }>(`/orgs/${slug}/challenges/${cslug}`).then(({ challenge: c, role }) => {
       if (!role) { setMsg({ kind: "err", text: "You are not an admin of this organisation." }); return; }
+      setReview({ state: c.review_state ?? "none", note: c.review_note ?? "" });
       setF({
         title: c.title, summary: c.summary, description: c.description, prizes: c.prizes, status: c.status, team_min: c.team_min, team_max: c.team_max,
         opens: toLocalInput(c.applications_open_at), closes: toLocalInput(c.applications_close_at), pitch: toLocalInput(c.pitch_due_at),
@@ -179,15 +181,20 @@ export function AdminChallenge() {
   async function save(status = f!.status) {
     setSaving(true); setMsg(null);
     try {
-      await api(`/orgs/${slug}/challenges/${cslug}`, { method: "PUT", json: {
+      const res = await api<{ pending?: boolean }>(`/orgs/${slug}/challenges/${cslug}`, { method: "PUT", json: {
         title: f!.title, summary: f!.summary, description: f!.description, prizes: f!.prizes, status,
         team_min: Number(f!.team_min), team_max: Number(f!.team_max),
         applications_open_at: fromLocalInput(f!.opens), applications_close_at: fromLocalInput(f!.closes), pitch_due_at: fromLocalInput(f!.pitch),
         topics: f!.topics,
         questions: f!.questions.map((q) => ({ ...q, options: q.type === "choice" ? q.options.filter(Boolean) : [] })),
       } });
-      setF({ ...f!, status });
-      setMsg({ kind: "ok", text: status === "open" && f!.status !== "open" ? "Published. Share the link below." : "Saved" });
+      if (res.pending) {
+        setF({ ...f!, status: "draft" }); setReview({ state: "pending", note: "" });
+        setMsg({ kind: "ok", text: "Sent for review. The Kakushin team checks new challenges before they go public, and you will get a note in your inbox." });
+      } else {
+        setF({ ...f!, status });
+        setMsg({ kind: "ok", text: status === "open" && f!.status !== "open" ? "Published. Share the link below." : "Saved" });
+      }
     } catch (err) { setMsg({ kind: "err", text: (err as Error).message }); }
     setSaving(false);
   }
@@ -207,7 +214,7 @@ export function AdminChallenge() {
 
   return (
     <>
-      <Band crumb="Back to organisation" to={`/admin/o/${slug}`} title={f.title || "Untitled challenge"} tags={<Tag status={f.status} />} tabs={challengeTabs(slug!, cslug!)} />
+      <Band crumb="Back to organisation" to={`/admin/o/${slug}`} title={f.title || "Untitled challenge"} tags={<Tag status={f.status === "draft" && review.state === "pending" ? "pending" : f.status} />} tabs={challengeTabs(slug!, cslug!)} />
       {f.status !== "draft" && (
         <div className="section"><div className="actions" style={{ marginTop: 0 }}><input readOnly value={publicUrl} aria-label="Public link" style={{ maxWidth: 420 }} onFocus={(e) => e.target.select()} /><button className="ghost" onClick={copy}>{copied ? "Copied" : "Copy link"}</button><Link className="btn ghost" to={`/o/${slug}/c/${cslug}`}>View page</Link></div></div>
       )}
@@ -270,9 +277,12 @@ export function AdminChallenge() {
         <label htmlFor="st">Stage</label>
         <select id="st" value={f.status} onChange={(e) => set("status", e.target.value)}>{STATUSES.map((s) => <option key={s}>{s}</option>)}</select>
         <p className="muted">Drafts are hidden from everyone but your admins. Open challenges appear on Explore.</p>
+        {f.status === "draft" && review.state === "pending" && <Notice kind="ok">Waiting for review. The Kakushin team is checking this challenge. You can keep editing, and you will get a note in your inbox when it is decided.</Notice>}
+        {f.status === "draft" && review.state === "rejected" && <Notice kind="err">Changes needed before this can go live: {review.note}</Notice>}
+        {f.status === "draft" && review.state !== "pending" && <p className="muted">Publishing sends the challenge to the Kakushin team for a quick check before it goes public.</p>}
         <div className="actions">
           <button onClick={() => save()} disabled={saving}>{saving ? "Saving..." : "Save"}</button>
-          {f.status === "draft" && <button className="ghost" onClick={() => save("open")} disabled={saving}>Publish</button>}
+          {f.status === "draft" && review.state !== "pending" && <button className="ghost" onClick={() => save("open")} disabled={saving}>{review.state === "rejected" ? "Send for review again" : "Publish"}</button>}
           {f.status === "draft" && <button className="ghost" onClick={remove}>Delete draft</button>}
         </div>
         {msg && <Notice kind={msg.kind}>{msg.text}</Notice>}
