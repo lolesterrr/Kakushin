@@ -1,7 +1,7 @@
 import React, { createContext, useContext, useEffect, useState } from "react";
 import { api } from "./api";
 
-export interface Me { id: string; email: string; name: string | null; bio: string | null; institution: string | null; location: string | null; skills: string[] }
+export interface Me { id: string; email: string; name: string | null; bio: string | null; institution: string | null; location: string | null; skills: string[]; is_platform_admin?: number }
 interface Ctx { me: Me | null; reload: () => Promise<void> }
 
 const AuthCtx = createContext<Ctx>({ me: null, reload: async () => {} });

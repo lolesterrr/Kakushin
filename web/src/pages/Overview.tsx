@@ -6,7 +6,7 @@ import { Band, NumSection, Notice, Tag } from "../ui";
 import { challengeTabs } from "./Admin";
 
 interface Overview { counts: Record<string, number>; newest: { team_id: string; name: string; submitted_at: number; members: number }[] }
-interface Ch { title: string; summary: string; description: string; cover_url: string | null; status: string; applications_close_at: number | null; questions: unknown[] }
+interface Ch { title: string; summary: string; description: string; cover_url: string | null; status: string; applications_close_at: number | null; questions: unknown[]; review_state?: string; review_note?: string }
 
 /** Organiser's home for one challenge: what stage everything is at and what to do next. */
 export function AdminOverview() {
@@ -32,7 +32,9 @@ export function AdminOverview() {
   const n = (k: string) => ov.counts[k] ?? 0;
   const publicUrl = `${window.location.origin}/o/${slug}/c/${cslug}`;
   const todo: { text: string; to?: string; cta?: string; copy?: boolean }[] = [];
-  if (ch.status === "draft") todo.push({ text: !ch.summary || !ch.description ? "Finish the summary and description, then publish" : "Publish your challenge so people can find it", to: `${base}/edit`, cta: "Open editor" });
+  if (ch.status === "draft" && ch.review_state === "pending") todo.push({ text: "Waiting for the Kakushin team to review this challenge. You will get a note in your inbox.", to: `${base}/edit`, cta: "View" });
+  else if (ch.status === "draft" && ch.review_state === "rejected") todo.push({ text: `Changes needed before this can go live: ${ch.review_note}`, to: `${base}/edit`, cta: "Fix and resend" });
+  else if (ch.status === "draft") todo.push({ text: !ch.summary || !ch.description ? "Finish the summary and description, then publish" : "Publish your challenge so people can find it", to: `${base}/edit`, cta: "Open editor" });
   if (!ch.cover_url) todo.push({ text: "Add a cover image so the challenge stands out", to: `${base}/edit`, cta: "Add image" });
   if (ch.status === "open" && n("applied") > 0) todo.push({ text: `Review ${n("applied")} new ${n("applied") === 1 ? "application" : "applications"}`, to: `${base}/applications?f=applied`, cta: "Review" });
   if (n("shortlisted") > 0) todo.push({ text: `Pick finalists from ${n("shortlisted")} shortlisted ${n("shortlisted") === 1 ? "team" : "teams"}`, to: `${base}/applications?f=shortlisted`, cta: "Choose" });

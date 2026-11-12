@@ -39,7 +39,7 @@ export async function userFromToken(c: Context<AppEnv>, token: string): Promise<
   const row = await c.env.DB.prepare(
     `SELECT u.id, u.email, u.name, u.is_platform_admin
      FROM sessions s JOIN users u ON u.id = s.user_id
-     WHERE s.id_hash = ? AND s.expires_at > ?`,
+     WHERE s.id_hash = ? AND s.expires_at > ? AND u.suspended = 0`,
   )
     .bind(await sha256Hex(token), Date.now())
     .first<User>();

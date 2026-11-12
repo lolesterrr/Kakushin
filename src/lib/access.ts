@@ -3,7 +3,7 @@ import type { AppEnv } from "../types";
 
 export interface OrgRow {
   id: string; slug: string; name: string; type: string;
-  logo_key: string | null; website: string | null; plan: string; created_at: number;
+  logo_key: string | null; website: string | null; plan: string; created_at: number; verified: number; suspended: number;
 }
 export type OrgRole = "owner" | "admin";
 
@@ -18,6 +18,8 @@ export async function loadOrg(c: Context<AppEnv>, slug: string): Promise<{ org: 
       .bind(org.id, user.id).first<{ role: OrgRole }>();
     role = m?.role ?? null;
   }
+  // A suspended organisation disappears for everyone except its own members and platform admins.
+  if (org.suspended && !role && !user?.is_platform_admin) return null;
   return { org, role };
 }
 

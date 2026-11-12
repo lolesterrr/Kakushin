@@ -23,6 +23,7 @@ export function Layout({ children }: { children: React.ReactNode }) {
             {!me && <Link to="/#how" className="hide-sm">How it works</Link>}
             <NavLink to="/admin" className="hide-sm">{me ? "Organise" : "For organisers"}</NavLink>
             {judging && <NavLink to="/judge">Judge</NavLink>}
+            {me?.is_platform_admin ? <NavLink to="/platform" className="hide-sm">Platform</NavLink> : null}
             {me && <NavLink to="/inbox">Inbox{unread > 0 && <span className="badge" aria-label={`${unread} unread`}>{unread}</span>}</NavLink>}
             {me && <NavLink to="/profile">Profile</NavLink>}
             {me ? <button className="link" onClick={logout}>Sign out</button> : <><NavLink to="/login">Sign in</NavLink><NavLink to="/login?mode=signup" className="signin">Sign up</NavLink></>}
@@ -91,8 +92,8 @@ export function Notice({ kind, children }: { kind: "ok" | "err"; children: React
 }
 
 export const Tag = ({ status }: { status: string }) => {
-  const label: Record<string, string> = { draft: "Draft", open: "Open", reviewing: "Reviewing", judging: "Judging", completed: "Completed", applied: "New", shortlisted: "Shortlisted", rejected: "Rejected", finalist: "Finalist", winner: "Winner", forming: "Forming" };
-  const tone: Record<string, string> = { draft: "sand", open: "moss", reviewing: "gold", judging: "indigo", completed: "ink", applied: "gold", shortlisted: "moss", rejected: "ink", finalist: "gold", winner: "indigo", forming: "sand" };
+  const label: Record<string, string> = { draft: "Draft", pending: "In review", rejected_review: "Changes needed", open: "Open", reviewing: "Reviewing", judging: "Judging", completed: "Completed", applied: "New", shortlisted: "Shortlisted", rejected: "Rejected", finalist: "Finalist", winner: "Winner", forming: "Forming" };
+  const tone: Record<string, string> = { draft: "sand", pending: "gold", rejected_review: "ink", open: "moss", reviewing: "gold", judging: "indigo", completed: "ink", applied: "gold", shortlisted: "moss", rejected: "ink", finalist: "gold", winner: "indigo", forming: "sand" };
   return <span className={`tag ${tone[status] ?? "sand"}`}>{label[status] ?? status}</span>;
 };
 
