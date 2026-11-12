@@ -14,13 +14,16 @@ interface ChallengeRow {
   cover_key: string | null; prizes: string; status: string; team_min: number; team_max: number;
   applications_open_at: number | null; applications_close_at: number | null; pitch_due_at: number | null;
   topics: string; questions: string; results_published: number; created_at: number;
-  review_state: string; review_note: string;
+  review_state: string; review_note: string; cover_credit: string | null;
 }
+
+const credit = z.object({ author: z.string().trim().min(1).max(120), license: z.string().trim().min(1).max(40), source: z.string().url().max(400).refine((u) => u.startsWith("https://")), license_url: z.string().url().max(300).refine((u) => u.startsWith("https://")).optional() });
+export const parseCredit = (raw: string | null) => { try { return raw ? (credit.parse(JSON.parse(raw)) as z.infer<typeof credit>) : null; } catch { return null; } };
 
 export function challengeOut(r: ChallengeRow, org: Pick<OrgRow, "slug" | "name" | "logo_key">) {
   return {
     id: r.id, slug: r.slug, title: r.title, summary: r.summary, description: r.description,
-    cover_url: fileUrl(r.cover_key), prizes: r.prizes, status: r.status,
+    cover_url: fileUrl(r.cover_key), cover_credit: parseCredit(r.cover_credit), prizes: r.prizes, status: r.status,
     team_min: r.team_min, team_max: r.team_max,
     applications_open_at: r.applications_open_at, applications_close_at: r.applications_close_at, pitch_due_at: r.pitch_due_at,
     topics: JSON.parse(r.topics) as string[], questions: JSON.parse(r.questions) as unknown[],
@@ -203,8 +206,16 @@ orgChallenges.put("/:slug/challenges/:cslug/cover", async (c) => {
 
   const saved = await saveImage(c, "covers", 4 * 1024 * 1024);
   if (!saved.ok) return c.json({ error: saved.error }, 400);
-  await c.env.DB.prepare("UPDATE challenges SET cover_key = ? WHERE org_id = ? AND slug = ?")
-    .bind(saved.key, access.org.id, c.req.param("cslug")).run();
+  // Optional credit for openly licensed photos, sent as JSON in X-Cover-Credit.
+  let creditJson: string | null = null;
+  const rawCredit = c.req.header("X-Cover-Credit");
+  if (rawCredit) {
+    const parsedCredit = credit.safeParse((() => { try { return JSON.parse(rawCredit); } catch { return null; } })());
+    if (!parsedCredit.success) { await c.env.FILES.delete(saved.key); return c.json({ error: "The photo credit needs an author, a licence and an https source link" }, 400); }
+    creditJson = JSON.stringify(parsedCredit.data);
+  }
+  await c.env.DB.prepare("UPDATE challenges SET cover_key = ?, cover_credit = ? WHERE org_id = ? AND slug = ?")
+    .bind(saved.key, creditJson, access.org.id, c.req.param("cslug")).run();
   if (row.cover_key) await c.env.FILES.delete(row.cover_key);
   return c.json({ ok: true, cover_url: fileUrl(saved.key) });
 });
@@ -248,6 +259,16 @@ explore.get("/", async (c) => {
       org: { slug: r.org_slug, name: r.org_name, logo_url: fileUrl(r.logo_key as string | null) },
     })),
   });
+});
+
+/** Photo credits for every public cover, linked from the site footer. */
+explore.get("/credits", async (c) => {
+  const { results } = await c.env.DB.prepare(
+    `SELECT c.slug, c.title, c.cover_credit, o.slug AS org_slug, o.name AS org_name
+     FROM challenges c JOIN organizations o ON o.id = c.org_id
+     WHERE c.cover_credit IS NOT NULL AND c.cover_key IS NOT NULL AND c.status != 'draft' AND o.suspended = 0 ORDER BY o.name, c.title`,
+  ).all<{ slug: string; title: string; cover_credit: string; org_slug: string; org_name: string }>();
+  return c.json({ credits: results.flatMap((r) => { const cr = parseCredit(r.cover_credit); return cr ? [{ title: r.title, slug: r.slug, org: r.org_name, org_slug: r.org_slug, ...cr }] : []; }) });
 });
 
 explore.get("/topics", (c) => c.json({ topics: TOPICS }));

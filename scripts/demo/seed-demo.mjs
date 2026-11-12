@@ -66,7 +66,7 @@ async function signIn(name) {
     const t = await res.text(); let d; try { d = JSON.parse(t); } catch { d = t; }
     return { s: res.status, d };
   };
-  call.putWithCookie = async (p, file, type) => (await fetch(`${U}/api${p}`, { method: "PUT", headers: { "content-type": type, "X-File-Name": path.basename(file), cookie: `kk_session=${tok}` }, body: fs.readFileSync(file) })).status;
+  call.putWithCookie = async (p, file, type, extra = {}) => (await fetch(`${U}/api${p}`, { method: "PUT", headers: { "content-type": type, "X-File-Name": path.basename(file), cookie: `kk_session=${tok}`, ...extra }, body: fs.readFileSync(file) })).status;
   call.email = emailOf(name);
   sessions[name] = call;
   await call("/me", "PUT", { name, bio: "", institution: "", location: "Kampala", skills: [], links: {}, gender: null });
@@ -86,6 +86,7 @@ for (const o of ORGS) {
 log("organisations ready");
 
 // ---------- challenges ----------
+const CREDITS = fs.existsSync(path.join(MEDIA, "credits.json")) ? JSON.parse(fs.readFileSync(path.join(MEDIA, "credits.json"), "utf8")) : {};
 const orgOf = Object.fromEntries(ORGS.map((o) => [o.key, o]));
 const MARKS = [[9, 8, 9], [8, 7, 8], [7, 8, 6], [6, 5, 7], [5, 6, 5]];
 let k = 0;
@@ -97,7 +98,10 @@ for (const ch of CHALLENGES) {
     applications_open_at: now - 20 * DAY, applications_close_at: now + (9 + ((k * 7) % 24)) * DAY,
   });
   ok(`challenge ${slug}`, put.s === 200, put);
-  ok(`cover ${slug}`, (await host.putWithCookie(`${C}/cover`, path.join(MEDIA, "covers", `${slug}.jpg`), "image/jpeg")) === 200);
+  // Openly licensed photos (with credits) when present, otherwise the drawn illustrations.
+  const photo = path.join(MEDIA, "covers-photo", `${slug}.jpg`), cr = CREDITS[slug];
+  const useIllustration = !fs.existsSync(photo) || !cr;
+  ok(`cover ${slug}`, (await host.putWithCookie(`${C}/cover`, useIllustration ? path.join(MEDIA, "covers", `${slug}.jpg`) : photo, "image/jpeg", useIllustration ? {} : { "X-Cover-Credit": JSON.stringify(cr) })) === 200);
   const qs = (await host(C)).d.challenge?.questions ?? (await host(C)).d.questions ?? [];
 
   // teams
