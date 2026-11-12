@@ -188,3 +188,4 @@ th, td { padding: 10px 12px; border-bottom: 1px solid var(--line); }
 .admin .section > h2::before, .admin .section > .head-row h2::before { counter-increment: sec; content: counter(sec, decimal-leading-zero); font-size: 14px; color: var(--red-text); }
 .admin th, .admin td { padding: 12px; }
 @media (max-width: 640px) { .admin .section { padding: 20px 16px 28px; } }
+input[type=range]{accent-color:var(--red);padding:0;border:0;background:none}

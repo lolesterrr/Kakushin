@@ -18,6 +18,14 @@ export async function uploadImage<T = unknown>(path: string, file: File): Promis
   return data as T;
 }
 
+/** Same as uploadImage, but also sends the original file name (used for pitch decks). */
+export async function uploadFile<T = unknown>(path: string, file: File): Promise<T> {
+  const res = await fetch(`/api${path}`, { method: "PUT", headers: { "Content-Type": file.type, "X-File-Name": file.name }, body: file, credentials: "same-origin" });
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) throw new Error((data as { error?: string }).error ?? `Upload failed (${res.status})`);
+  return data as T;
+}
+
 const MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
 export const fmtDate = (ms: number | null) => {
   if (!ms) return "Not set";

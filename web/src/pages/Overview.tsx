@@ -35,12 +35,15 @@ export function AdminOverview() {
   if (ch.status === "draft") todo.push({ text: !ch.summary || !ch.description ? "Finish the summary and description, then publish" : "Publish your challenge so people can find it", to: `${base}/edit`, cta: "Open editor" });
   if (!ch.cover_url) todo.push({ text: "Add a cover image so the challenge stands out", to: `${base}/edit`, cta: "Add image" });
   if (ch.status === "open" && n("applied") > 0) todo.push({ text: `Review ${n("applied")} new ${n("applied") === 1 ? "application" : "applications"}`, to: `${base}/applications?f=applied`, cta: "Review" });
+  if (n("shortlisted") > 0) todo.push({ text: `Pick finalists from ${n("shortlisted")} shortlisted ${n("shortlisted") === 1 ? "team" : "teams"}`, to: `${base}/applications?f=shortlisted`, cta: "Choose" });
+  if (n("finalist") > 0 && ch.status !== "judging" && ch.status !== "completed") todo.push({ text: "Set up judging: criteria, judges, then start judging", to: `${base}/judging`, cta: "Open judging" });
+  if (ch.status === "judging") todo.push({ text: "Judging is open. Watch the leaderboard", to: `${base}/judging`, cta: "Leaderboard" });
   if (ch.status !== "draft") todo.push({ text: "Share the link with your audience", copy: true });
   if (todo.length === 0) todo.push({ text: "You are all caught up." });
 
   const stages: [string, string, boolean][] = [
     ["forming", "Forming teams", false], ["applied", "New", n("applied") > 0 && ch.status === "open"],
-    ["shortlisted", "Shortlisted", false], ["rejected", "Rejected", false],
+    ["shortlisted", "Shortlisted", false], ["finalist", "Finalists", false], ["rejected", "Rejected", false],
   ];
 
   return (

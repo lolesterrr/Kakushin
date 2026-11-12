@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from "react";
 import { Link, Navigate, useNavigate, useParams } from "react-router-dom";
-import { api } from "../api";
+import { api, fmtDate, uploadFile } from "../api";
 import { useAuth } from "../auth";
 import { Logo, Notice, Stamp } from "../ui";
 
@@ -32,7 +32,7 @@ export function useMyTeam(orgSlug: string, cslug: string) {
   return { team, reload };
 }
 
-type Chal = { status: string; team_min: number; team_max: number; applications_open_at: number | null; applications_close_at: number | null };
+type Chal = { status: string; team_min: number; team_max: number; applications_open_at: number | null; applications_close_at: number | null; pitch_due_at?: number | null };
 
 function windowClosed(c: Chal): string | null {
   const now = Date.now();
@@ -44,7 +44,8 @@ function windowClosed(c: Chal): string | null {
 /** One panel: the deadline countdown and the single thing to do next. */
 export function NextStep({ orgSlug, cslug, challenge, team }: { orgSlug: string; cslug: string; challenge: Chal; team: TeamData | null | undefined }) {
   const { me } = useAuth();
-  const closed = windowClosed(challenge);
+  const inPitchStage = !!team && !["forming", "applied"].includes(team.status);
+  const closed = inPitchStage ? null : windowClosed(challenge);
   const close = challenge.applications_close_at;
   const days = close ? Math.ceil((close - Date.now()) / 86400000) : null;
   let text = "", action: React.ReactNode = null;
@@ -59,13 +60,14 @@ export function NextStep({ orgSlug, cslug, challenge, team }: { orgSlug: string;
     else text = "Your team lead sends the application.";
   }
   else if (team.status === "applied") text = "Received. The organisers will review your application. You can edit it until the deadline.";
-  else if (team.status === "shortlisted") text = "You are shortlisted. The organisers will share the next steps.";
+  else if (team.status === "shortlisted") { text = `You are shortlisted. Send your pitch${challenge.pitch_due_at ? ` before ${fmtDate(challenge.pitch_due_at)}` : ""}.`; action = <a className="btn" href="#pitch">Submit your pitch</a>; }
+  else if (team.status === "finalist") { text = "You are a finalist. Judges can see your pitch, so keep it up to date."; action = <a className="btn" href="#pitch">Update your pitch</a>; }
   else if (team.status === "rejected") { text = "Not selected this time. Plenty of other challenges are open."; action = <Link className="btn ghost" to="/challenges">Browse challenges</Link>; }
   else text = "You are in. Check your email for updates.";
   return (
     <aside className="next" aria-label="Your next step">
       <div className="days">
-        {days === null ? <b>Open</b> : days > 0 ? <><b>{days}</b><span className="muted">{days === 1 ? "day left" : "days left"}</span></> : <b>Closed</b>}
+        {challenge.status !== "open" ? <b>{({ reviewing: "Reviewing", judging: "Judging", completed: "Done", draft: "Draft" } as Record<string, string>)[challenge.status] ?? "Closed"}</b> : days === null ? <b>Open</b> : days > 0 ? <><b>{days}</b><span className="muted">{days === 1 ? "day left" : "days left"}</span></> : <b>Closed</b>}
       </div>
       <div className="body"><p className="label" style={{ margin: 0 }}>Your next step</p><p>{text}</p>{action}</div>
     </aside>
@@ -74,7 +76,7 @@ export function NextStep({ orgSlug, cslug, challenge, team }: { orgSlug: string;
 
 interface Props {
   orgSlug: string; cslug: string; team: TeamData | null | undefined; reload: () => Promise<void>;
-  challenge: { status: string; team_min: number; team_max: number; questions: Question[]; applications_open_at: number | null; applications_close_at: number | null };
+  challenge: { pitch_due_at?: number | null; status: string; team_min: number; team_max: number; questions: Question[]; applications_open_at: number | null; applications_close_at: number | null };
 }
 
 export function TeamPanel({ orgSlug, cslug, challenge, team, reload }: Props) {
@@ -161,6 +163,8 @@ export function TeamPanel({ orgSlug, cslug, challenge, team, reload }: Props) {
         {team.status === "forming" && <div className="actions"><button className="ghost" onClick={() => run(() => api(`/teams/${team.id}/leave`, { method: "POST" }))}>Leave team</button></div>}
       </div>
 
+      {["shortlisted", "finalist", "winner"].includes(team.status) && <PitchSection team={team} dueAt={challenge.pitch_due_at} />}
+
       {(team.status === "forming" || team.status === "applied") && (
         <div className="section form">
           <h2>{team.status === "applied" ? "Your application" : "Application"}</h2>
@@ -221,6 +225,51 @@ export function Join() {
         </>
       ) : !err ? null : <h1>Invite not found</h1>}
       {err && <Notice kind="err">{err}</Notice>}
+    </div>
+  );
+}
+
+interface PitchData { has_deck: boolean; deck_name: string | null; video_url: string; demo_url: string; notes: string }
+
+export function PitchSection({ team, dueAt }: { team: TeamData; dueAt: number | null | undefined }) {
+  const [pitch, setPitch] = useState<PitchData | null>(null);
+  const [form, setForm] = useState({ video_url: "", demo_url: "", notes: "" });
+  const [msg, setMsg] = useState<Msg>(null);
+  const [busy, setBusy] = useState(false);
+  const late = !!dueAt && Date.now() > dueAt;
+  async function load() {
+    const r = await api<{ pitch: PitchData | null }>(`/teams/${team.id}/pitch`);
+    setPitch(r.pitch); if (r.pitch) setForm({ video_url: r.pitch.video_url, demo_url: r.pitch.demo_url, notes: r.pitch.notes });
+  }
+  useEffect(() => { void load().catch(() => {}); }, [team.id]);
+  async function save(e: React.FormEvent) {
+    e.preventDefault(); setMsg(null);
+    try { await api(`/teams/${team.id}/pitch`, { method: "PUT", json: form }); await load(); setMsg({ kind: "ok", text: "Pitch saved" }); }
+    catch (err) { setMsg({ kind: "err", text: (err as Error).message }); }
+  }
+  async function deck(e: React.ChangeEvent<HTMLInputElement>) {
+    const f = e.target.files?.[0]; e.target.value = ""; if (!f) return;
+    setBusy(true); setMsg(null);
+    try { await uploadFile(`/teams/${team.id}/pitch/deck`, f); await load(); setMsg({ kind: "ok", text: "Deck uploaded" }); }
+    catch (err) { setMsg({ kind: "err", text: (err as Error).message }); }
+    setBusy(false);
+  }
+  const set = (k: keyof typeof form) => (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => setForm({ ...form, [k]: e.target.value });
+  return (
+    <div className="section form" id="pitch">
+      <h2>Your pitch</h2>
+      <p className="muted">Add a deck, a video link, a demo link, or all three. Judges see exactly what you add here.{dueAt ? ` Due ${fmtDate(dueAt)}.` : ""}</p>
+      {late && <Notice kind="err">The pitch deadline has passed, so the pitch can no longer be changed.</Notice>}
+      <form onSubmit={save}>
+        <label htmlFor="pd">Pitch deck (PDF, up to 20 MB)</label>
+        <input id="pd" type="file" accept="application/pdf" disabled={busy || late} onChange={deck} />
+        {pitch?.has_deck && <p style={{ margin: "8px 0 0", fontSize: 14 }}>Uploaded: <a href={`/api/decks/${team.id}`} target="_blank" rel="noopener noreferrer">{pitch.deck_name ?? "deck.pdf"}</a></p>}
+        <label htmlFor="pv">Video link</label><input id="pv" type="url" placeholder="https://" disabled={late} value={form.video_url} onChange={set("video_url")} />
+        <label htmlFor="pm">Demo link</label><input id="pm" type="url" placeholder="https://" disabled={late} value={form.demo_url} onChange={set("demo_url")} />
+        <label htmlFor="pn">Notes for the judges</label><textarea id="pn" rows={4} maxLength={2000} disabled={late} value={form.notes} onChange={set("notes")} />
+        {!late && <div className="actions"><button type="submit">Save pitch</button></div>}
+        {msg && <Notice kind={msg.kind}>{msg.text}</Notice>}
+      </form>
     </div>
   );
 }

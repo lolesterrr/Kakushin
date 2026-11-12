@@ -56,7 +56,7 @@ orgApplications.get("/:slug/challenges/:cslug/applications", async (c) => {
   return c.json({ questions: x.questions, applications: await list(c, x.ch.id) });
 });
 
-const STATUS = z.enum(["applied", "shortlisted", "rejected"]);
+const STATUS = z.enum(["applied", "shortlisted", "rejected", "finalist"]);
 
 orgApplications.post("/:slug/challenges/:cslug/applications/status", async (c) => {
   const x = await load(c, c.req.param("slug"), c.req.param("cslug"));
@@ -69,13 +69,13 @@ orgApplications.post("/:slug/challenges/:cslug/applications/status", async (c) =
   const marks = team_ids.map(() => "?").join(",");
   const { results: teams } = await c.env.DB.prepare(
     `SELECT t.id, t.name, t.status FROM teams t JOIN applications a ON a.team_id = t.id
-     WHERE t.challenge_id = ? AND t.status IN ('applied','shortlisted','rejected') AND t.id IN (${marks})`,
+     WHERE t.challenge_id = ? AND t.status IN ('applied','shortlisted','rejected','finalist') AND t.id IN (${marks})`,
   ).bind(x.ch.id, ...team_ids).all<{ id: string; name: string; status: string }>();
   const changing = teams.filter((t) => t.status !== status);
   if (changing.length) {
     await c.env.DB.batch(changing.map((t) => c.env.DB.prepare("UPDATE teams SET status = ? WHERE id = ?").bind(status, t.id)));
   }
-  if (status !== "applied") {
+  if (status === "shortlisted" || status === "rejected") {
     for (const t of changing) {
       const { results: ms } = await c.env.DB.prepare("SELECT u.email FROM team_members m JOIN users u ON u.id = m.user_id WHERE m.team_id = ?").bind(t.id).all<{ email: string }>();
       notifyTeam(c, status, ms.map((m) => m.email), { team: t.name, challenge: x.ch.title, org: x.org.name, url: `${c.env.APP_URL}/o/${x.org.slug}/c/${x.ch.slug}` });

@@ -7,6 +7,8 @@ import { Login, Verify } from "./pages/Auth";
 import { Profile } from "./pages/Profile";
 import { ChallengePublic, Explore, Home, OrgPublic } from "./pages/Public";
 import { Join } from "./pages/Team";
+import { AdminJudging } from "./pages/Judging";
+import { JudgeChallenge, JudgeHome, JudgeTeam } from "./pages/Judge";
 import { AdminOverview } from "./pages/Overview";
 import { AdminApplications } from "./pages/Applications";
 import { AdminChallenge, AdminHome, AdminOrg } from "./pages/Admin";
@@ -28,6 +30,10 @@ function App() {
         <Route path="/admin" element={<AdminHome />} />
         <Route path="/admin/o/:slug" element={<AdminOrg />} />
         <Route path="/admin/o/:slug/c/:cslug" element={<AdminOverview />} />
+        <Route path="/admin/o/:slug/c/:cslug/judging" element={<AdminJudging />} />
+        <Route path="/judge" element={<JudgeHome />} />
+        <Route path="/judge/:slug/:cslug" element={<JudgeChallenge />} />
+        <Route path="/judge/:slug/:cslug/teams/:teamId" element={<JudgeTeam />} />
         <Route path="/admin/o/:slug/c/:cslug/edit" element={<AdminChallenge />} />
         <Route path="*" element={<div className="empty"><p className="hand">Page not found</p></div>} />
       </Routes>
