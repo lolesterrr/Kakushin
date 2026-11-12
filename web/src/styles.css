@@ -121,7 +121,7 @@ th, td { padding: 10px 12px; border-bottom: 1px solid var(--line); }
 .home-hero .art { flex: 1 1 340px; min-width: 0; border-left: 1px solid var(--line); position: relative; min-height: 380px; overflow: hidden; background: #000; }
 .art i { position: absolute; display: block; }
 .home-hero .art .glyph { position: absolute; inset: 24px; width: calc(100% - 48px); height: calc(100% - 48px); object-fit: contain; }
-@media (prefers-reduced-motion: reduce) { .home-hero .art .glyph { content: url(/hero/rocket-poster.webp); } }
+@media (prefers-reduced-motion: reduce) { .home-hero .art .glyph { content: url(/hero/bulb-poster.webp); } }
 .steps { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); border-top: 1px solid var(--line); }
 .steps > div { padding: 28px 32px; border-right: 1px solid var(--line); }
 .steps > div:last-child { border-right: 0; }
