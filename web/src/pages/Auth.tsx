@@ -22,7 +22,7 @@ export function Login() {
   useEffect(() => {
     if (!siteKey || !widget.current) return;
     const el = widget.current; let id: string | undefined;
-    const draw = () => { const t = (window as unknown as { turnstile?: { render: (e: HTMLElement, o: object) => string; remove: (id: string) => void } }).turnstile; if (t && !id) id = t.render(el, { sitekey: siteKey, callback: (v: string) => setCaptcha(v), "expired-callback": () => setCaptcha("") }); };
+    const draw = () => { const t = (window as unknown as { turnstile?: { render: (e: HTMLElement, o: object) => string; remove: (id: string) => void } }).turnstile; if (t && !id) id = t.render(el, { sitekey: siteKey, action: "signin", callback: (v: string) => setCaptcha(v), "expired-callback": () => setCaptcha("") }); };
     if ((window as unknown as { turnstile?: unknown }).turnstile) draw();
     else if (!document.getElementById("cf-turnstile")) { const s = document.createElement("script"); s.id = "cf-turnstile"; s.src = "https://challenges.cloudflare.com/turnstile/v0/api.js?render=explicit"; s.async = true; s.onload = draw; document.head.appendChild(s); }
     else document.getElementById("cf-turnstile")!.addEventListener("load", draw);
