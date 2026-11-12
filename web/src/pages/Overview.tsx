@@ -35,7 +35,7 @@ export function AdminOverview() {
   if (ch.status === "draft" && ch.review_state === "pending") todo.push({ text: "Waiting for the Kakushin team to review this challenge. You will get a note in your inbox.", to: `${base}/edit`, cta: "View" });
   else if (ch.status === "draft" && ch.review_state === "rejected") todo.push({ text: `Changes needed before this can go live: ${ch.review_note}`, to: `${base}/edit`, cta: "Fix and resend" });
   else if (ch.status === "draft") todo.push({ text: !ch.summary || !ch.description ? "Finish the summary and description, then publish" : "Publish your challenge so people can find it", to: `${base}/edit`, cta: "Open editor" });
-  if (!ch.cover_url) todo.push({ text: "Add a cover image so the challenge stands out", to: `${base}/edit`, cta: "Add image" });
+  if (!ch.cover_url) todo.push({ text: "Add a banner. It is required to publish and it is the first thing people see", to: `${base}/edit`, cta: "Add banner" });
   if (ch.status === "open" && n("applied") > 0) todo.push({ text: `Review ${n("applied")} new ${n("applied") === 1 ? "application" : "applications"}`, to: `${base}/applications?f=applied`, cta: "Review" });
   if (n("shortlisted") > 0) todo.push({ text: `Pick finalists from ${n("shortlisted")} shortlisted ${n("shortlisted") === 1 ? "team" : "teams"}`, to: `${base}/applications?f=shortlisted`, cta: "Choose" });
   if (n("finalist") > 0 && ch.status !== "judging" && ch.status !== "completed") todo.push({ text: "Set up judging: criteria, judges, then start judging", to: `${base}/judging`, cta: "Open judging" });
