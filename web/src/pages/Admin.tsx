@@ -2,7 +2,7 @@ import React, { useEffect, useRef, useState } from "react";
 import { Link, Navigate, useNavigate, useParams } from "react-router-dom";
 import { api, fmtDate, fromLocalInput, toLocalInput, uploadImage } from "../api";
 import { useAuth } from "../auth";
-import { Band, Logo, Notice, Tag } from "../ui";
+import { Band, Banner, Logo, Notice, Tag } from "../ui";
 import { AnnounceBox, OrgMembers } from "./OrgTeam";
 
 const ORG_TYPES = ["university", "hub", "corporate", "partner", "other"];
@@ -160,6 +160,7 @@ export function AdminChallenge() {
   const [msg, setMsg] = useState<Msg>(null);
   const [saving, setSaving] = useState(false);
   const [copied, setCopied] = useState(false);
+  const [wasDraft, setWasDraft] = useState(true);
   const [review, setReview] = useState<{ state: string; note: string }>({ state: "none", note: "" });
   useEffect(() => {
     if (guard) return;
@@ -167,6 +168,7 @@ export function AdminChallenge() {
     api<{ challenge: any; role: string | null }>(`/orgs/${slug}/challenges/${cslug}`).then(({ challenge: c, role }) => {
       if (!role) { setMsg({ kind: "err", text: "You are not an admin of this organisation." }); return; }
       setReview({ state: c.review_state ?? "none", note: c.review_note ?? "" });
+      setWasDraft(c.status === "draft");
       setF({
         title: c.title, summary: c.summary, description: c.description, prizes: c.prizes, status: c.status, team_min: c.team_min, team_max: c.team_max,
         opens: toLocalInput(c.applications_open_at), closes: toLocalInput(c.applications_close_at), pitch: toLocalInput(c.pitch_due_at),
@@ -184,6 +186,7 @@ export function AdminChallenge() {
   };
 
   async function save(status = f!.status) {
+    if (wasDraft && status !== "draft" && !f!.cover_url) { setMsg({ kind: "err", text: "Add a banner before publishing. It is the first thing people see." }); return; }
     setSaving(true); setMsg(null);
     try {
       const res = await api<{ pending?: boolean }>(`/orgs/${slug}/challenges/${cslug}`, { method: "PUT", json: {
@@ -197,7 +200,7 @@ export function AdminChallenge() {
         setF({ ...f!, status: "draft" }); setReview({ state: "pending", note: "" });
         setMsg({ kind: "ok", text: "Sent for review. The Kakushin team checks new challenges before they go public, and you will get a note in your inbox." });
       } else {
-        setF({ ...f!, status });
+        setF({ ...f!, status }); if (status !== "draft") setWasDraft(false);
         setMsg({ kind: "ok", text: status === "open" && f!.status !== "open" ? "Published. Share the link below." : "Saved" });
       }
     } catch (err) { setMsg({ kind: "err", text: (err as Error).message }); }
@@ -205,7 +208,7 @@ export function AdminChallenge() {
   }
   async function cover(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0]; if (!file) return;
-    try { const r = await uploadImage<{ cover_url: string }>(`/orgs/${slug}/challenges/${cslug}/cover`, file); set("cover_url", r.cover_url); setMsg({ kind: "ok", text: "Cover updated" }); }
+    try { const r = await uploadImage<{ cover_url: string }>(`/orgs/${slug}/challenges/${cslug}/cover`, file); set("cover_url", r.cover_url); setMsg({ kind: "ok", text: "Banner updated" }); }
     catch (err) { setMsg({ kind: "err", text: (err as Error).message }); }
     e.target.value = "";
   }
@@ -230,9 +233,11 @@ export function AdminChallenge() {
         <label htmlFor="su">One-line summary (shown on cards)</label><input id="su" maxLength={200} value={f.summary} onChange={(e) => set("summary", e.target.value)} />
         <label htmlFor="d">Description</label><textarea id="d" rows={10} value={f.description} onChange={(e) => set("description", e.target.value)} />
         <label htmlFor="p">Prizes</label><textarea id="p" rows={4} value={f.prizes} onChange={(e) => set("prizes", e.target.value)} />
-        <label>Cover image (PNG, JPEG or WebP, up to 4 MB)</label>
-        {f.cover_url && <img src={f.cover_url} alt="Current cover" style={{ width: "100%", maxHeight: 180, objectFit: "cover", borderRadius: 8, marginBottom: 8 }} />}
-        <input type="file" accept="image/png,image/jpeg,image/webp" onChange={cover} aria-label="Upload cover image" />
+        <label htmlFor="banner">Banner</label>
+        <p className="muted" style={{ margin: "0 0 10px" }}>Every challenge needs a banner. It is the first thing people see on the app and the website. PNG, JPEG or WebP, up to 4 MB, best at 1600 by 500 pixels.</p>
+        <div className="banner-preview"><Banner url={f.cover_url} seed={cslug ?? "challenge"} alt={f.cover_url ? "Current banner" : ""} /></div>
+        {!f.cover_url && <p className="note-box">No banner yet, so people will see an illustration. Add one to publish.</p>}
+        <input id="banner" type="file" accept="image/png,image/jpeg,image/webp" onChange={cover} style={{ marginTop: 10 }} />
         <label>Topics (up to 5)</label>
         <div className="pills">{allTopics.map((t) => {
           const on = f.topics.includes(t);
@@ -288,6 +293,7 @@ export function AdminChallenge() {
         <div className="actions">
           <button onClick={() => save()} disabled={saving}>{saving ? "Saving..." : "Save"}</button>
           {f.status === "draft" && review.state !== "pending" && <button className="ghost" onClick={() => save("open")} disabled={saving}>{review.state === "rejected" ? "Send for review again" : "Publish"}</button>}
+          {f.status === "draft" && !f.cover_url && <span className="muted">Add a banner above to publish.</span>}
           {f.status === "draft" && <button className="ghost" onClick={remove}>Delete draft</button>}
         </div>
         {msg && <Notice kind={msg.kind}>{msg.text}</Notice>}
