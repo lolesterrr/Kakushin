@@ -128,7 +128,7 @@ export function OrgPublic() {
 }
 
 interface ChallengeFull extends ChallengeCardData {
-  description: string; prizes: string; status: string; results_published?: number; applications_open_at: number | null; pitch_due_at: number | null; questions: Question[];
+  cover_credit?: { author: string; license: string; source: string; license_url?: string } | null; description: string; prizes: string; status: string; results_published?: number; applications_open_at: number | null; pitch_due_at: number | null; questions: Question[];
 }
 
 export function ChallengePublic() {
@@ -148,6 +148,11 @@ export function ChallengePublic() {
   return (
     <>
       {c.cover_url && <img className="cover" style={{ aspectRatio: "16 / 6" }} src={c.cover_url} alt="" />}
+      {c.cover_credit && (
+        <p className="muted" style={{ fontSize: 12, margin: "6px 24px 0", textAlign: "right" }}>
+          Photo: <a href={c.cover_credit.source} target="_blank" rel="noreferrer">{c.cover_credit.author}</a>, {c.cover_credit.license_url ? <a href={c.cover_credit.license_url} target="_blank" rel="noreferrer">{c.cover_credit.license}</a> : c.cover_credit.license}
+        </p>
+      )}
       <div className="hero">
         <div className="head-row">
           <div style={{ maxWidth: 680 }}>
