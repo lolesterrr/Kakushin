@@ -4,7 +4,9 @@ import { Redirect } from "expo-router";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useAuth } from "../lib/auth";
 import { useTheme } from "../lib/theme";
-import { Body, Button, Field, H1, Notice } from "../components/ui";
+import { Banner } from "../components/Banner";
+import { Body, Button, Field, H1, Hand, Notice } from "../components/ui";
+import { shadow } from "../lib/theme";
 
 export default function SignIn() {
   const { me, ready, requestCode, verify } = useAuth();
@@ -32,12 +34,16 @@ export default function SignIn() {
   }
 
   return (
-    <SafeAreaView style={{ flex: 1, backgroundColor: t.bg }}>
-      <View style={{ flex: 1, padding: 24, gap: 16, justifyContent: "center" }}>
-        <View style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
-          <View style={{ width: 14, height: 14, borderRadius: 7, backgroundColor: "#c8321f" }} />
-          <Text style={{ fontSize: 22, fontWeight: "800", color: t.ink }}>Kakushin</Text>
+    <View style={{ flex: 1, backgroundColor: t.bg }}>
+      <Banner seed="kakushin-sign-in" label="Kakushin" style={{ position: "absolute", top: 0, left: 0, right: 0, height: 330 }} />
+      <SafeAreaView edges={["top"]} style={{ position: "absolute", top: 0, left: 24 }}>
+        <View style={{ flexDirection: "row", alignItems: "center", gap: 8, paddingTop: 8 }}>
+          <View style={{ width: 14, height: 14, borderRadius: 7, backgroundColor: "#D93A2B" }} />
+          <Text style={{ fontSize: 20, fontWeight: "700", color: "#111111" }}>Kakushin</Text>
         </View>
+      </SafeAreaView>
+      <View style={[{ flex: 1, marginTop: 290, backgroundColor: t.bg, borderTopLeftRadius: 28, borderTopRightRadius: 28, padding: 24, paddingBottom: 32, gap: 16 }, shadow(0.3)]}>
+        {step === "code" ? <Hand>Check your email</Hand> : <Hand>Welcome</Hand>}
         <H1>{step === "email" ? "Sign in or create your account" : "Enter your code"}</H1>
         {step === "email" ? (
           <>
@@ -57,6 +63,6 @@ export default function SignIn() {
           </>
         )}
       </View>
-    </SafeAreaView>
+    </View>
   );
 }

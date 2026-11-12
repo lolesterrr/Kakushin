@@ -7,3 +7,6 @@ export type Theme = typeof light;
 export const useTheme = (): Theme => (useColorScheme() === "dark" ? dark : light);
 // Fills that always carry white text, in both modes.
 export const FILL = { red: "#c8321f", gold: "#8a6a22", moss: "#4e7a3a", indigo: "#2f4f8f", ink: "#111111" } as const;
+
+/** Soft depth used on cards, banners and the floating bar. */
+export const shadow = (strength = 0.25) => ({ shadowColor: "#111111", shadowOpacity: strength, shadowRadius: 18, shadowOffset: { width: 0, height: 10 }, elevation: 6 });

@@ -1,5 +1,7 @@
 import React, { useState } from "react";
-import { Linking, Text, View } from "react-native";
+import { Linking, Pressable, Text, View } from "react-native";
+import Svg, { Path } from "react-native-svg";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Stack, useLocalSearchParams, useRouter } from "expo-router";
 import { api } from "../../../lib/api";
 import { API_URL } from "../../../lib/config";
@@ -7,7 +9,10 @@ import { challengeDetail, follows as followsSchema, teamResponse, type Challenge
 import { daysLeft, fmtDate, teamSize } from "../../../lib/format";
 import { useLoad } from "../../../lib/useLoad";
 import { useTheme } from "../../../lib/theme";
-import { Body, Button, Card, Field, H1, H2, Label, Loading, Notice, Pill, Screen, StatusStamp } from "../../../components/ui";
+import { Banner, Scrim } from "../../../components/Banner";
+import { F } from "../../../lib/fonts";
+import { shadow } from "../../../lib/theme";
+import { Body, Button, Card, DaysStamp, Field, H2, Label, Loading, Notice, Pill, Screen, StatusStamp } from "../../../components/ui";
 
 export default function ChallengeScreen() {
   const { org, slug } = useLocalSearchParams<{ org: string; slug: string }>();
@@ -30,25 +35,31 @@ export default function ChallengeScreen() {
   const d = daysLeft(c.applications_close_at);
   const teamLoaded = tm.loaded;
   return (
-    <Screen onRefresh={refresh} refreshing={ch.refreshing}>
-      <Stack.Screen options={{ title: c.org.name }} />
-      <Text style={{ color: t.muted }}>{c.org.name}</Text>
-      <H1>{c.title}</H1>
-      {c.summary ? <Body muted>{c.summary}</Body> : null}
-      <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 8 }}>
-        <Pill text={c.status} />
-        {c.topics.map((x) => <Pill key={x} text={x} />)}
-      </View>
-      <Button title={following ? `Following ${c.org.name}` : `Follow ${c.org.name}`} kind="ghost" onPress={toggleFollow} />
-
-      <Card>
-        <Label>Applications close</Label>
-        <Text style={{ color: t.ink, fontSize: 17, fontWeight: "800" }}>{fmtDate(c.applications_close_at)}{d !== null && d > 0 ? `  ·  ${d} ${d === 1 ? "day" : "days"} left` : ""}</Text>
-        <Label>Team size</Label>
-        <Text style={{ color: t.ink, fontSize: 17, fontWeight: "800" }}>{teamSize(c.team_min, c.team_max)}</Text>
-        <Label>Pitch due</Label>
-        <Text style={{ color: t.ink, fontSize: 17, fontWeight: "800" }}>{fmtDate(c.pitch_due_at)}</Text>
-      </Card>
+    <View style={{ flex: 1, backgroundColor: t.bg }}>
+      <Screen onRefresh={refresh} refreshing={ch.refreshing} flush>
+        <Stack.Screen options={{ headerShown: false }} />
+        <Banner url={c.cover_url} seed={c.slug} label={c.title} style={{ height: 300 }}>
+          <Scrim height={90} />
+        </Banner>
+        <View style={{ marginTop: -26, backgroundColor: t.bg, borderTopLeftRadius: 26, borderTopRightRadius: 26, padding: 20, gap: 14 }}>
+          <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between", gap: 8 }}>
+            <View style={{ flexDirection: "row", alignItems: "center", gap: 8, flex: 1 }}>
+              <Pill text={c.status === "open" ? "Open" : c.status} />
+              <Text numberOfLines={1} style={{ flex: 1, color: t.muted, fontSize: 12, fontWeight: "700", letterSpacing: 1.2, textTransform: "uppercase" }}>{c.org.name}</Text>
+            </View>
+            <Pressable onPress={toggleFollow} accessibilityRole="button" style={{ minHeight: 40, paddingHorizontal: 14, borderRadius: 999, borderWidth: 1.5, borderColor: t.ink, justifyContent: "center" }}>
+              <Text style={{ color: t.ink, fontSize: 13, fontWeight: "700" }}>{following ? "Following" : "Follow"}</Text>
+            </Pressable>
+          </View>
+          <Text accessibilityRole="header" style={{ color: t.ink, fontFamily: F.display, fontSize: 32, lineHeight: 34, letterSpacing: -0.6 }}>{c.title}</Text>
+          {c.summary ? <Body muted>{c.summary}</Body> : null}
+          {c.topics.length ? <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 8 }}>{c.topics.map((x) => <Pill key={x} text={x} />)}</View> : null}
+          <View style={{ flexDirection: "row", gap: 8 }}>
+            <View style={[{ flex: 1, backgroundColor: t.card, borderWidth: 1, borderColor: t.line, borderRadius: 14, padding: 12 }, shadow(0.06)]}><Label>Closes</Label><Text style={{ color: t.ink, fontFamily: F.display, fontSize: 19 }}>{fmtDate(c.applications_close_at)}</Text></View>
+            <View style={[{ flex: 1, backgroundColor: t.card, borderWidth: 1, borderColor: t.line, borderRadius: 14, padding: 12 }, shadow(0.06)]}><Label>Team</Label><Text style={{ color: t.ink, fontFamily: F.display, fontSize: 19 }}>{teamSize(c.team_min, c.team_max)}</Text></View>
+            <View style={{ flex: 1, backgroundColor: "#111111", borderRadius: 14, padding: 12 }}><Label>Pitch</Label><Text style={{ color: "#F6F4EE", fontFamily: F.display, fontSize: 19 }}>{fmtDate(c.pitch_due_at)}</Text></View>
+          </View>
+          {d !== null && d > 0 ? <View style={{ flexDirection: "row" }}><DaysStamp days={d} tilt={-2} /></View> : null}
 
       {c.description ? <><H2>About</H2><Body>{c.description}</Body></> : null}
       {c.prizes ? <><H2>Prizes</H2><Body>{c.prizes}</Body></> : null}
@@ -56,7 +67,10 @@ export default function ChallengeScreen() {
       {msg ? <Notice kind={msg.kind}>{msg.text}</Notice> : null}
       <TeamPanel base={base} c={c} team={tm.data} loaded={teamLoaded} onChange={refresh} />
       {c.results_published ? <Button title="See results on the web" kind="ghost" onPress={() => void Linking.openURL(`${API_URL}/o/${org}/c/${slug}#results`)} /> : null}
-    </Screen>
+        </View>
+      </Screen>
+      <BackButton />
+    </View>
   );
 }
 
@@ -153,4 +167,16 @@ function QuestionField({ q, value, onChange }: { q: Question; value: string; onC
     );
   }
   return <Field label={label} value={value} onChangeText={onChange} multiline={q.type === "long_text"} autoCapitalize={q.type === "url" ? "none" : "sentences"} keyboardType={q.type === "url" ? "url" : "default"} />;
+}
+
+/** Round back button floating over the banner. */
+function BackButton() {
+  const router = useRouter();
+  const insets = useSafeAreaInsets();
+  return (
+    <Pressable onPress={() => router.back()} accessibilityRole="button" accessibilityLabel="Back"
+      style={[{ position: "absolute", top: insets.top + 8, left: 16, width: 44, height: 44, borderRadius: 22, backgroundColor: "#F6F4EEEB", alignItems: "center", justifyContent: "center" }, shadow(0.3)]}>
+      <Svg width={18} height={18} viewBox="0 0 18 18" fill="none" stroke="#111111" strokeWidth={2.6} strokeLinecap="round" strokeLinejoin="round"><Path d="M11 3L5 9l6 6" /></Svg>
+    </Pressable>
+  );
 }
