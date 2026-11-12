@@ -136,7 +136,11 @@ orgChallenges.get("/:slug/challenges/:cslug", async (c) => {
     .bind(access.org.id, c.req.param("cslug")).first<ChallengeRow>();
   // Drafts are only visible to the organisation's own admins.
   if (!row || (row.status === "draft" && !access.role)) return c.json({ error: "Not found" }, 404);
-  return c.json({ challenge: challengeOut(row, access.org), role: access.role });
+  // The rubric is public so people know how they will be scored before they apply. Weights go out as percentages.
+  const { results: rubric } = await c.env.DB.prepare("SELECT name, description, weight, max_score FROM criteria WHERE challenge_id = ? ORDER BY position, rowid")
+    .bind(row.id).all<{ name: string; description: string; weight: number; max_score: number }>();
+  const criteria = rubric.map((r) => ({ name: r.name, description: r.description, weight: Math.round(r.weight * 10000) / 100, max_score: r.max_score }));
+  return c.json({ challenge: { ...challengeOut(row, access.org), criteria }, role: access.role });
 });
 
 orgChallenges.put("/:slug/challenges/:cslug", async (c) => {

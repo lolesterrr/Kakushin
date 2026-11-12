@@ -1,3 +1,5 @@
+import type { OutboxMessage } from "./lib/outbox";
+
 export interface Env {
   DB: D1Database;
   FILES: R2Bucket;
@@ -14,6 +16,8 @@ export interface Env {
   // Per-IP limits on sign-in (wrangler.jsonc "ratelimits"). Optional so a setup without them still runs.
   AUTH_REQUEST_LIMIT?: RateLimit;
   AUTH_VERIFY_LIMIT?: RateLimit;
+  // Results emails and pushes that must reach everyone (src/lib/outbox.ts). Optional so a setup without it still runs.
+  OUTBOX?: Queue<OutboxMessage>;
   EXPO_PUSH_URL?: string; // only set in tests, to point pushes at a fake server
 }
 
