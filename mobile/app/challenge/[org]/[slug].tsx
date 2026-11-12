@@ -140,7 +140,13 @@ function TeamPanel({ base, c, team, loaded, onChange }: { base: string; c: Chall
       ) : null}
       {!team.is_lead && team.status === "forming" ? <Body muted>Your team lead sends the application.</Body> : null}
       {team.status === "applied" && !canApply ? <Body muted>Received. The organisers will review your application.</Body> : null}
-      {c.status !== "completed" && (team.status === "shortlisted" || team.status === "finalist") ? <Body muted>Pitches are added on the web for now. Open Kakushin in your browser to add your deck and links.</Body> : null}
+      {c.status !== "completed" && ["shortlisted", "finalist", "winner"].includes(team.status) ? (
+        <>
+          <H2>Your pitch</H2>
+          <Body muted>Upload your deck and add a video or demo link{c.pitch_due_at ? ` by ${fmtDate(c.pitch_due_at)}` : ""}. Anyone on the team can do it.</Body>
+          <Button title="Open your pitch" onPress={() => router.push({ pathname: "/pitch/[team]", params: { team: team.id, name: team.name } } as never)} />
+        </>
+      ) : null}
       {c.status === "completed" && ["shortlisted", "finalist", "winner"].includes(team.status) ? <Button title="Get your certificate" onPress={() => router.push("/profile")} /> : null}
       {team.status === "forming" || team.status === "applied" ? (
         <Button title="Leave team" kind="ghost" busy={busy} onPress={() => void run(() => api(`/teams/${team.id}/leave`, { method: "POST" }), "You left the team")} />
