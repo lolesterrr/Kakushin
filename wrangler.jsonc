@@ -27,7 +27,7 @@
     { "name": "AUTH_VERIFY_LIMIT", "namespace_id": "2002", "simple": { "limit": 30, "period": 60 } }
   ],
   "vars": {
-    "APP_URL": "https://kakushin.kajjabantu.workers.dev",
+    "APP_URL": "https://kakushin.dpdns.org",
     "EMAIL_FROM": "Kakushin <onboarding@resend.dev>"
   }
 }

@@ -15,7 +15,7 @@ import { fileURLToPath } from "node:url";
 import { CHALLENGES, JUDGES, ORGS, PEOPLE, QUESTIONS, slugOf } from "./data.mjs";
 
 const live = process.argv.includes("--live");
-const U = live ? "https://kakushin.kajjabantu.workers.dev" : "http://localhost:8787";
+const U = live ? "https://kakushin.dpdns.org" : "http://localhost:8787";
 const where = live ? "--remote" : "--local";
 const MEDIA = path.join(path.dirname(fileURLToPath(import.meta.url)), "media");
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../..");

@@ -13,7 +13,7 @@ import fs from "node:fs";
 
 const live = process.argv.includes("--live");
 const cleanup = process.argv.includes("--cleanup");
-const U = live ? "https://kakushin.kajjabantu.workers.dev" : "http://localhost:8787";
+const U = live ? "https://kakushin.dpdns.org" : "http://localhost:8787";
 const D = "dryrun";
 const SLUG = "dryrun-hub";
 const where = live ? "--remote" : "--local";
