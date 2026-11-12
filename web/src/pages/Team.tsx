@@ -13,7 +13,7 @@ interface TeamData {
 type Msg = { kind: "ok" | "err"; text: string } | null;
 
 export function StatusStamp({ status }: { status: string }) {
-  if (status === "applied") return <Stamp big="Sent" small="under review" tone="indigo" />;
+  if (status === "applied") return <Stamp big="Received" small="under review" tone="indigo" size="sm" />;
   if (status === "shortlisted") return <Stamp big="Yes!" small="shortlisted" tone="moss" />;
   if (status === "rejected") return <Stamp big="Thanks" small="not selected" tone="ink" />;
   if (status === "finalist") return <Stamp big="Final" small="finalist" tone="gold" />;
@@ -21,14 +21,64 @@ export function StatusStamp({ status }: { status: string }) {
   return <Stamp big="Team" small="forming" tone="gold" />;
 }
 
+export function useMyTeam(orgSlug: string, cslug: string) {
+  const { me } = useAuth();
+  const [team, setTeam] = useState<TeamData | null | undefined>(undefined);
+  const reload = async () => {
+    if (!me) { setTeam(null); return; }
+    try { setTeam((await api<{ team: TeamData | null }>(`/orgs/${orgSlug}/challenges/${cslug}/team`)).team); } catch { setTeam(null); }
+  };
+  useEffect(() => { void reload(); }, [me?.id, orgSlug, cslug]);
+  return { team, reload };
+}
+
+type Chal = { status: string; team_min: number; team_max: number; applications_open_at: number | null; applications_close_at: number | null };
+
+function windowClosed(c: Chal): string | null {
+  const now = Date.now();
+  return c.status !== "open" ? "This challenge is not taking applications."
+    : c.applications_open_at && now < c.applications_open_at ? "Applications have not opened yet."
+    : c.applications_close_at && now > c.applications_close_at ? "Applications are closed." : null;
+}
+
+/** One panel: the deadline countdown and the single thing to do next. */
+export function NextStep({ orgSlug, cslug, challenge, team }: { orgSlug: string; cslug: string; challenge: Chal; team: TeamData | null | undefined }) {
+  const { me } = useAuth();
+  const closed = windowClosed(challenge);
+  const close = challenge.applications_close_at;
+  const days = close ? Math.ceil((close - Date.now()) / 86400000) : null;
+  let text = "", action: React.ReactNode = null;
+  if (closed) text = closed;
+  else if (!me) { text = "Sign in to create a team and apply."; action = <Link className="btn" to={`/login?next=/o/${orgSlug}/c/${cslug}`}>Sign in to apply</Link>; }
+  else if (team === undefined) text = "";
+  else if (!team) { text = "Create a team, or join one with an invite code."; action = <a className="btn" href="#apply">Create or join a team</a>; }
+  else if (team.status === "forming") {
+    const need = Math.max(0, challenge.team_min - team.members.length);
+    if (need > 0) { text = `Invite ${need} more ${need === 1 ? "teammate" : "teammates"} to be able to apply.`; action = <a className="btn" href="#apply">Get the invite link</a>; }
+    else if (team.is_lead) { text = "Answer the questions and send your application."; action = <a className="btn" href="#apply">Finish application</a>; }
+    else text = "Your team lead sends the application.";
+  }
+  else if (team.status === "applied") text = "Received. The organisers will review your application. You can edit it until the deadline.";
+  else if (team.status === "shortlisted") text = "You are shortlisted. The organisers will share the next steps.";
+  else if (team.status === "rejected") { text = "Not selected this time. Plenty of other challenges are open."; action = <Link className="btn ghost" to="/challenges">Browse challenges</Link>; }
+  else text = "You are in. Check your email for updates.";
+  return (
+    <aside className="next" aria-label="Your next step">
+      <div className="days">
+        {days === null ? <b>Open</b> : days > 0 ? <><b>{days}</b><span className="muted">{days === 1 ? "day left" : "days left"}</span></> : <b>Closed</b>}
+      </div>
+      <div className="body"><p className="label" style={{ margin: 0 }}>Your next step</p><p>{text}</p>{action}</div>
+    </aside>
+  );
+}
+
 interface Props {
-  orgSlug: string; cslug: string;
+  orgSlug: string; cslug: string; team: TeamData | null | undefined; reload: () => Promise<void>;
   challenge: { status: string; team_min: number; team_max: number; questions: Question[]; applications_open_at: number | null; applications_close_at: number | null };
 }
 
-export function TeamPanel({ orgSlug, cslug, challenge }: Props) {
+export function TeamPanel({ orgSlug, cslug, challenge, team, reload }: Props) {
   const { me } = useAuth();
-  const [team, setTeam] = useState<TeamData | null | undefined>(undefined);
   const [msg, setMsg] = useState<Msg>(null);
   const [name, setName] = useState("");
   const [code, setCode] = useState("");
@@ -36,18 +86,9 @@ export function TeamPanel({ orgSlug, cslug, challenge }: Props) {
   const [copied, setCopied] = useState(false);
   const base = `/orgs/${orgSlug}/challenges/${cslug}/team`;
 
-  const now = Date.now();
-  const closedWhy =
-    challenge.status !== "open" ? "This challenge is not taking applications."
-    : challenge.applications_open_at && now < challenge.applications_open_at ? "Applications have not opened yet."
-    : challenge.applications_close_at && now > challenge.applications_close_at ? "Applications are closed."
-    : null;
-
-  async function load() {
-    try { const r = await api<{ team: TeamData | null }>(base); setTeam(r.team); setAnswers(r.team?.application?.answers ?? {}); }
-    catch { setTeam(null); }
-  }
-  useEffect(() => { if (me) void load(); else setTeam(null); }, [me?.id, orgSlug, cslug]);
+  useEffect(() => { setAnswers(team?.application?.answers ?? {}); }, [team?.id, team?.application?.submitted_at]);
+  const closedWhy = windowClosed(challenge);
+  const load = reload;
 
   async function run(fn: () => Promise<unknown>, ok?: string) {
     setMsg(null);
@@ -123,6 +164,8 @@ export function TeamPanel({ orgSlug, cslug, challenge }: Props) {
       {(team.status === "forming" || team.status === "applied") && (
         <div className="section form">
           <h2>{team.status === "applied" ? "Your application" : "Application"}</h2>
+          <div className="progress" aria-hidden><i className={size >= challenge.team_min ? "on" : ""} /><i className={team.status === "applied" ? "on" : ""} /><i className={team.status === "applied" ? "on" : ""} /></div>
+          <div className="progress-labels"><span>1 Team</span><span>2 Answers</span><span>3 Sent</span></div>
           {!team.is_lead && <p className="muted">Your team lead submits the application.</p>}
           {closedWhy && <p className="muted">{closedWhy}</p>}
           <form onSubmit={(e) => { e.preventDefault(); void run(() => api(`/teams/${team.id}/application`, { method: "PUT", json: { answers } }), team.status === "applied" ? "Application updated" : "Application sent"); }}>

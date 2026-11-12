@@ -1,8 +1,9 @@
 import React, { useEffect, useMemo, useState } from "react";
-import { Link, Navigate, useParams } from "react-router-dom";
+import { Link, Navigate, useParams, useSearchParams } from "react-router-dom";
 import { api, fmtDate } from "../api";
 import { useAuth } from "../auth";
-import { Notice } from "../ui";
+import { Band, Notice, Tag } from "../ui";
+import { challengeTabs } from "./Admin";
 
 interface App {
   team_id: string; name: string; status: string; submitted_at: number; answers: Record<string, string>; reviewer_note: string;
@@ -18,7 +19,8 @@ export function AdminApplications() {
   const { slug, cslug } = useParams();
   const { me } = useAuth();
   const [data, setData] = useState<Data | null>(null);
-  const [filter, setFilter] = useState<(typeof FILTERS)[number][0]>("all");
+  const [qs] = useSearchParams();
+  const [filter, setFilter] = useState<(typeof FILTERS)[number][0]>((FILTERS.find(([k]) => k === qs.get("f"))?.[0]) ?? "all");
   const [q, setQ] = useState("");
   const [sel, setSel] = useState<Set<string>>(new Set());
   const [msg, setMsg] = useState<Msg>(null);
@@ -48,13 +50,9 @@ export function AdminApplications() {
 
   return (
     <>
-      <div className="hero">
-        <Link className="muted" to={`/admin/o/${slug}/c/${cslug}`}>← Back to challenge</Link>
-        <div className="head-row" style={{ marginTop: 8 }}>
-          <h1>Applications</h1>
-          <a className="btn ghost" href={`/api${base}.csv`}>Download CSV</a>
-        </div>
-        <div className="pills" style={{ marginTop: 16 }} role="group" aria-label="Filter by status">
+      <Band crumb="Back to organisation" to={`/admin/o/${slug}`} title="Applications" tags={<a href={`/api${base}.csv`} style={{ color: "inherit" }}>Download CSV</a>} tabs={challengeTabs(slug!, cslug!)} />
+      <div className="section" style={{ paddingBottom: 16 }}>
+        <div className="pills" role="group" aria-label="Filter by status">
           {FILTERS.map(([k, l]) => <button key={k} className={`pill ${filter === k ? "on" : ""}`} onClick={() => setFilter(k)}>{l} ({count(k)})</button>)}
         </div>
       </div>
@@ -85,7 +83,7 @@ function Row({ a, questions, checked, toggle, setStatus, base }: {
     <details className="app-row">
       <summary>
         <input type="checkbox" style={{ width: "auto" }} checked={checked} onChange={toggle} onClick={(e) => e.stopPropagation()} aria-label={`Select ${a.name}`} />
-        <b>{a.name}</b><span className={`pill ${TONE[a.status] ?? "sand"}`}>{LABEL[a.status] ?? a.status}</span>
+        <b>{a.name}</b><Tag status={a.status} />
         <span className="muted">{a.members.length} {a.members.length === 1 ? "person" : "people"} · {fmtDate(a.submitted_at)}</span>
       </summary>
       <div style={{ marginTop: 12, maxWidth: 760 }}>
