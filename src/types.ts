@@ -5,6 +5,7 @@ export interface Env {
   APP_URL: string;
   EMAIL_FROM: string;
   RESEND_API_KEY?: string;
+  RESEND_ONLY_TO?: string; // secret; comma-separated addresses that always go through Resend (the admin's own)
   BREVO_API_KEY?: string; // secret; when set, email goes through Brevo instead of Resend
   TURNSTILE_SECRET?: string; // secret; sign-in check is off until both Turnstile values exist
   TURNSTILE_SITE_KEY?: string;
