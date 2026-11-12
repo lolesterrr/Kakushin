@@ -178,3 +178,25 @@ Implementation notes for later: the web uses Tailwind + shadcn/ui, so the palett
 | 7 | [Curved activity picker](design-refs/07-curved-picker.jpg) | The curved scroll motion | Curved wheel picker for the mobile app |
 
 The reference images are other people's work and are kept here only for inspiration. Don't ship them or copy them directly into the product.
+
+## Chosen direction (12 Nov 2026)
+
+Joe compared three mockup directions on the [UI directions canvas](https://claude.ai/artifact/1GzBAPNXKYZCAsqi7L7SVP) and picked a mix:
+
+| Surface | Direction | What that means |
+|---|---|---|
+| Public web portal (Explore, organisation pages, challenge page) | **A, Grid Editorial** | Visible 1px `sand` grid lines, edge-to-edge panels, lots of air, one red focal point per screen. Inter for body, Inter Tight 800/900 for headings and big numbers. Handwritten font barely used. |
+| Admin portal (organiser dashboard) | **C, Stamp Poster** | Ink header band with the challenge name, section tabs underlined in red, numbered sections (01 Pipeline, 02 Do next, 03 Newest applications), a pipeline row of huge numbers with the stage that needs action filled red, square status tags, 3px ink rules above sections. |
+| Mobile layouts (Expo app, and the web on phones for sign-in and apply) | **C, Stamp Poster** | Ink header band, heavy display type (Archivo Black), 6 large code boxes on sign-in, stamps for status changes (e.g. "Received" stamp after applying), "What happens next" date list, full-width square buttons. |
+| Logo | **A's logo** | A solid red dot followed by the word "Kakushin" in Inter 700. Used everywhere, including the C screens, replacing C's uppercase "KAKUSHIN." wordmark. |
+
+Structure fixes that apply to every surface (all three mockups shared them, and they stay):
+
+1. The home page says what Kakushin is in one line and shows the 4 steps: pick, apply, pitch, certificate.
+2. Every challenge card shows status, deadline, team size and prize up front.
+3. The challenge page has one "Your next step" panel with the deadline countdown and the main button.
+4. Sign-in says plainly that there is no password and that a 6-digit code is emailed.
+5. Applying is a 3-step flow with a progress bar (answers, team, check and send).
+6. The organiser dashboard opens on what to do next, not on raw tables.
+
+Fonts in use: Inter and Inter Tight on the public web; Archivo Black plus Inter on the admin dashboard and mobile. Palette and dark mode stay as defined above.
