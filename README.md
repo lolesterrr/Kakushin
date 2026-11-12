@@ -18,7 +18,7 @@ Built for universities, innovation hubs, corporates and development partners tha
 
 ## Stack (short version)
 
-Cloudflare Workers (Hono) for the API, D1 for the database, R2 for files, Resend for email. One React web app serves both the public portal and the admin portal. A React Native app (Expo) covers participants on mobile, with push notifications. Everything runs on free tiers while it is just one tester.
+Cloudflare Workers (Hono) for the API, D1 for the database, R2 for files, Resend for email. One React web app serves both the public portal and the admin portal. A React Native app (Expo) covers participants on mobile, with push notifications. Everything runs on free tiers during testing.
 
 ## Local development
 
@@ -34,7 +34,7 @@ Without a `RESEND_API_KEY`, the sign-in link or code is printed in the `wrangler
 
 ## Live
 
-Runs at https://kakushin.dpdns.org (a free DigitalPlat name on Cloudflare, attached to the Worker as a custom domain). The old https://kakushin.kajjabantu.workers.dev address still works. D1 database `kakushin`, R2 bucket `kakushin-files`.
+Deploys as a Cloudflare Worker, served from a custom domain (`https://<your-domain>`, set as `APP_URL` in `wrangler.jsonc`) and from the account's default `https://kakushin.<your-subdomain>.workers.dev` address. D1 database `kakushin`, R2 bucket `kakushin-files`.
 
 ```
 npm run db:migrate:remote
@@ -52,8 +52,8 @@ Day 5 (results and certificates): organisers place winners and publish at `.../r
 Day 6 (mobile app): `mobile/` is an Expo (SDK 58, Expo Router) app for participants: code sign-in, explore, apply with a team, my teams, inbox, certificates, profile and topics. See `mobile/README.md` for running it in Expo Go.
 
 Notes:
-- Email goes through Brevo when the `BREVO_API_KEY` secret is set, otherwise Resend (`RESEND_API_KEY`). Resend refuses free public-suffix names such as `.dpdns.org`, so it only delivers to its own account's address until Kakushin has a paid domain. `EMAIL_FROM` must be a sender the provider has verified.
-- `kakushin.dpdns.org` is free and must be renewed by hand in DigitalPlat. Move to a paid domain before issuing certificates to real participants, because a certificate's QR address never changes.
+- Email goes through Brevo when the `BREVO_API_KEY` secret is set, otherwise Resend (`RESEND_API_KEY`). Resend refuses free public-suffix domains, so it only delivers to its own account's address until Kakushin has a paid domain. `EMAIL_FROM` must be a sender the provider has verified.
+- If the domain is a free one that must be renewed by hand, move to a paid domain before issuing certificates to real participants, because a certificate's QR address never changes.
 - Editing a secret in the dashboard saves a new version but may not deploy it. Check the Deployments tab.
 - Workers logs are on (`observability`), so errors show in the dashboard under the Worker's Logs tab.
 
@@ -69,7 +69,7 @@ Notes:
 - **Per-IP limits** (Workers Rate Limiting, set in `wrangler.jsonc` under `ratelimits`): 5 sign-in requests and 30 code checks a minute from one IP. These sit on top of the per-email limits (5 code requests an hour, 5 wrong codes then a lock).
 - **Turnstile** (Cloudflare's bot check) is built but off until both keys exist. Once on, every sign-in request needs it: the web form shows the widget, and the phone app shows the same widget in a small web view loaded from `/api/auth/turnstile`. No header or client type skips it.
 
-The widget (site key in `wrangler.jsonc`) allows `kakushin.dpdns.org`. Turnstile switches on once the `TURNSTILE_SECRET` secret exists on the Worker. The server checks Cloudflare's answer for success, the `signin` action and a hostname listed in `TURNSTILE_HOSTNAMES`, so sign-in on the old workers.dev address stops working while Turnstile is on.
+The widget (site key in `wrangler.jsonc`) must allow your domain. Turnstile switches on once the `TURNSTILE_SECRET` secret exists on the Worker. The server checks Cloudflare's answer for success, the `signin` action and a hostname listed in `TURNSTILE_HOSTNAMES`, so sign-in on the old workers.dev address stops working while Turnstile is on.
 
 ## Link previews
 
