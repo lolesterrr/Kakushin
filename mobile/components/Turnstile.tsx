@@ -14,7 +14,8 @@ export function Turnstile({ onToken }: { onToken: (token: string | null) => void
       <WebView
         source={{ uri: `${API_URL}/api/auth/turnstile` }}
         style={{ backgroundColor: "transparent" }}
-        originWhitelist={["https://*"]}
+        // Turnstile draws its check in an about:srcdoc frame; without "about:*" iOS refuses it ("Can't open url").
+        originWhitelist={["https://*", "about:*"]}
         scrollEnabled={false}
         onMessage={(e) => {
           try {
