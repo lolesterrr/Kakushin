@@ -15,7 +15,6 @@ export default function TabsLayout() {
       <Tabs.Screen name="index" options={{ title: "Explore", headerShown: false }} />
       <Tabs.Screen name="teams" options={{ title: "My teams" }} />
       <Tabs.Screen name="inbox" options={{ title: "Inbox" }} />
-      <Tabs.Screen name="profile" options={{ title: "Profile" }} />
     </Tabs>
   );
 }
