@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import { Link, useParams } from "react-router-dom";
 import { api, fmtDate } from "../api";
 import { useAuth } from "../auth";
@@ -7,15 +7,33 @@ import { FollowButton } from "./Inbox";
 import { PublicResults } from "./Results";
 import { ChallengeCard, type ChallengeCardData, DeadlineStamp, Logo, Notice, Stamp, StatusPill, TopicPills } from "../ui";
 
-/** Banner bulb: grows in once per visitor, then loops a gentle turn. Reduced motion gets the still. */
+/**
+ * Banner bulb: grows in once per visitor, then loops a gentle turn. Reduced motion gets the still.
+ * The intro waits until the banner is on screen and the tab is in front, so it is not used up
+ * while someone is scrolled away (the banner sits below the text on phones). Add ?intro to replay it.
+ */
 function HeroBulb() {
   const seenKey = "kk-bulb-intro-seen";
+  const ref = useRef<HTMLVideoElement>(null);
   const [still] = useState(() => typeof window !== "undefined" && window.matchMedia?.("(prefers-reduced-motion: reduce)").matches);
-  const [intro, setIntro] = useState(() => { try { return !localStorage.getItem(seenKey); } catch { return true; } });
+  const [intro, setIntro] = useState(() => {
+    if (typeof window !== "undefined" && new URLSearchParams(window.location.search).has("intro")) return true;
+    try { return !localStorage.getItem(seenKey); } catch { return true; }
+  });
+  useEffect(() => {
+    const v = ref.current;
+    if (!intro || !v) return;
+    let onScreen = false;
+    const sync = () => { if (onScreen && document.visibilityState === "visible") v.play().catch(() => {}); else v.pause(); };
+    const io = new IntersectionObserver((es) => { const e = es[es.length - 1]; onScreen = !!e && e.isIntersecting && e.intersectionRatio >= 0.5; sync(); }, { threshold: [0, 0.5, 1] });
+    io.observe(v);
+    document.addEventListener("visibilitychange", sync);
+    return () => { io.disconnect(); document.removeEventListener("visibilitychange", sync); };
+  }, [intro]);
   function done() { try { localStorage.setItem(seenKey, "1"); } catch { /* private mode */ } setIntro(false); }
   if (still) return <img className="glyph" src="/hero/bulb-poster.jpg" width={640} height={800} alt="" />;
   return intro
-    ? <video key="intro" className="glyph" src="/hero/bulb-intro.mp4" autoPlay muted playsInline preload="auto" onEnded={done} onError={done} />
+    ? <video key="intro" ref={ref} className="glyph" src="/hero/bulb-intro.mp4" muted playsInline preload="auto" onEnded={done} onError={() => setIntro(false)} />
     : <video key="loop" className="glyph" src="/hero/bulb-loop.mp4" poster="/hero/bulb-poster.jpg" autoPlay muted loop playsInline preload="auto" />;
 }
 
