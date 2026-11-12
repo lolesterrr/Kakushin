@@ -36,6 +36,7 @@ pitch.get("/:id/pitch", async (c) => {
 
 function guard(x: TeamCtx): string | null {
   if (!PITCH_STATUSES.includes(x.team.status)) return "Only shortlisted teams can submit a pitch";
+  if (x.chStatus === "completed") return "This challenge is finished";
   if (x.due && Date.now() > x.due) return "The pitch deadline has passed";
   return null;
 }

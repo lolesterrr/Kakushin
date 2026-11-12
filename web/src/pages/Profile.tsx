@@ -4,6 +4,8 @@ import { api } from "../api";
 import { useAuth } from "../auth";
 import { Notice } from "../ui";
 import { StatusStamp } from "./Team";
+import { CertificatesList } from "./Certificates";
+import { TopicPicker } from "./Inbox";
 
 export function Profile() {
   const { me, reload } = useAuth();
@@ -33,6 +35,7 @@ export function Profile() {
         </div>
       </div>
     )}
+    <CertificatesList />
     <div className="section form">
       <h1>Your profile</h1><p className="muted">{me.email}</p>
       <form onSubmit={save}>
@@ -45,6 +48,7 @@ export function Profile() {
         {msg && <Notice kind={msg.kind}>{msg.text}</Notice>}
       </form>
     </div>
+    <TopicPicker />
     </>
   );
 }

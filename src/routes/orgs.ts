@@ -10,6 +10,7 @@ import { challengeOut, orgChallenges } from "./challenges";
 import { orgTeams } from "./teams";
 import { orgApplications } from "./applications";
 import { orgJudging } from "./judging";
+import { orgResults } from "./results";
 
 export const orgs = new Hono<AppEnv>();
 const MAX_ORGS_PER_USER = 5;
@@ -109,3 +110,4 @@ orgs.route("/", orgChallenges);
 orgs.route("/", orgTeams);
 orgs.route("/", orgApplications);
 orgs.route("/", orgJudging);
+orgs.route("/", orgResults);

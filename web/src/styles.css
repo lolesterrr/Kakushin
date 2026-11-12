@@ -189,3 +189,8 @@ th, td { padding: 10px 12px; border-bottom: 1px solid var(--line); }
 .admin th, .admin td { padding: 12px; }
 @media (max-width: 640px) { .admin .section { padding: 20px 16px 28px; } }
 input[type=range]{accent-color:var(--red);padding:0;border:0;background:none}
+.badge { display: inline-block; min-width: 18px; margin-left: 6px; padding: 1px 5px; border-radius: 999px; background: var(--f-red); color: #fff; font-size: 11px; font-weight: 700; text-align: center; line-height: 16px; }
+.results { list-style: none; padding: 0; margin: 16px 0; border: 1px solid var(--line); }
+.results li { display: flex; gap: 16px; align-items: baseline; padding: 14px 16px; border-bottom: 1px solid var(--line); }
+.results li:last-child { border-bottom: 0; }
+.results .place { font-family: var(--heavy); font-weight: 400; font-size: 28px; min-width: 56px; color: var(--red-text); }

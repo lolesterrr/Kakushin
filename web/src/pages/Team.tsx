@@ -60,6 +60,7 @@ export function NextStep({ orgSlug, cslug, challenge, team }: { orgSlug: string;
     else text = "Your team lead sends the application.";
   }
   else if (team.status === "applied") text = "Received. The organisers will review your application. You can edit it until the deadline.";
+  else if (challenge.status === "completed" && ["shortlisted", "finalist", "winner"].includes(team.status)) { text = team.status === "winner" ? "Congratulations, you won. Your certificate is ready." : "Results are out. Your certificate is ready."; action = <Link className="btn" to="/profile#certificates">Get your certificate</Link>; }
   else if (team.status === "shortlisted") { text = `You are shortlisted. Send your pitch${challenge.pitch_due_at ? ` before ${fmtDate(challenge.pitch_due_at)}` : ""}.`; action = <a className="btn" href="#pitch">Submit your pitch</a>; }
   else if (team.status === "finalist") { text = "You are a finalist. Judges can see your pitch, so keep it up to date."; action = <a className="btn" href="#pitch">Update your pitch</a>; }
   else if (team.status === "rejected") { text = "Not selected this time. Plenty of other challenges are open."; action = <Link className="btn ghost" to="/challenges">Browse challenges</Link>; }
@@ -163,7 +164,7 @@ export function TeamPanel({ orgSlug, cslug, challenge, team, reload }: Props) {
         {team.status === "forming" && <div className="actions"><button className="ghost" onClick={() => run(() => api(`/teams/${team.id}/leave`, { method: "POST" }))}>Leave team</button></div>}
       </div>
 
-      {["shortlisted", "finalist", "winner"].includes(team.status) && <PitchSection team={team} dueAt={challenge.pitch_due_at} />}
+      {challenge.status !== "completed" && ["shortlisted", "finalist", "winner"].includes(team.status) && <PitchSection team={team} dueAt={challenge.pitch_due_at} />}
 
       {(team.status === "forming" || team.status === "applied") && (
         <div className="section form">

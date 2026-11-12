@@ -3,6 +3,8 @@ import { Link, useParams } from "react-router-dom";
 import { api, fmtDate } from "../api";
 import { useAuth } from "../auth";
 import { NextStep, TeamPanel, useMyTeam, type Question } from "./Team";
+import { FollowButton } from "./Inbox";
+import { PublicResults } from "./Results";
 import { ChallengeCard, type ChallengeCardData, DeadlineStamp, Logo, Notice, Stamp, StatusPill, TopicPills } from "../ui";
 
 export function Home() {
@@ -107,7 +109,7 @@ export function OrgPublic() {
           </div>
           <Stamp big={String(visible.length)} small={visible.length === 1 ? "challenge" : "challenges"} tone="indigo" size="lg" />
         </div>
-        {role && <div className="actions"><Link className="btn ghost" to={`/admin/o/${org.slug}`}>Manage organisation</Link></div>}
+        <div className="actions"><FollowButton slug={org.slug} />{role && <Link className="btn ghost" to={`/admin/o/${org.slug}`}>Manage organisation</Link>}</div>
       </div>
       {visible.length > 0
         ? <div className="grid">{visible.map((c) => <ChallengeCard key={c.slug} c={{ ...c, org }} />)}</div>
@@ -117,7 +119,7 @@ export function OrgPublic() {
 }
 
 interface ChallengeFull extends ChallengeCardData {
-  description: string; prizes: string; status: string; applications_open_at: number | null; pitch_due_at: number | null; questions: Question[];
+  description: string; prizes: string; status: string; results_published?: number; applications_open_at: number | null; pitch_due_at: number | null; questions: Question[];
 }
 
 export function ChallengePublic() {
@@ -160,6 +162,7 @@ export function ChallengePublic() {
         <div><p className="label">Team size</p><b>{c.team_min === c.team_max ? c.team_min : `${c.team_min} to ${c.team_max}`}</b></div>
         <div><p className="label">Pitch due</p><b>{fmtDate(c.pitch_due_at)}</b></div>
       </div>
+      {c.results_published && <PublicResults orgSlug={c.org.slug} cslug={c.slug} />}
       {c.description && <div className="section"><p className="label" style={{ marginTop: 0 }}>About</p><div className="prose">{c.description}</div></div>}
       {c.prizes && <div className="section"><p className="label" style={{ marginTop: 0 }}>Prizes</p><div className="prose">{c.prizes}</div></div>}
       {c.status !== "draft" && <div id="apply"><TeamPanel orgSlug={c.org.slug} cslug={c.slug} challenge={c} team={team} reload={reload} /></div>}
