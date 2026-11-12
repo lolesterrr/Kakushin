@@ -1,9 +1,9 @@
 // Full dry run of a hackathon, from posting the challenge to certificates, through the public API.
-// Also leaves a demo dataset behind (a demo organisation, an open challenge, and one finished challenge with results).
+// It removes everything it created when it finishes (use --keep to leave it for inspection). For presentation data see scripts/demo/seed-demo.mjs.
 //
 //   Local:      node scripts/dryrun.mjs                     (needs `npm run dev` running)
 //   Production: node scripts/dryrun.mjs --live              (needs CLOUDFLARE_API_TOKEN / CLOUDFLARE_ACCOUNT_ID)
-//   Remove:     node scripts/dryrun.mjs --live --cleanup    (deletes everything the dry run created)
+//   Remove:     node scripts/dryrun.mjs --live --cleanup    (only needed after --keep or a crash)
 //
 // People are signed in by writing one-time codes straight into the database, so no email is sent. All demo accounts use
 // @example.com addresses, which cannot receive mail, so nobody can sign in as them by accident.
@@ -14,8 +14,8 @@ import fs from "node:fs";
 const live = process.argv.includes("--live");
 const cleanup = process.argv.includes("--cleanup");
 const U = live ? "https://kakushin.kajjabantu.workers.dev" : "http://localhost:8787";
-const D = "demo";
-const SLUG = "kampala-demo-hub";
+const D = "dryrun";
+const SLUG = "dryrun-hub";
 const where = live ? "--remote" : "--local";
 const sql = (q) => execSync(`npx wrangler d1 execute kakushin ${where} --json --command "${q.replace(/"/g, '\\"')}"`, { stdio: ["ignore", "pipe", "ignore"] }).toString();
 const email = (l) => `${D}-${l}@example.com`;
@@ -158,5 +158,10 @@ ok("second challenge published", next.r.s === 200, next.r);
 const bell = (await leads[0].p("/inbox")).d.items.map((i) => i.kind);
 ok("followers are told about the new challenge", bell.includes("challenge.new") && bell.includes("announcement"), bell);
 
+if (!process.argv.includes("--keep")) {
+  sql(`DELETE FROM organizations WHERE slug = '${SLUG}'`);
+  sql(`DELETE FROM users WHERE email LIKE '${D}-%@example.com'`);
+  sql(`DELETE FROM login_tokens WHERE email LIKE '${D}-%@example.com'`);
+}
 console.log(`\n${fail === 0 ? "ALL PASS" : "FAILURES"}: ${pass} passed, ${fail} failed in ${Math.round((Date.now() - t0) / 1000)}s (${U})`);
 process.exit(fail ? 1 : 0);
