@@ -16,14 +16,15 @@ To point the app at a local Worker instead, start `wrangler dev` and set `EXPO_P
 - Sign in with an emailed 6-digit code. The session token is kept in `expo-secure-store`.
 - Explore (filter by topic), challenge detail, follow an organisation.
 - Create or join a team with an invite code, fill in the application questions, update or withdraw.
+- Pitch for shortlisted teams: upload a PDF deck from Files, add video and demo links and notes.
 - My teams with the status stamps, inbox, certificates (opened as a PDF), profile, topic interests.
 
-Pitch uploads and judging are web-only for now.
+Judging is web-only for now.
 
 ## Layout
 
 ```
-app/                  Expo Router screens: (tabs)/index, teams, inbox, profile; sign-in; challenge/[org]/[slug]
+app/                  Expo Router screens: (tabs)/index, teams, inbox, profile; sign-in; challenge/[org]/[slug]; pitch/[team]
 components/ui.tsx     buttons, fields, cards, the status stamp
 lib/api.ts            fetch client with bearer token and Zod-checked responses
 lib/schemas.ts        Zod schemas for the Worker responses the app uses

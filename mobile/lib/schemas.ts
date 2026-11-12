@@ -58,3 +58,12 @@ export const inbox = z.object({
 
 export const follows = z.object({ orgs: z.array(z.object({ slug: z.string(), name: z.string() })), topics: z.array(z.string()) });
 export const topics = z.object({ topics: z.array(z.string()) });
+
+export const pitch = z.object({
+  pitch: z.object({
+    has_deck: z.boolean(), deck_name: z.string().nullable(), video_url: z.string(), demo_url: z.string(), notes: z.string(), updated_at: z.number(),
+  }).nullable(),
+  due: z.number().nullable(),
+  open: z.boolean(),
+});
+export type Pitch = z.infer<typeof pitch>;
