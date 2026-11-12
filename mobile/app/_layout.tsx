@@ -41,6 +41,7 @@ export default function Root() {
       <StatusBar style="auto" />
       <Stack screenOptions={{ headerStyle: { backgroundColor: t.bg }, headerTintColor: t.ink, headerTitleStyle: { fontWeight: "700" }, contentStyle: { backgroundColor: t.bg } }}>
         <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
+        <Stack.Screen name="profile" options={{ title: "Profile" }} />
         <Stack.Screen name="sign-in" options={{ headerShown: false }} />
         <Stack.Screen name="challenge/[org]/[slug]" options={{ headerShown: false }} />
         <Stack.Screen name="apply/[org]/[slug]" options={{ headerShown: false }} />
