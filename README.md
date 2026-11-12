@@ -69,7 +69,7 @@ Notes:
 - **Per-IP limits** (Workers Rate Limiting, set in `wrangler.jsonc` under `ratelimits`): 5 sign-in requests and 30 code checks a minute from one IP. These sit on top of the per-email limits (5 code requests an hour, 5 wrong codes then a lock).
 - **Turnstile** (Cloudflare's bot check) is built but off until both keys exist. Once on, every sign-in request needs it: the web form shows the widget, and the phone app shows the same widget in a small web view loaded from `/api/auth/turnstile`. No header or client type skips it.
 
-To turn Turnstile on, create a widget in the Cloudflare dashboard (Turnstile, Add widget) with the site's hostname (and `kakushin.kajjabantu.workers.dev` while that address is still in use), then set `TURNSTILE_SITE_KEY` as a variable and `TURNSTILE_SECRET` as a secret (`npx wrangler secret put TURNSTILE_SECRET`) and redeploy.
+The widget (site key in `wrangler.jsonc`) allows `kakushin.dpdns.org`. Turnstile switches on once the `TURNSTILE_SECRET` secret exists on the Worker. The server checks Cloudflare's answer for success, the `signin` action and a hostname listed in `TURNSTILE_HOSTNAMES`, so sign-in on the old workers.dev address stops working while Turnstile is on.
 
 ## Link previews
 
