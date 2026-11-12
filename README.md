@@ -60,7 +60,8 @@ Notes:
 
 - `npm test` runs the unit tests (scoring formula).
 - `npm run test:e2e` runs 50+ permission and tenant-isolation checks against a local `npm run dev`. It only talks to localhost.
-- `node scripts/dryrun.mjs` runs a whole fake hackathon (post, apply, shortlist, judge, results, certificates) against local. Add `--live` to run it on production, which also leaves a demo organisation ("Kampala Demo Hub") behind. `--live --cleanup` removes it again.
+- `node scripts/dryrun.mjs` runs a whole fake hackathon (post, apply, shortlist, judge, results, certificates) against local. Add `--live` to run it on production; it cleans up after itself.
+- `node scripts/demo/seed-demo.mjs [--live]` builds the presentation dataset: 5 organisations with logos, 9 challenges with covers at every stage, teams, pitch decks, scores, winners and certificates. Run it again to rebuild from scratch, or add `--cleanup` to remove it. Images and decks live in `scripts/demo/media` (regenerate with `scripts/demo/make-media.mjs`).
 
 ## Turnstile (bot check on the web sign-in form)
 
