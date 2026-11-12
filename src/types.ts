@@ -5,6 +5,9 @@ export interface Env {
   APP_URL: string;
   EMAIL_FROM: string;
   RESEND_API_KEY?: string;
+  TURNSTILE_SECRET?: string; // secret; sign-in check is off until both Turnstile values exist
+  TURNSTILE_SITE_KEY?: string;
+  TURNSTILE_VERIFY_URL?: string; // only set in tests
   EXPO_PUSH_URL?: string; // only set in tests, to point pushes at a fake server
 }
 

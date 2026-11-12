@@ -21,7 +21,7 @@ export async function api<T = unknown>(path: string, opts: { method?: string; js
   try {
     res = await fetch(`${API_URL}/api${path}`, {
       method: opts.method ?? "GET",
-      headers: { "Content-Type": "application/json", ...(token ? { Authorization: `Bearer ${token}` } : {}) },
+      headers: { "Content-Type": "application/json", "X-Kakushin-Client": "mobile", ...(token ? { Authorization: `Bearer ${token}` } : {}) },
       body: opts.json === undefined ? undefined : JSON.stringify(opts.json),
     });
   } catch {

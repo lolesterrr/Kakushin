@@ -13,15 +13,30 @@ export function Login() {
   const [msg, setMsg] = useState("");
   const [digits, setDigits] = useState<string[]>(["", "", "", "", "", ""]);
   const boxes = useRef<(HTMLInputElement | null)[]>([]);
+  const [siteKey, setSiteKey] = useState<string | null>(null);
+  const [captcha, setCaptcha] = useState("");
+  const widget = useRef<HTMLDivElement>(null);
   const next = params.get("next");
+  useEffect(() => { api<{ turnstile_site_key: string | null }>("/auth/config").then((r) => setSiteKey(r.turnstile_site_key)).catch(() => {}); }, []);
+  // Cloudflare Turnstile, only when the server has keys. The widget script loads from Cloudflare.
+  useEffect(() => {
+    if (!siteKey || !widget.current) return;
+    const el = widget.current; let id: string | undefined;
+    const draw = () => { const t = (window as unknown as { turnstile?: { render: (e: HTMLElement, o: object) => string; remove: (id: string) => void } }).turnstile; if (t && !id) id = t.render(el, { sitekey: siteKey, callback: (v: string) => setCaptcha(v), "expired-callback": () => setCaptcha("") }); };
+    if ((window as unknown as { turnstile?: unknown }).turnstile) draw();
+    else if (!document.getElementById("cf-turnstile")) { const s = document.createElement("script"); s.id = "cf-turnstile"; s.src = "https://challenges.cloudflare.com/turnstile/v0/api.js?render=explicit"; s.async = true; s.onload = draw; document.head.appendChild(s); }
+    else document.getElementById("cf-turnstile")!.addEventListener("load", draw);
+    return () => { const t = (window as unknown as { turnstile?: { remove: (id: string) => void } }).turnstile; if (t && id) t.remove(id); };
+  }, [siteKey, state]);
   const signup = params.get("mode") === "signup";
   useEffect(() => { if (next && next.startsWith("/")) rememberNext(next); }, [next]);
   if (me) return <Navigate to={next && next.startsWith("/") ? next : "/"} replace />;
 
   async function send(kind: "link" | "code") {
     setState("sending"); setMsg("");
-    try { await api("/auth/request", { method: "POST", json: { email, kind } }); setState(kind); }
+    try { await api("/auth/request", { method: "POST", json: { email, kind, ...(captcha ? { turnstile: captcha } : {}) } }); setState(kind); }
     catch (err) { setState("error"); setMsg((err as Error).message); }
+    finally { setCaptcha(""); }
   }
   function submit(e: React.FormEvent) { e.preventDefault(); void send("link"); }
   async function verify(code: string) {
@@ -60,9 +75,10 @@ export function Login() {
         <form onSubmit={submit}>
           <label htmlFor="email">Email</label>
           <input id="email" type="email" required autoComplete="email" value={email} onChange={(e) => setEmail(e.target.value)} />
+          {siteKey && <div ref={widget} style={{ margin: "12px 0" }} />}
           <div className="actions">
-            <button type="submit" disabled={state === "sending"}>{state === "sending" ? "Sending..." : "Email me a link"}</button>
-            <button type="button" className="ghost" disabled={state === "sending" || !email} onClick={() => void send("code")}>Email me a code instead</button>
+            <button type="submit" disabled={state === "sending" || (!!siteKey && !captcha)}>{state === "sending" ? "Sending..." : "Email me a link"}</button>
+            <button type="button" className="ghost" disabled={state === "sending" || !email || (!!siteKey && !captcha)} onClick={() => void send("code")}>Email me a code instead</button>
           </div>
           {state === "error" && <Notice kind="err">{msg}</Notice>}
         </form>
