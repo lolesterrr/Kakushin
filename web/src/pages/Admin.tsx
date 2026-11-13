@@ -4,6 +4,7 @@ import { api, confirmStageMove, fmtDate, fromLocalInput, toLocalInput, uploadIma
 import { useAuth } from "../auth";
 import { Band, Banner, Logo, Notice, Tag } from "../ui";
 import { AnnounceBox, OrgMembers } from "./OrgTeam";
+import { MarkdownField } from "../markdown";
 
 const ORG_TYPES = ["university", "hub", "corporate", "partner", "other"];
 const STATUSES = ["draft", "open", "reviewing", "judging", "completed"];
@@ -153,9 +154,11 @@ export function AdminOrg() {
 }
 
 interface Question { id?: string; label: string; type: string; required: boolean; options: string[] }
+interface Sponsor { name: string; url: string; logo_key: string | null; logo_url: string | null }
 interface Form {
   title: string; summary: string; description: string; prizes: string; status: string; team_min: number; team_max: number;
   opens: string; closes: string; pitch: string; topics: string[]; questions: Question[]; cover_url: string | null;
+  rules: string; faq: { q: string; a: string }[]; sponsors: Sponsor[]; timeline: { label: string; at: string }[]; show_judges: boolean;
 }
 
 export function AdminChallenge() {
@@ -181,6 +184,9 @@ export function AdminChallenge() {
         title: c.title, summary: c.summary, description: c.description, prizes: c.prizes, status: c.status, team_min: c.team_min, team_max: c.team_max,
         opens: toLocalInput(c.applications_open_at), closes: toLocalInput(c.applications_close_at), pitch: toLocalInput(c.pitch_due_at),
         topics: c.topics, questions: c.questions, cover_url: c.cover_url,
+        rules: c.rules ?? "", faq: c.faq ?? [], show_judges: !!c.show_judges,
+        sponsors: (c.sponsors ?? []).map((x: Sponsor) => ({ name: x.name, url: x.url ?? "", logo_key: x.logo_key, logo_url: x.logo_url })),
+        timeline: (c.timeline ?? []).map((x: { label: string; at: number }) => ({ label: x.label, at: toLocalInput(x.at) })),
       });
     }).catch((e: Error) => setMsg({ kind: "err", text: e.message }));
   }, [slug, cslug, guard]);
@@ -195,6 +201,7 @@ export function AdminChallenge() {
 
   async function save(status = f!.status) {
     if (wasDraft && status !== "draft" && !f!.cover_url) { setMsg({ kind: "err", text: "Add a banner before publishing. It is the first thing people see." }); return; }
+    if (f!.timeline.some((x) => !x.label.trim() !== !x.at)) { setMsg({ kind: "err", text: "Give every timeline date both a label and a time, or remove it." }); return; }
     const reopen = confirmStageMove(liveStatus, status);
     if (reopen === null) return;
     setSaving(true); setMsg(null);
@@ -205,6 +212,9 @@ export function AdminChallenge() {
         applications_open_at: fromLocalInput(f!.opens), applications_close_at: fromLocalInput(f!.closes), pitch_due_at: fromLocalInput(f!.pitch),
         topics: f!.topics,
         questions: f!.questions.map((q) => ({ ...q, options: q.type === "choice" ? q.options.filter(Boolean) : [] })),
+        rules: f!.rules, faq: f!.faq, show_judges: f!.show_judges,
+        sponsors: f!.sponsors.map((x) => ({ name: x.name, url: x.url || null, logo_key: x.logo_key })),
+        timeline: f!.timeline.filter((x) => x.label.trim() && x.at).map((x) => ({ label: x.label, at: fromLocalInput(x.at) ?? 0 })),
         ...(reopen ? { reopen } : {}),
       } });
       if (res.pending) {
@@ -222,6 +232,19 @@ export function AdminChallenge() {
     try { const r = await uploadImage<{ cover_url: string }>(`/orgs/${slug}/challenges/${cslug}/cover`, file); set("cover_url", r.cover_url); setMsg({ kind: "ok", text: "Banner updated" }); }
     catch (err) { setMsg({ kind: "err", text: (err as Error).message }); }
     e.target.value = "";
+  }
+  async function sponsorLogo(i: number, e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0]; e.target.value = ""; if (!file) return;
+    try {
+      const r = await uploadImage<{ logo_key: string; logo_url: string }>(`/orgs/${slug}/challenges/${cslug}/sponsor-logo`, file);
+      set("sponsors", f!.sponsors.map((x, j) => (j === i ? { ...x, logo_key: r.logo_key, logo_url: r.logo_url } : x)));
+      setMsg({ kind: "ok", text: "Logo added. Save to keep it." });
+    } catch (err) { setMsg({ kind: "err", text: (err as Error).message }); }
+  }
+  async function duplicate() {
+    if (!confirm("Make a new draft from this challenge? It copies the text, questions, both rubrics, sponsors and FAQ. Dates, the banner, teams and judges stay here.")) return;
+    try { const r = await api<{ slug: string }>(`/orgs/${slug}/challenges/${cslug}/duplicate`, { method: "POST" }); nav(`/admin/o/${slug}/c/${r.slug}/edit`); }
+    catch (err) { setMsg({ kind: "err", text: (err as Error).message }); }
   }
   async function remove() {
     if (!confirm("Delete this draft? This cannot be undone.")) return;
@@ -242,8 +265,8 @@ export function AdminChallenge() {
         <h2>Basics</h2>
         <label htmlFor="t">Title</label><input id="t" value={f.title} onChange={(e) => set("title", e.target.value)} />
         <label htmlFor="su">One-line summary (shown on cards)</label><input id="su" maxLength={200} value={f.summary} onChange={(e) => set("summary", e.target.value)} />
-        <label htmlFor="d">Description</label><textarea id="d" rows={10} value={f.description} onChange={(e) => set("description", e.target.value)} />
-        <label htmlFor="p">Prizes</label><textarea id="p" rows={4} value={f.prizes} onChange={(e) => set("prizes", e.target.value)} />
+        <MarkdownField id="d" label="Description" rows={10} value={f.description} onChange={(v) => set("description", v)} uploadPath={`/orgs/${slug}/challenges/${cslug}/images`} />
+        <MarkdownField id="p" label="Prizes" rows={4} maxLength={5000} value={f.prizes} onChange={(v) => set("prizes", v)} hint="The first line shows on cards, so start with the main prize." />
         <label htmlFor="banner">Banner</label>
         <p className="muted" style={{ margin: "0 0 10px" }}>Every challenge needs a banner. It is the first thing people see on the app and the website. PNG, JPEG or WebP, up to 4 MB, best at 1600 by 500 pixels.</p>
         <div className="banner-preview"><Banner url={f.cover_url} seed={cslug ?? "challenge"} alt={f.cover_url ? "Current banner" : ""} /></div>
@@ -257,6 +280,40 @@ export function AdminChallenge() {
       </div>
 
       <div className="section form">
+        <h2>Rules and FAQ</h2>
+        <MarkdownField id="ru" label="Rules" rows={8} value={f.rules} onChange={(v) => set("rules", v)} uploadPath={`/orgs/${slug}/challenges/${cslug}/images`} hint="Who can take part, what to build, what is not allowed. Same formatting as the description." />
+        <label>Frequently asked questions</label>
+        {f.faq.map((x, i) => (
+          <div className="qcard" key={i}>
+            <label htmlFor={`fq${i}`} style={{ marginTop: 0 }}>Question {i + 1}</label><input id={`fq${i}`} maxLength={200} value={x.q} onChange={(e) => set("faq", f.faq.map((y, j) => (j === i ? { ...y, q: e.target.value } : y)))} />
+            <label htmlFor={`fa${i}`}>Answer</label><textarea id={`fa${i}`} rows={3} maxLength={2000} value={x.a} onChange={(e) => set("faq", f.faq.map((y, j) => (j === i ? { ...y, a: e.target.value } : y)))} />
+            <div className="actions" style={{ marginTop: 10 }}><button type="button" className="ghost small" onClick={() => set("faq", f.faq.filter((_, j) => j !== i))}>Remove</button></div>
+          </div>
+        ))}
+        <button type="button" className="ghost" disabled={f.faq.length >= 30} onClick={() => set("faq", [...f.faq, { q: "", a: "" }])}>Add a question</button>
+      </div>
+
+      <div className="section form">
+        <h2>Sponsors</h2>
+        <p className="muted">Shown with their logo on the challenge page. Logos are PNG, JPEG or WebP, up to 1 MB.</p>
+        {f.sponsors.map((x, i) => (
+          <div className="qcard" key={i}>
+            <div className="row">
+              <div><label htmlFor={`sn${i}`} style={{ marginTop: 0 }}>Name</label><input id={`sn${i}`} maxLength={80} value={x.name} onChange={(e) => set("sponsors", f.sponsors.map((y, j) => (j === i ? { ...y, name: e.target.value } : y)))} /></div>
+              <div><label htmlFor={`su${i}`} style={{ marginTop: 0 }}>Website (optional)</label><input id={`su${i}`} type="url" placeholder="https://" value={x.url} onChange={(e) => set("sponsors", f.sponsors.map((y, j) => (j === i ? { ...y, url: e.target.value } : y)))} /></div>
+            </div>
+            <label htmlFor={`sl${i}`}>Logo</label>
+            <div style={{ display: "flex", gap: 12, alignItems: "center" }}>{x.logo_url && <img src={x.logo_url} alt="" style={{ height: 40, maxWidth: 120, objectFit: "contain" }} />}<input id={`sl${i}`} type="file" accept="image/png,image/jpeg,image/webp" onChange={(e) => void sponsorLogo(i, e)} /></div>
+            <div className="actions" style={{ marginTop: 10 }}>
+              <button type="button" className="ghost small" disabled={i === 0} onClick={() => { const a = [...f.sponsors]; [a[i - 1], a[i]] = [a[i]!, a[i - 1]!]; set("sponsors", a); }}>Up</button>
+              <button type="button" className="ghost small" onClick={() => set("sponsors", f.sponsors.filter((_, j) => j !== i))}>Remove</button>
+            </div>
+          </div>
+        ))}
+        <button type="button" className="ghost" disabled={f.sponsors.length >= 20} onClick={() => set("sponsors", [...f.sponsors, { name: "", url: "", logo_key: null, logo_url: null }])}>Add a sponsor</button>
+      </div>
+
+      <div className="section form">
         <h2>Timeline and teams</h2>
         <div className="row">
           <div><label htmlFor="o">Applications open</label><input id="o" type="datetime-local" value={f.opens} onChange={(e) => set("opens", e.target.value)} /></div>
@@ -267,6 +324,18 @@ export function AdminChallenge() {
           <div><label htmlFor="mn">Smallest team</label><input id="mn" type="number" min={1} max={20} value={f.team_min} onChange={(e) => set("team_min", Number(e.target.value))} /></div>
           <div><label htmlFor="mx">Largest team</label><input id="mx" type="number" min={1} max={20} value={f.team_max} onChange={(e) => set("team_max", Number(e.target.value))} /></div>
         </div>
+        <label>More dates for the timeline</label>
+        <p className="muted" style={{ marginTop: 0 }}>The application and pitch dates above are on the page already. Add others, such as an info session or demo day.</p>
+        {f.timeline.map((x, i) => (
+          <div className="row" key={i} style={{ alignItems: "end" }}>
+            <div><label htmlFor={`tl${i}`}>What happens</label><input id={`tl${i}`} maxLength={80} placeholder="Info session" value={x.label} onChange={(e) => set("timeline", f.timeline.map((y, j) => (j === i ? { ...y, label: e.target.value } : y)))} /></div>
+            <div><label htmlFor={`ta${i}`}>When</label><input id={`ta${i}`} type="datetime-local" value={x.at} onChange={(e) => set("timeline", f.timeline.map((y, j) => (j === i ? { ...y, at: e.target.value } : y)))} /></div>
+            <div><button type="button" className="ghost small" onClick={() => set("timeline", f.timeline.filter((_, j) => j !== i))}>Remove</button></div>
+          </div>
+        ))}
+        <div className="actions"><button type="button" className="ghost" disabled={f.timeline.length >= 20} onClick={() => set("timeline", [...f.timeline, { label: "", at: "" }])}>Add a date</button></div>
+        <label className="check" style={{ marginTop: 20 }}><input type="checkbox" checked={f.show_judges} onChange={(e) => set("show_judges", e.target.checked)} />Show judges on the page</label>
+        <p className="muted" style={{ marginTop: 4 }}>Only judges who add a display name on their judging page appear, with their title. Their email is never shown.</p>
       </div>
 
       <div className="section form">
@@ -305,6 +374,7 @@ export function AdminChallenge() {
           <button onClick={() => save()} disabled={saving}>{saving ? "Saving..." : "Save"}</button>
           {f.status === "draft" && review.state !== "pending" && <button className="ghost" onClick={() => save("open")} disabled={saving}>{review.state === "rejected" ? "Send for review again" : "Publish"}</button>}
           {f.status === "draft" && !f.cover_url && <span className="muted">Add a banner above to publish.</span>}
+          <button className="ghost" onClick={duplicate} disabled={saving}>Duplicate</button>
           {f.status === "draft" && <button className="ghost" onClick={remove}>Delete draft</button>}
         </div>
         {msg && <Notice kind={msg.kind}>{msg.text}</Notice>}

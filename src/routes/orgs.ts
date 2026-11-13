@@ -14,6 +14,7 @@ import { orgResults } from "./results";
 import { orgAnnouncements } from "./announcements";
 import { orgMembers } from "./members";
 import { orgMessages } from "./messages";
+import { orgPeople } from "./people";
 
 export const orgs = new Hono<AppEnv>();
 const MAX_ORGS_PER_USER = 5;
@@ -134,3 +135,4 @@ orgs.route("/", orgResults);
 orgs.route("/", orgAnnouncements);
 orgs.route("/", orgMembers);
 orgs.route("/", orgMessages);
+orgs.route("/", orgPeople);

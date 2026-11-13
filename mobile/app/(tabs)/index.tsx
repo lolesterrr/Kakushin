@@ -65,8 +65,16 @@ export default function Explore() {
   const { me } = useAuth();
   const [topic, setTopic] = useState<string | null>(null);
   const [q, setQ] = useState("");
+  // The server searches title, summary and organiser, a moment after typing stops.
+  const [query, setQuery] = useState("");
+  useEffect(() => { const h = setTimeout(() => setQuery(q.trim()), 350); return () => clearTimeout(h); }, [q]);
   const topics = useLoad(() => api("/challenges/topics", { schema: topicsSchema }), [], { cache: "topics" });
-  const list = useLoad(() => api(`/challenges${topic ? `?topic=${encodeURIComponent(topic)}` : ""}`, { schema: challengeList }), [topic], { cache: `explore.${topic ?? "all"}` });
+  const list = useLoad(() => {
+    const u = new URLSearchParams({ limit: "60" });
+    if (topic) u.set("topic", topic);
+    if (query) u.set("q", query);
+    return api(`/challenges?${u.toString()}`, { schema: challengeList });
+  }, [topic, query], { cache: query ? undefined : `explore.${topic ?? "all"}` });
   // The topics behind "For you": the account's when signed in, otherwise the ones picked during onboarding.
   const mine = useLoad(async () => (me ? (await api("/follows", { schema: followsSchema })).topics : (await loadPrefs()).topics), [me?.id]);
   const suggested = !topic && !q.trim() ? forYou(list.data?.challenges ?? [], mine.data ?? []) : [];
@@ -86,7 +94,9 @@ export default function Explore() {
   }, [me?.id]); // eslint-disable-line react-hooks/exhaustive-deps
   const first = (me?.name ?? me?.email ?? "").split(/[ @]/)[0] ?? "";
   const initials = (me?.name ?? me?.email ?? "?").split(/[ @.]/).filter(Boolean).slice(0, 2).map((x) => x[0]!.toUpperCase()).join("");
-  const shown = (list.data?.challenges ?? []).filter((c) => !q.trim() || `${c.title} ${c.org.name} ${c.topics.join(" ")}`.toLowerCase().includes(q.trim().toLowerCase()));
+  // Until the server answers, narrow what is already on screen so typing feels instant.
+  const typing = q.trim().toLowerCase();
+  const shown = (list.data?.challenges ?? []).filter((c) => !typing || typing === query.toLowerCase() || `${c.title} ${c.summary} ${c.org.name} ${c.topics.join(" ")}`.toLowerCase().includes(typing));
 
   return (
     <Screen onRefresh={list.refresh} refreshing={list.refreshing} scroll>
@@ -112,7 +122,7 @@ export default function Explore() {
 
       <View style={[{ flexDirection: "row", alignItems: "center", gap: 10, height: 54, paddingHorizontal: 18, backgroundColor: t.card, borderWidth: 1, borderColor: t.line, borderRadius: 27 }, shadow(0.08)]}>
         <Svg width={20} height={20} viewBox="0 0 20 20" fill="none" stroke={t.ink} strokeWidth={2.4} strokeLinecap="round"><Circle cx={9} cy={9} r={6} /><Path d="M14 14l4 4" /></Svg>
-        <TextInput accessibilityLabel="Search challenges" value={q} onChangeText={setQ} placeholder="Search by name, topic or organiser" placeholderTextColor={t.muted} returnKeyType="search" style={{ flex: 1, color: t.ink, fontSize: 16, paddingVertical: 0 }} />
+        <TextInput accessibilityLabel="Search challenges" value={q} onChangeText={setQ} placeholder="Search by name, summary or organiser" placeholderTextColor={t.muted} returnKeyType="search" style={{ flex: 1, color: t.ink, fontSize: 16, paddingVertical: 0 }} />
       </View>
       <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 8 }}>
         <Pill text="All" on={!topic} onPress={() => setTopic(null)} />

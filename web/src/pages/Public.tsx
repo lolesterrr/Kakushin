@@ -6,6 +6,8 @@ import { NextStep, TeamPanel, useMyTeam, type Question } from "./Team";
 import { FollowButton } from "./Inbox";
 import { PublicResults } from "./Results";
 import { Banner, ChallengeCard, type ChallengeCardData, DeadlineStamp, Logo, Notice, Stamp, StatusPill, TopicPills } from "../ui";
+import { Markdown } from "../markdown";
+import { Gallery, ShowProject, WhosComing } from "./People";
 
 /**
  * Banner bulb: grows in once per page load, then loops a gentle turn. Reduced motion gets the still.
@@ -40,7 +42,7 @@ function HeroBulb() {
 export function Home() {
   const { me } = useAuth();
   const [items, setItems] = useState<ChallengeCardData[] | null>(null);
-  useEffect(() => { api<{ challenges: ChallengeCardData[] }>("/challenges").then((r) => setItems(r.challenges.slice(0, 3))).catch(() => setItems([])); }, []);
+  useEffect(() => { api<{ challenges: ChallengeCardData[] }>("/challenges?limit=3").then((r) => setItems(r.challenges.slice(0, 3))).catch(() => setItems([])); }, []);
   useEffect(() => { if (window.location.hash === "#how") document.getElementById("how")?.scrollIntoView(); }, []);
   const steps: [string, string, string][] = [
     ["01", "Pick", "Browse open challenges. Each one shows its deadline, team size and prize up front."],
@@ -83,33 +85,110 @@ export function Home() {
   );
 }
 
+type Page = { challenges: ChallengeCardData[]; next: string | null };
+
 export function Explore() {
   const [topics, setTopics] = useState<string[]>([]);
-  const [topic, setTopic] = useState<string | null>(null);
+  const params = new URLSearchParams(typeof window !== "undefined" ? window.location.search : "");
+  const [topic, setTopic] = useState<string | null>(params.get("topic"));
+  const [q, setQ] = useState(params.get("q") ?? "");
+  const [query, setQuery] = useState(q);
+  const [size, setSize] = useState(params.get("size") ?? "");
+  const [sort, setSort] = useState(params.get("sort") === "newest" ? "newest" : "closing");
   const [items, setItems] = useState<ChallengeCardData[] | null>(null);
+  const [next, setNext] = useState<string | null>(null);
+  const [busy, setBusy] = useState(false);
   const [err, setErr] = useState("");
   useEffect(() => { api<{ topics: string[] }>("/challenges/topics").then((r) => setTopics(r.topics)).catch(() => {}); }, []);
+  // Search as people type, a moment after they stop.
+  useEffect(() => { const t = setTimeout(() => setQuery(q.trim()), 300); return () => clearTimeout(t); }, [q]);
+  const qs = (cursor?: string) => {
+    const u = new URLSearchParams();
+    if (topic) u.set("topic", topic);
+    if (query) u.set("q", query);
+    if (size) u.set("size", size);
+    if (sort !== "closing") u.set("sort", sort);
+    if (cursor) u.set("cursor", cursor);
+    return u.toString();
+  };
   useEffect(() => {
-    setItems(null);
-    api<{ challenges: ChallengeCardData[] }>(`/challenges${topic ? `?topic=${topic}` : ""}`)
-      .then((r) => setItems(r.challenges)).catch((e: Error) => setErr(e.message));
-  }, [topic]);
+    let alive = true;
+    setItems(null); setErr("");
+    const shown = qs();
+    // Keep the filters in the address, so a search can be shared or survives a reload.
+    window.history.replaceState(null, "", `/challenges${shown ? `?${shown}` : ""}`);
+    api<Page>(`/challenges?${shown}`).then((r) => { if (alive) { setItems(r.challenges); setNext(r.next); } }).catch((e: Error) => alive && setErr(e.message));
+    return () => { alive = false; };
+  }, [topic, query, size, sort]); // eslint-disable-line react-hooks/exhaustive-deps
+  async function more() {
+    if (!next) return;
+    setBusy(true);
+    try { const r = await api<Page>(`/challenges?${qs(next)}`); setItems([...(items ?? []), ...r.challenges]); setNext(r.next); }
+    catch (e) { setErr((e as Error).message); }
+    setBusy(false);
+  }
+  const filtered = !!(topic || query || size);
   return (
     <>
       <div className="hero">
         <p className="hand">Open now</p>
         <h1>Challenges</h1>
-        <p>Hackathons and innovation challenges from universities, hubs and companies. Find one, form a team, apply.</p>
-        <div className="pills" style={{ marginTop: 20 }} role="group" aria-label="Filter by topic">
+        <p>Hackathons and innovation challenges from universities, hubs and companies. Find one, form a team, apply. <Link to="/challenges/winners">See past winners</Link>.</p>
+        <div className="search-row">
+          <input type="search" aria-label="Search challenges" placeholder="Search by name, summary or organiser" value={q} onChange={(e) => setQ(e.target.value)} maxLength={80} />
+          <select aria-label="Team size" value={size} onChange={(e) => setSize(e.target.value)}>
+            <option value="">Any team size</option>
+            {[1, 2, 3, 4, 5, 6].map((n) => <option key={n} value={n}>{n === 1 ? "Solo" : `Team of ${n}`}</option>)}
+          </select>
+          <select aria-label="Sort" value={sort} onChange={(e) => setSort(e.target.value)}>
+            <option value="closing">Closing soon</option>
+            <option value="newest">Newest</option>
+          </select>
+        </div>
+        <div className="pills" style={{ marginTop: 16 }} role="group" aria-label="Filter by topic">
           <button className={`pill ${topic === null ? "on" : ""}`} onClick={() => setTopic(null)}>all</button>
           {topics.map((t) => <button key={t} className={`pill ${topic === t ? "on" : ""}`} onClick={() => setTopic(t)}>{t}</button>)}
         </div>
       </div>
       {err && <div className="section"><Notice kind="err">{err}</Notice></div>}
       {items && items.length > 0 && <div className="grid">{items.map((c) => <ChallengeCard key={`${c.org.slug}/${c.slug}`} c={c} />)}</div>}
+      {next && <div className="section" style={{ textAlign: "center" }}><button className="ghost" onClick={() => void more()} disabled={busy}>{busy ? "Loading…" : "Load more"}</button></div>}
       {items && items.length === 0 && (
-        <div className="empty"><p className="hand">Nothing here yet</p><p className="muted">{topic ? "No open challenges for this topic." : "No open challenges right now. Check back soon."}</p></div>
+        <div className="empty"><p className="hand">Nothing here yet</p><p className="muted">{filtered ? "No open challenges match. Try fewer filters." : "No open challenges right now. Check back soon."}</p></div>
       )}
+    </>
+  );
+}
+
+type Winner = ChallengeCardData & { results_published_at: number | null; winners: { placement: number; team: string }[] };
+
+/** Completed challenges with published results, newest first. */
+export function Winners() {
+  const [items, setItems] = useState<Winner[] | null>(null);
+  const [next, setNext] = useState<string | null>(null);
+  const [err, setErr] = useState("");
+  const load = (cursor?: string) => api<{ challenges: Winner[]; next: string | null }>(`/challenges/winners${cursor ? `?cursor=${cursor}` : ""}`)
+    .then((r) => { setItems((old) => [...(cursor ? old ?? [] : []), ...r.challenges]); setNext(r.next); }).catch((e: Error) => setErr(e.message));
+  useEffect(() => { void load(); }, []);
+  const ord = (n: number) => (n === 1 ? "1st" : n === 2 ? "2nd" : n === 3 ? "3rd" : `${n}th`);
+  return (
+    <>
+      <div className="hero"><p className="hand">Hall of fame</p><h1>Past winners</h1><p>Winning teams from completed challenges. <Link to="/challenges">Back to open challenges</Link>.</p></div>
+      {err && <div className="section"><Notice kind="err">{err}</Notice></div>}
+      {items && items.length > 0 && (
+        <div className="grid">{items.map((c) => (
+          <Link key={`${c.org.slug}/${c.slug}`} to={`/o/${c.org.slug}/c/${c.slug}#results`} className="cell card-link">
+            <div className="ban"><Banner url={c.cover_url} seed={c.slug} lazy /></div>
+            <div className="cell-body">
+              <div className="org-line"><Logo url={c.org.logo_url} name={c.org.name} size={22} /><span>{c.org.name}</span></div>
+              <h3>{c.title}</h3>
+              <ol className="results" style={{ marginTop: 8 }}>{c.winners.map((w) => <li key={w.placement}><b className="place">{ord(w.placement)}</b><span>{w.team}</span></li>)}</ol>
+            </div>
+          </Link>
+        ))}</div>
+      )}
+      {next && <div className="section" style={{ textAlign: "center" }}><button className="ghost" onClick={() => void load(next)}>Load more</button></div>}
+      {items && items.length === 0 && <div className="empty"><p className="hand">No results yet</p><p className="muted">Winners show here once organisers publish results.</p></div>}
     </>
   );
 }
@@ -144,6 +223,7 @@ export function OrgPublic() {
       {visible.length > 0
         ? <div className="grid">{visible.map((c) => <ChallengeCard key={c.slug} c={{ ...c, org }} />)}</div>
         : <div className="empty"><p className="hand">No public challenges yet</p></div>}
+      <Gallery path={`/orgs/${org.slug}/gallery`} heading="Projects from past challenges" showChallenge />
     </>
   );
 }
@@ -151,12 +231,24 @@ export function OrgPublic() {
 interface ChallengeFull extends ChallengeCardData {
   cover_credit?: { author: string; license: string; source: string; license_url?: string } | null; description: string; prizes: string; status: string; results_published?: number; applications_open_at: number | null; pitch_due_at: number | null; questions: Question[];
   criteria?: { name: string; description: string; weight: number; max_score: number }[];
+  rules?: string; faq?: { q: string; a: string }[]; timeline?: { label: string; at: number }[];
+  sponsors?: { name: string; url: string | null; logo_url: string | null }[]; judges?: { name: string; title: string }[];
 }
+
+/** Application and pitch dates plus the organiser's own, in order. */
+function timelineOf(c: ChallengeFull) {
+  const rows: { label: string; at: number }[] = [...(c.timeline ?? [])];
+  if (c.applications_open_at) rows.push({ label: "Applications open", at: c.applications_open_at });
+  if (c.applications_close_at) rows.push({ label: "Applications close", at: c.applications_close_at });
+  if (c.pitch_due_at) rows.push({ label: "Pitches due", at: c.pitch_due_at });
+  return rows.sort((a, b) => a.at - b.at);
+}
+const when = (ms: number) => new Date(ms).toLocaleString(undefined, { day: "numeric", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit" });
 
 /** The judging rubric, so people know how they will be scored before they apply. */
 function Rubric({ criteria }: { criteria: NonNullable<ChallengeFull["criteria"]> }) {
   return (
-    <div className="section">
+    <div className="section" id="scoring">
       <p className="label" style={{ marginTop: 0 }}>How you will be scored</p>
       <p className="muted" style={{ marginTop: 0, maxWidth: 720 }}>Judges score each pitch on these criteria. The weights show how much each one counts towards the final score.</p>
       <ul className="todo" style={{ maxWidth: 720 }}>
@@ -183,6 +275,14 @@ export function ChallengePublic() {
   if (err) return <div className="section"><Notice kind="err">{err === "Not found" ? "We could not find that challenge." : err}</Notice></div>;
   if (!data) return null;
   const { challenge: c, role } = data;
+  const tl = timelineOf(c);
+  const now = Date.now();
+  const isOpen = c.status === "open" && (!c.applications_open_at || now >= c.applications_open_at) && (!c.applications_close_at || now < c.applications_close_at);
+  const sections = ([
+    ["overview", "Overview", !!c.description], ["rules", "Rules", !!c.rules], ["timeline", "Timeline", tl.length > 0], ["prizes", "Prizes", !!c.prizes],
+    ["judges", "Judges", (c.judges?.length ?? 0) > 0], ["sponsors", "Sponsors", (c.sponsors?.length ?? 0) > 0], ["faq", "FAQ", (c.faq?.length ?? 0) > 0],
+    ["scoring", "Scoring", (c.criteria?.length ?? 0) > 0], ["people", "Who's coming", c.status !== "draft"],
+  ] as [string, string, boolean][]).filter(([, , on]) => on);
   async function copy() {
     try { await navigator.clipboard.writeText(window.location.href); setCopied(true); setTimeout(() => setCopied(false), 2000); } catch { /* clipboard blocked */ }
   }
@@ -217,11 +317,44 @@ export function ChallengePublic() {
         <div><p className="label">Team size</p><b>{c.team_min === c.team_max ? c.team_min : `${c.team_min} to ${c.team_max}`}</b></div>
         {c.pitch_due_at ? <div><p className="label">Pitch due</p><b>{fmtDate(c.pitch_due_at)}</b></div> : null}
       </div>
-      {c.results_published ? <PublicResults orgSlug={c.org.slug} cslug={c.slug} /> : null}
-      {c.description && <div className="section"><p className="label" style={{ marginTop: 0 }}>About</p><div className="prose">{c.description}</div></div>}
-      {c.prizes && <div className="section"><p className="label" style={{ marginTop: 0 }}>Prizes</p><div className="prose">{c.prizes}</div></div>}
+      <nav className="secnav" aria-label="On this page">
+        {sections.map(([id, label]) => <a key={id} href={`#${id}`}>{label}</a>)}
+      </nav>
+      {c.results_published ? <><PublicResults orgSlug={c.org.slug} cslug={c.slug} /><Gallery path={`/orgs/${c.org.slug}/challenges/${c.slug}/gallery`} /></> : null}
+      {c.description && <div className="section" id="overview"><p className="label" style={{ marginTop: 0 }}>Overview</p><Markdown text={c.description} /></div>}
+      {c.rules && <div className="section" id="rules"><p className="label" style={{ marginTop: 0 }}>Rules</p><Markdown text={c.rules} /></div>}
+      {tl.length > 0 && (
+        <div className="section" id="timeline">
+          <p className="label" style={{ marginTop: 0 }}>Timeline</p>
+          <ol className="timeline">{tl.map((r, i) => <li key={i} className={r.at < Date.now() ? "past" : ""}><time dateTime={new Date(r.at).toISOString()}>{when(r.at)}</time><b>{r.label}</b></li>)}</ol>
+        </div>
+      )}
+      {c.prizes && <div className="section" id="prizes"><p className="label" style={{ marginTop: 0 }}>Prizes</p><Markdown text={c.prizes} /></div>}
+      {(c.judges?.length ?? 0) > 0 && (
+        <div className="section" id="judges">
+          <p className="label" style={{ marginTop: 0 }}>Judges</p>
+          <ul className="judges">{c.judges!.map((j, i) => <li key={i}><span className="logo ph" aria-hidden style={{ width: 44, height: 44, fontSize: 20 }}>{j.name.slice(0, 1).toUpperCase()}</span><span><b>{j.name}</b>{j.title && <><br /><span className="muted">{j.title}</span></>}</span></li>)}</ul>
+        </div>
+      )}
+      {(c.sponsors?.length ?? 0) > 0 && (
+        <div className="section" id="sponsors">
+          <p className="label" style={{ marginTop: 0 }}>Sponsors</p>
+          <ul className="sponsors">{c.sponsors!.map((x, i) => {
+            const inner = x.logo_url ? <img src={x.logo_url} alt={x.name} loading="lazy" /> : <b>{x.name}</b>;
+            return <li key={i}>{x.url ? <a href={x.url} target="_blank" rel="noopener noreferrer" title={x.name}>{inner}</a> : inner}</li>;
+          })}</ul>
+        </div>
+      )}
+      {(c.faq?.length ?? 0) > 0 && (
+        <div className="section" id="faq">
+          <p className="label" style={{ marginTop: 0 }}>FAQ</p>
+          <div className="faq">{c.faq!.map((x, i) => <details key={i}><summary>{x.q}</summary><Markdown text={x.a} /></details>)}</div>
+        </div>
+      )}
       {c.criteria && c.criteria.length > 0 && <Rubric criteria={c.criteria} />}
+      {c.status !== "draft" && <WhosComing orgSlug={c.org.slug} cslug={c.slug} open={isOpen} teamMax={c.team_max} team={team} />}
       {c.status !== "draft" && <div id="apply"><TeamPanel orgSlug={c.org.slug} cslug={c.slug} challenge={c} team={team} reload={reload} /></div>}
+      {team && ["finalist", "winner"].includes(team.status) && <ShowProject team={team} onChange={reload} />}
     </>
   );
 }

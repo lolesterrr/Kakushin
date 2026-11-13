@@ -4,6 +4,7 @@ import type { AppEnv } from "../types";
 import { loadOrg } from "../lib/access";
 import { sendEmail } from "../lib/email";
 import { pushLater } from "../lib/push";
+import { audit } from "../lib/audit";
 
 /** Organisation admins: list, invite by email, remove. Mounted under /api/orgs. */
 export const orgMembers = new Hono<AppEnv>();
@@ -71,5 +72,28 @@ orgMembers.delete("/:slug/invites", async (c) => {
   const parsed = z.object({ email: z.string().trim().toLowerCase() }).safeParse(await c.req.json().catch(() => null));
   if (!parsed.success) return c.json({ error: "Check the request" }, 400);
   await c.env.DB.prepare("DELETE FROM org_invites WHERE org_id = ? AND email = ?").bind(x.org.id, parsed.data.email).run();
+  return c.json({ ok: true });
+});
+
+/** The owner hands the owner role to another admin and stays on as an admin. */
+orgMembers.post("/:slug/owner", async (c) => {
+  const x = await adminOrg(c); if ("err" in x) return x.err;
+  if (x.role !== "owner") return c.json({ error: "Only the owner can hand over the organisation" }, 403);
+  const parsed = z.object({ user_id: z.string().min(1).max(64) }).safeParse(await c.req.json().catch(() => null));
+  if (!parsed.success) return c.json({ error: "Pick the admin who becomes the owner" }, 400);
+  if (parsed.data.user_id === x.user.id) return c.json({ error: "You are already the owner" }, 400);
+  const target = await c.env.DB.prepare("SELECT u.name, u.email, u.suspended FROM memberships m JOIN users u ON u.id = m.user_id WHERE m.org_id = ? AND m.user_id = ? AND m.role = 'admin'")
+    .bind(x.org.id, parsed.data.user_id).first<{ name: string | null; email: string; suspended: number }>();
+  if (!target) return c.json({ error: "Only an existing admin of this organisation can become its owner" }, 404);
+  if (target.suspended) return c.json({ error: "That account is suspended" }, 409);
+  // Both rows change in one batch, so the organisation always has exactly one owner.
+  await c.env.DB.batch([
+    c.env.DB.prepare("UPDATE memberships SET role = 'owner' WHERE org_id = ? AND user_id = ? AND role = 'admin'").bind(x.org.id, parsed.data.user_id),
+    c.env.DB.prepare("UPDATE memberships SET role = 'admin' WHERE org_id = ? AND user_id = ? AND role = 'owner'").bind(x.org.id, x.user.id),
+    c.env.DB.prepare("INSERT INTO notifications (id, user_id, kind, title, body, link, created_at) VALUES (lower(hex(randomblob(12))), ?, 'org.owner', ?, ?, ?, ?)")
+      .bind(parsed.data.user_id, `You are now the owner of ${x.org.name}`, `${x.user.name || x.user.email} handed the organisation over to you.`, `/admin/o/${x.org.slug}`, Date.now()),
+  ]);
+  await audit(c, "org.owner_transferred", "organization", x.org.slug, `to ${target.email}`);
+  pushLater(c);
   return c.json({ ok: true });
 });
