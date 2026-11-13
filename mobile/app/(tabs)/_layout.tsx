@@ -14,6 +14,7 @@ export default function TabsLayout() {
       screenOptions={{ headerStyle: { backgroundColor: t.bg }, headerShadowVisible: false, headerTintColor: t.ink, headerTitleStyle: { fontWeight: "800" } }}>
       <Tabs.Screen name="index" options={{ title: "Explore", headerShown: false }} />
       <Tabs.Screen name="teams" options={{ title: "My teams" }} />
+      <Tabs.Screen name="judge" options={{ title: "Judging" }} />
       <Tabs.Screen name="inbox" options={{ title: "Inbox" }} />
     </Tabs>
   );

@@ -21,6 +21,8 @@ export interface Env {
   GOOGLE_CLIENT_ID?: string; // public; Google sign-in is off until it is set
   GOOGLE_CERTS_URL?: string; // only set in tests
   EXPO_PUSH_URL?: string; // only set in tests, to point pushes at a fake server
+  GITHUB_TOKEN?: string; // secret; a read-only token so repo lookups get 5,000 calls an hour instead of 60 per address
+  GITHUB_API_URL?: string; // only set in tests, to point repo lookups at a fake server
 }
 
 export interface User {
