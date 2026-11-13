@@ -38,6 +38,7 @@ function HeroBulb() {
 }
 
 export function Home() {
+  const { me } = useAuth();
   const [items, setItems] = useState<ChallengeCardData[] | null>(null);
   useEffect(() => { api<{ challenges: ChallengeCardData[] }>("/challenges").then((r) => setItems(r.challenges.slice(0, 3))).catch(() => setItems([])); }, []);
   useEffect(() => { if (window.location.hash === "#how") document.getElementById("how")?.scrollIntoView(); }, []);
@@ -56,7 +57,7 @@ export function Home() {
           <p className="hand" style={{ margin: 0 }}>Hackathons, without the spreadsheets</p>
           <h1>Find a challenge.<br />Build a team.<br />Pitch your idea.</h1>
           <p className="lead">Kakushin is where universities, hubs and companies run innovation challenges, and where you go to find them. One profile for every event.</p>
-          <div className="actions"><Link className="btn" to="/login?mode=signup">Create your account</Link><Link className="btn ghost" to="/challenges">Browse challenges</Link><Link className="btn ghost" to="/admin">I run events</Link></div>
+          <div className="actions">{!me && <Link className="btn" to="/login?mode=signup">Create your account</Link>}<Link className={me ? "btn" : "btn ghost"} to="/challenges">Browse challenges</Link><Link className="btn ghost" to="/admin">I run events</Link></div>
         </div>
         <div className="art" aria-hidden>
           <HeroBulb />
@@ -75,7 +76,7 @@ export function Home() {
         {items && items.length === 0 && <div className="empty" style={{ borderTop: "1px solid var(--line)" }}><p className="hand">No open challenges right now</p><p className="muted">Check back soon, or run your own.</p></div>}
       </section>
       <section className="split">
-        <div><p className="hand" style={{ margin: 0 }}>For participants</p><h2 style={{ margin: "6px 0 10px", fontSize: 26 }}>One profile for every event</h2><p>Keep your skills, teams and certificates in one place.</p><Link to="/login" style={{ fontWeight: 600 }}>Sign in with your email</Link></div>
+        <div><p className="hand" style={{ margin: 0 }}>For participants</p><h2 style={{ margin: "6px 0 10px", fontSize: 26 }}>One profile for every event</h2><p>Keep your skills, teams and certificates in one place.</p>{me ? <Link to="/profile" style={{ fontWeight: 600 }}>Go to your profile</Link> : <Link to="/login" style={{ fontWeight: 600 }}>Sign in with your email</Link>}</div>
         <div><p className="hand" style={{ margin: 0 }}>For organisers</p><h2 style={{ margin: "6px 0 10px", fontSize: 26 }}>Run the whole challenge here</h2><p>Post a challenge, review applications, invite judges, score pitches and issue certificates.</p><Link className="btn" to="/admin">Set up your organisation</Link></div>
       </section>
     </>

@@ -20,6 +20,27 @@ import { Credits } from "./pages/Credits";
 import { Privacy, Terms } from "./pages/Legal";
 import "./styles.css";
 
+/**
+ * Browsers draw an animated SVG favicon as a still, so the tab icon blinks by swapping two static frames, in step
+ * with the logo dot (1.2s: lit for about half, dim for the rest). Stays lit for people who ask for less motion.
+ */
+function blinkFavicon() {
+  try {
+    if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) return;
+    const link = document.querySelector<HTMLLinkElement>('link[rel="icon"]');
+    if (!link) return;
+    const frame = (opacity: number) => "data:image/svg+xml," + encodeURIComponent(
+      `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64"><rect width="64" height="64" rx="14" fill="#111111"/><circle cx="32" cy="32" r="15" fill="#c8321f" opacity="${opacity}"/></svg>`);
+    const lit = frame(1), dim = frame(0.2);
+    let on = true, timer = 0;
+    const tick = () => { on = !on; link.href = on ? lit : dim; };
+    const run = () => { window.clearInterval(timer); if (document.visibilityState === "visible") timer = window.setInterval(tick, 600); else { on = true; link.href = lit; } };
+    document.addEventListener("visibilitychange", run);
+    run();
+  } catch { /* the static icon in index.html stays */ }
+}
+blinkFavicon();
+
 function App() {
   return (
     <Layout>
