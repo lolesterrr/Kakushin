@@ -18,6 +18,8 @@ export interface Env {
   AUTH_VERIFY_LIMIT?: RateLimit;
   // Results emails and pushes that must reach everyone (src/lib/outbox.ts). Optional so a setup without it still runs.
   OUTBOX?: Queue<OutboxMessage>;
+  GOOGLE_CLIENT_ID?: string; // public; Google sign-in is off until it is set
+  GOOGLE_CERTS_URL?: string; // only set in tests
   EXPO_PUSH_URL?: string; // only set in tests, to point pushes at a fake server
 }
 

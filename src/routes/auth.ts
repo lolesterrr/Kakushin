@@ -4,6 +4,7 @@ import type { AppEnv } from "../types";
 import { newId, randomCode, randomToken, sha256Hex } from "../lib/crypto";
 import { sendEmail } from "../lib/email";
 import { turnstileOk, turnstileOn } from "../lib/turnstile";
+import { verifyGoogleToken } from "../lib/google";
 import { clearSessionCookie, createSession, readToken, setSessionCookie } from "../lib/session";
 
 export const auth = new Hono<AppEnv>();
@@ -22,7 +23,7 @@ const MAX_CODE_MISSES = 5;
 const MISS_WINDOW_MS = 15 * 60 * 1000;
 
 /** The web app asks this to know whether to show the Turnstile check. The site key is public by design. */
-auth.get("/config", (c) => c.json({ turnstile_site_key: turnstileOn(c) ? c.env.TURNSTILE_SITE_KEY : null }));
+auth.get("/config", (c) => c.json({ turnstile_site_key: turnstileOn(c) ? c.env.TURNSTILE_SITE_KEY : null, google_client_id: c.env.GOOGLE_CLIENT_ID ?? null }));
 
 /**
  * Per-IP limits, on top of the per-email ones, so one machine cannot send codes to thousands of addresses
@@ -146,24 +147,43 @@ auth.post("/verify", async (c) => {
   }
   if (guessing) await c.env.DB.prepare("DELETE FROM code_failures WHERE email = ?").bind(guessing).run();
 
-  let user = await c.env.DB.prepare("SELECT id, suspended FROM users WHERE email = ?").bind(row.email).first<{ id: string; suspended?: number }>();
+  return finishSignIn(c, row.email, null);
+});
+
+/**
+ * The end of every sign-in, whichever way the person proved their email: find or create the account, turn admin
+ * invites into memberships, and start a session. `name` only fills in a name a new account does not have yet.
+ */
+async function finishSignIn(c: Context<AppEnv>, email: string, name: string | null) {
+  let user = await c.env.DB.prepare("SELECT id, suspended FROM users WHERE email = ?").bind(email).first<{ id: string; suspended?: number }>();
   if (user?.suspended) return c.json({ error: "This account has been suspended. Contact the Kakushin team." }, 403);
   if (!user) {
     const id = newId();
-    await c.env.DB.prepare("INSERT INTO users (id, email, created_at) VALUES (?, ?, ?)").bind(id, row.email, Date.now()).run();
+    await c.env.DB.prepare("INSERT INTO users (id, email, name, created_at) VALUES (?, ?, ?, ?)").bind(id, email, name, Date.now()).run();
     user = { id };
   }
 
   // Admin invites sent to this address become memberships now.
   await c.env.DB.batch([
-    c.env.DB.prepare("INSERT OR IGNORE INTO memberships (org_id, user_id, role) SELECT org_id, ?, role FROM org_invites WHERE email = ?").bind(user.id, row.email),
-    c.env.DB.prepare("DELETE FROM org_invites WHERE email = ?").bind(row.email),
+    c.env.DB.prepare("INSERT OR IGNORE INTO memberships (org_id, user_id, role) SELECT org_id, ?, role FROM org_invites WHERE email = ?").bind(user.id, email),
+    c.env.DB.prepare("DELETE FROM org_invites WHERE email = ?").bind(email),
   ]);
 
   const token = await createSession(c, user.id);
   setSessionCookie(c, token);
   // The token is also returned so the mobile app can store it in secure storage.
   return c.json({ ok: true, token });
+}
+
+/** Sign in with Google: the web page posts the ID token Google gave it. Google has already verified the email. */
+auth.post("/google", async (c) => {
+  const parsed = z.object({ credential: z.string().min(20).max(4096) }).safeParse(await c.req.json().catch(() => null));
+  if (!parsed.success) return c.json({ error: "Invalid request" }, 400);
+  if (!c.env.GOOGLE_CLIENT_ID) return c.json({ error: "Google sign-in is not set up" }, 404);
+  if (await ipLimited(c, c.env.AUTH_VERIFY_LIMIT)) return c.json({ error: "Too many attempts from your network. Wait a minute and try again." }, 429);
+  const who = await verifyGoogleToken(c.env, parsed.data.credential);
+  if (!who) return c.json({ error: "We could not check your Google sign-in. Try again, or use your email instead." }, 401);
+  return finishSignIn(c, who.email, who.name);
 });
 
 auth.post("/logout", async (c) => {
