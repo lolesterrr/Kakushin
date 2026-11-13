@@ -11,6 +11,7 @@ import { Turnstile } from "../components/Turnstile";
 import { api } from "../lib/api";
 import { Body, Button, Field, H1, Hand, Notice } from "../components/ui";
 import { shadow } from "../lib/theme";
+import { RedLight } from "../components/RedLight";
 
 export default function SignIn() {
   const { me, ready, requestCode, verify } = useAuth();
@@ -51,7 +52,7 @@ export default function SignIn() {
       <Banner seed="kakushin-sign-in" label="Kakushin" style={{ position: "absolute", top: 0, left: 0, right: 0, height: 330 }} />
       <SafeAreaView edges={["top"]} style={{ position: "absolute", top: 0, left: 24 }}>
         <View style={{ flexDirection: "row", alignItems: "center", gap: 8, paddingTop: 8 }}>
-          <View style={{ width: 14, height: 14, borderRadius: 7, backgroundColor: "#D93A2B" }} />
+          <RedLight size={14} />
           <Text style={{ fontSize: 20, fontWeight: "700", color: "#111111" }}>Kakushin</Text>
         </View>
       </SafeAreaView>
