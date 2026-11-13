@@ -8,7 +8,7 @@
     "binding": "ASSETS",
     "not_found_handling": "single-page-application",
     // Pages go through the Worker so it can fill in link-preview tags (src/lib/meta.ts). Static files skip it.
-    "run_worker_first": ["/*", "!/assets/*", "!/hero/*", "!/favicon.svg", "!/og.jpg", "!/apple-touch-icon.png"]
+    "run_worker_first": ["/*", "!/assets/*", "!/hero/*", "!/fonts/*", "!/favicon.svg", "!/og.jpg", "!/apple-touch-icon.png"]
   },
   "d1_databases": [
     {

@@ -103,9 +103,26 @@ orgs.put("/:slug/logo", async (c) => {
   if (!access.role) return c.json({ error: "Only organisation admins can do that" }, 403);
   const saved = await saveImage(c, "logos", 2 * 1024 * 1024);
   if (!saved.ok) return c.json({ error: saved.error }, 400);
-  await c.env.DB.prepare("UPDATE organizations SET logo_key = ? WHERE id = ?").bind(saved.key, access.org.id).run();
-  if (access.org.logo_key) await c.env.FILES.delete(access.org.logo_key);
+  // A new logo makes the old print copy wrong, so it goes too; the web app sends a fresh one straight after.
+  await c.env.DB.prepare("UPDATE organizations SET logo_key = ?, logo_print_key = NULL WHERE id = ?").bind(saved.key, access.org.id).run();
+  const old = [access.org.logo_key, access.org.logo_print_key].filter((k): k is string => !!k);
+  if (old.length) await c.env.FILES.delete(old);
   return c.json({ ok: true, logo_url: fileUrl(saved.key) });
+});
+
+/** The JPEG copy of the logo that certificates print (see migrations/0010_logo_print.sql). */
+orgs.put("/:slug/logo/print", async (c) => {
+  const user = c.get("user");
+  if (!user) return c.json({ error: "Not signed in" }, 401);
+  const access = await loadOrg(c, c.req.param("slug"));
+  if (!access) return c.json({ error: "Not found" }, 404);
+  if (!access.role) return c.json({ error: "Only organisation admins can do that" }, 403);
+  if ((c.req.header("Content-Type") ?? "").split(";")[0]!.trim().toLowerCase() !== "image/jpeg") return c.json({ error: "Send a JPEG" }, 400);
+  const saved = await saveImage(c, "logos", 300 * 1024);
+  if (!saved.ok) return c.json({ error: saved.error }, 400);
+  await c.env.DB.prepare("UPDATE organizations SET logo_print_key = ? WHERE id = ?").bind(saved.key, access.org.id).run();
+  if (access.org.logo_print_key) await c.env.FILES.delete(access.org.logo_print_key);
+  return c.json({ ok: true });
 });
 
 orgs.route("/", orgChallenges);

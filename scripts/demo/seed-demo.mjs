@@ -30,6 +30,7 @@ const rows = (q) => JSON.parse(sql(q))[0].results;
 async function cleanup() {
   const slugs = [...ORGS.map((o) => o.slug), "kampala-demo-hub", "dryrun-hub"].map((s) => `'${s}'`).join(",");
   const keys = rows(`SELECT logo_key AS k FROM organizations WHERE slug IN (${slugs}) AND logo_key IS NOT NULL
+    UNION SELECT logo_print_key FROM organizations WHERE slug IN (${slugs}) AND logo_print_key IS NOT NULL
     UNION SELECT cover_key FROM challenges WHERE cover_key IS NOT NULL AND org_id IN (SELECT id FROM organizations WHERE slug IN (${slugs}))
     UNION SELECT deck_key FROM submissions WHERE deck_key IS NOT NULL AND team_id IN (SELECT t.id FROM teams t JOIN challenges c ON c.id = t.challenge_id JOIN organizations o ON o.id = c.org_id WHERE o.slug IN (${slugs}))
     UNION SELECT pdf_key FROM certificates WHERE pdf_key IS NOT NULL AND challenge_id IN (SELECT c.id FROM challenges c JOIN organizations o ON o.id = c.org_id WHERE o.slug IN (${slugs}))`.replace(/\s+/g, " ")).map((r) => r.k);
@@ -84,6 +85,8 @@ for (const o of ORGS) {
   ok(`org ${o.slug}`, r.s === 201 || r.s === 200, r);
   sql(`UPDATE organizations SET verified = 1 WHERE slug = '${o.slug}'`);
   ok(`logo ${o.slug}`, (await host.putWithCookie(`/orgs/${o.slug}/logo`, path.join(MEDIA, "logos", `${o.key}.png`), "image/png")) === 200);
+  // The JPEG copy certificates print, which the web app makes in the browser when an organiser uploads a logo.
+  ok(`print logo ${o.slug}`, (await host.putWithCookie(`/orgs/${o.slug}/logo/print`, path.join(MEDIA, "logos-print", `${o.key}.jpg`), "image/jpeg")) === 200);
 }
 log("organisations ready");
 
