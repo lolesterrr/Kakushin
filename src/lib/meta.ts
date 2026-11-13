@@ -36,6 +36,14 @@ export async function pageMeta(c: Context<AppEnv>, path: string): Promise<Partia
     if (!row) return {};
     return { title: `${row.name} on Kakushin`, description: `Open and past innovation challenges from ${row.name}.`, ...(row.logo_key ? { image: `/api/files/${row.logo_key}` } : {}) };
   }
+  const person = /^\/u\/([a-z0-9-]{3,30})\/?$/.exec(path);
+  if (person) {
+    const row = await c.env.DB.prepare("SELECT name, bio FROM users WHERE handle = ? AND public_profile = 1 AND suspended = 0").bind(person[1]!).first<{ name: string | null; bio: string | null }>();
+    if (!row) return {};
+    const name = row.name || "A Kakushin participant";
+    return { title: `${name} · Kakushin`, description: clip(row.bio || `${name}'s challenges, teams and certificates on Kakushin.`, 200) };
+  }
+  if (path === "/challenges/winners") return { title: "Past winners · Kakushin", description: "Winning teams from completed innovation challenges on Kakushin." };
   if (path === "/privacy") return { title: "Privacy policy · Kakushin", description: "What Kakushin keeps about you, who can see it, and how to delete it." };
   if (path === "/terms") return { title: "Terms of use · Kakushin", description: "The rules for using Kakushin as a participant, judge or organiser." };
   if (path === "/challenges" || path === "/challenges/") return { title: "Challenges · Kakushin", description: "Open innovation challenges and hackathons you can apply to now." };

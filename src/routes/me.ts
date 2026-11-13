@@ -2,6 +2,7 @@ import { Hono } from "hono";
 import { z } from "zod";
 import type { AppEnv } from "../types";
 import { clearSessionCookie } from "../lib/session";
+import { HANDLE_RE, RESERVED_HANDLES } from "./people";
 
 export const me = new Hono<AppEnv>();
 
@@ -9,10 +10,10 @@ me.get("/", async (c) => {
   const u = c.get("user");
   if (!u) return c.json({ user: null });
   const full = await c.env.DB.prepare(
-    "SELECT id, email, name, bio, institution, location, skills, links, gender, is_platform_admin FROM users WHERE id = ?",
+    "SELECT id, email, name, bio, institution, location, skills, links, gender, is_platform_admin, handle, public_profile FROM users WHERE id = ?",
   ).bind(u.id).first<Record<string, unknown>>();
   return c.json({
-    user: { ...full, skills: JSON.parse(String(full?.skills ?? "[]")), links: JSON.parse(String(full?.links ?? "{}")) },
+    user: { ...full, public_profile: !!full?.public_profile, skills: JSON.parse(String(full?.skills ?? "[]")), links: JSON.parse(String(full?.links ?? "{}")) },
   });
 });
 
@@ -25,6 +26,9 @@ const profile = z.object({
   // Only web addresses: z.string().url() alone would let javascript: and data: links through.
   links: z.record(z.string().trim().max(300).url().regex(/^https?:\/\/[^\s/]/i, "Links must start with http:// or https://")).refine((l) => Object.keys(l).length <= 10).optional(),
   gender: z.enum(["female", "male", "other", "prefer_not_to_say"]).nullable().optional(),
+  // Public profile at /u/:handle. Left out, both stay as they are.
+  handle: z.string().trim().toLowerCase().max(30).nullable().optional().transform((v) => (v === "" ? null : v)),
+  public_profile: z.boolean().optional(),
 });
 
 me.put("/", async (c) => {
@@ -33,18 +37,36 @@ me.put("/", async (c) => {
   const parsed = profile.safeParse(await c.req.json().catch(() => null));
   if (!parsed.success) return c.json({ error: "Check the profile fields", issues: parsed.error.issues }, 400);
   const p = parsed.data;
+  if (p.handle && (!HANDLE_RE.test(p.handle) || RESERVED_HANDLES.has(p.handle))) {
+    return c.json({ error: "Your profile address must be 3 to 30 lowercase letters, numbers or dashes, and not a reserved word" }, 400);
+  }
+  if (p.public_profile || p.handle !== undefined) {
+    const cur = await c.env.DB.prepare("SELECT handle FROM users WHERE id = ?").bind(u.id).first<{ handle: string | null }>();
+    const handle = p.handle !== undefined ? p.handle : cur?.handle ?? null;
+    if (p.public_profile && !handle) return c.json({ error: "Pick a profile address before making your profile public" }, 400);
+    if (handle && handle !== cur?.handle) {
+      const taken = await c.env.DB.prepare("SELECT 1 AS x FROM users WHERE handle = ? AND id != ?").bind(handle, u.id).first();
+      if (taken) return c.json({ error: "That profile address is taken" }, 409);
+    }
+  }
   // links and gender are kept as they are unless the request sends them, so a form without those fields cannot wipe them.
-  await c.env.DB.prepare(
+  // Clearing the handle also turns the public profile off.
+  const res = await c.env.DB.prepare(
     `UPDATE users SET name=?, bio=?, institution=?, location=?, skills=?,
        links = CASE WHEN ? THEN ? ELSE links END,
-       gender = CASE WHEN ? THEN ? ELSE gender END
+       gender = CASE WHEN ? THEN ? ELSE gender END,
+       handle = CASE WHEN ? THEN ? ELSE handle END,
+       public_profile = CASE WHEN ? THEN ? ELSE public_profile END
      WHERE id=?`,
   ).bind(
     p.name, p.bio, p.institution, p.location, JSON.stringify(p.skills),
     p.links !== undefined ? 1 : 0, JSON.stringify(p.links ?? {}),
     p.gender !== undefined ? 1 : 0, p.gender ?? null,
+    p.handle !== undefined ? 1 : 0, p.handle ?? null,
+    p.public_profile !== undefined || p.handle === null ? 1 : 0, p.handle === null ? 0 : p.public_profile ? 1 : 0,
     u.id,
-  ).run();
+  ).run().catch((e) => { if (String(e).includes("UNIQUE")) return null; throw e; });
+  if (!res) return c.json({ error: "That profile address is taken" }, 409);
   return c.json({ ok: true });
 });
 
@@ -99,15 +121,15 @@ me.delete("/", async (c) => {
     ...orgsToDelete.flatMap((o) => [
       db.prepare("DELETE FROM application_scores WHERE criterion_id IN (SELECT id FROM criteria WHERE challenge_id IN (SELECT id FROM challenges WHERE org_id = ?))").bind(o.id),
       db.prepare("DELETE FROM announcements WHERE challenge_id IN (SELECT id FROM challenges WHERE org_id = ?)").bind(o.id),
-      ...["judge_assignments", "judge_conflicts", "criteria", "judges"].map((table) => db.prepare(`DELETE FROM ${table} WHERE challenge_id IN (SELECT id FROM challenges WHERE org_id = ?)`).bind(o.id)),
+      ...["judge_assignments", "judge_conflicts", "team_seekers", "criteria", "judges"].map((table) => db.prepare(`DELETE FROM ${table} WHERE challenge_id IN (SELECT id FROM challenges WHERE org_id = ?)`).bind(o.id)),
       ...["challenges", "memberships", "follows", "announcements", "org_invites"].map((table) => db.prepare(`DELETE FROM ${table} WHERE org_id = ?`).bind(o.id)),
       db.prepare("DELETE FROM organizations WHERE id = ?").bind(o.id),
     ]),
     ...led.filter((t) => t.heir).map((t) => db.prepare("UPDATE teams SET lead_user_id = ? WHERE id = ?").bind(t.heir, t.id)),
-    ...solo.flatMap((t) => [byTeam("scores", t.id), byTeam("application_scores", t.id), byTeam("judge_assignments", t.id), byTeam("judge_conflicts", t.id), byTeam("certificates", t.id), byTeam("submissions", t.id), byTeam("applications", t.id), byTeam("team_members", t.id),
+    ...solo.flatMap((t) => [byTeam("scores", t.id), byTeam("application_scores", t.id), byTeam("judge_assignments", t.id), byTeam("judge_conflicts", t.id), byTeam("team_finder_invites", t.id), byTeam("certificates", t.id), byTeam("submissions", t.id), byTeam("applications", t.id), byTeam("team_members", t.id),
       db.prepare("DELETE FROM teams WHERE id = ?").bind(t.id)]),
     // Children first, so this works whether or not the database enforces ON DELETE CASCADE.
-    ...["sessions", "memberships", "team_members", "certificates", "notifications", "follows", "interests", "push_tokens", "notification_settings"]
+    ...["sessions", "memberships", "team_members", "team_seekers", "team_finder_invites", "certificates", "notifications", "follows", "interests", "push_tokens", "notification_settings"]
       .map((table) => db.prepare(`DELETE FROM ${table} WHERE user_id = ?`).bind(u.id)),
     db.prepare("DELETE FROM scores WHERE judge_user_id = ?").bind(u.id),
     db.prepare("DELETE FROM application_scores WHERE reviewer_user_id = ?").bind(u.id),

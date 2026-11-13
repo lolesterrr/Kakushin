@@ -69,6 +69,13 @@ export function OrgMembers({ slug }: { slug: string }) {
     if (!confirm(`Remove ${label} as an admin?`)) return;
     try { await api(`/orgs/${slug}/members/${id}`, { method: "DELETE" }); await load(); } catch (err) { setMsg({ kind: "err", text: (err as Error).message }); }
   }
+  const [handTo, setHandTo] = useState<{ id: string; label: string } | null>(null);
+  async function handOver() {
+    if (!handTo) return;
+    setMsg(null);
+    try { await api(`/orgs/${slug}/owner`, { method: "POST", json: { user_id: handTo.id } }); setHandTo(null); setMsg({ kind: "ok", text: `${handTo.label} is now the owner. You stay on as an admin.` }); await load(); }
+    catch (err) { setMsg({ kind: "err", text: (err as Error).message }); }
+  }
   async function cancelInvite(em: string) {
     try { await api(`/orgs/${slug}/invites`, { method: "DELETE", json: { email: em } }); await load(); } catch (err) { setMsg({ kind: "err", text: (err as Error).message }); }
   }
@@ -82,13 +89,20 @@ export function OrgMembers({ slug }: { slug: string }) {
           <tbody>
             {d.members.map((m) => (
               <tr key={m.id}><td><b>{m.name || m.email.split("@")[0]}</b><br /><span className="muted">{m.email}</span></td><td>{m.role}</td>
-                <td>{m.role !== "owner" && (d.your_role === "owner" || m.id === d.you) && <button className="ghost small" onClick={() => void remove(m.id, m.email)}>{m.id === d.you ? "Leave" : "Remove"}</button>}</td></tr>
+                <td style={{ whiteSpace: "nowrap" }}>{m.role !== "owner" && (d.your_role === "owner" || m.id === d.you) && <button className="ghost small" onClick={() => void remove(m.id, m.email)}>{m.id === d.you ? "Leave" : "Remove"}</button>}
+                  {d.your_role === "owner" && m.role === "admin" && <> <button className="ghost small" onClick={() => setHandTo({ id: m.id, label: m.name || m.email })}>Make owner</button></>}</td></tr>
             ))}
             {d.invites.map((i) => (
               <tr key={i.email}><td><span className="muted">{i.email}</span></td><td><span className="tag sand">Invited</span></td><td><button className="ghost small" onClick={() => void cancelInvite(i.email)}>Cancel</button></td></tr>
             ))}
           </tbody>
         </table></div>
+      )}
+      {handTo && (
+        <div className="note-box" role="alertdialog" aria-label="Confirm the new owner" style={{ marginTop: 12 }}>
+          <p style={{ marginTop: 0 }}><b>Make {handTo.label} the owner?</b> They can then add and remove admins and hand the organisation on. You become an admin and cannot undo this yourself.</p>
+          <div className="actions" style={{ marginTop: 0 }}><button onClick={() => void handOver()}>Yes, hand it over</button><button className="ghost" onClick={() => setHandTo(null)}>Cancel</button></div>
+        </div>
       )}
       <form onSubmit={add} style={{ display: "flex", gap: 8, maxWidth: 480, marginTop: 12 }}>
         <input type="email" required aria-label="Email of the new admin" placeholder="colleague@example.org" value={email} onChange={(e) => setEmail(e.target.value)} />
