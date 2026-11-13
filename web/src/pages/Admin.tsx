@@ -13,6 +13,7 @@ export const challengeTabs = (slug: string, cslug: string) => [
   { to: `/admin/o/${slug}/c/${cslug}/applications`, label: "Applications" },
   { to: `/admin/o/${slug}/c/${cslug}/judging`, label: "Judging" },
   { to: `/admin/o/${slug}/c/${cslug}/messages`, label: "Messages" },
+  { to: `/admin/o/${slug}/c/${cslug}/live`, label: "Event day" },
   { to: `/admin/o/${slug}/c/${cslug}/results`, label: "Results" },
   { to: `/admin/o/${slug}/c/${cslug}/edit`, label: "Edit" },
 ];
