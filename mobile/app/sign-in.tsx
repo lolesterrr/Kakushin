@@ -62,8 +62,6 @@ export default function SignIn() {
         {step === "email" ? (
           <>
             <Body muted>No password. We email you a 6-digit code. New here? Your account is created when you confirm it.</Body>
-            {/* Gmail is blocking mail from our current free domain, so steer people to an address that receives it. */}
-            <Notice kind="ok">Use your school or work email. Codes sent to Gmail addresses may not arrive at the moment.</Notice>
             <Field label="Email" value={email} onChangeText={setEmail} autoCapitalize="none" autoCorrect={false} keyboardType="email-address" textContentType="emailAddress" autoComplete="email" onSubmitEditing={send} />
             {needsCheck ? <Turnstile key={check} onToken={setToken} /> : null}
             {err ? <Notice kind="err">{err}</Notice> : null}
