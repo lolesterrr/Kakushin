@@ -322,6 +322,23 @@ judge.get("/:slug/:cslug", async (c) => {
   });
 });
 
+/** What this judge wants on the public challenge page. It only shows when the organiser turns the judges section on. */
+judge.get("/:slug/:cslug/profile", async (c) => {
+  const x = await judgeLoad(c); if ("err" in x) return x.err;
+  const r = await c.env.DB.prepare("SELECT j.display_name, j.title, ch.show_judges FROM judges j JOIN challenges ch ON ch.id = j.challenge_id WHERE j.challenge_id = ? AND j.email = ?")
+    .bind(x.ch.id, x.email).first<{ display_name: string | null; title: string | null; show_judges: number }>();
+  return c.json({ display_name: r?.display_name ?? "", title: r?.title ?? "", shown: !!r?.show_judges });
+});
+
+judge.put("/:slug/:cslug/profile", async (c) => {
+  const x = await judgeLoad(c); if ("err" in x) return x.err;
+  const parsed = z.object({ display_name: z.string().trim().max(80).default(""), title: z.string().trim().max(120).default("") }).safeParse(await c.req.json().catch(() => null));
+  if (!parsed.success) return c.json({ error: "Keep the name under 80 characters and the title under 120" }, 400);
+  await c.env.DB.prepare("UPDATE judges SET display_name = ?, title = ? WHERE challenge_id = ? AND email = ?")
+    .bind(parsed.data.display_name || null, parsed.data.title || null, x.ch.id, x.email).run();
+  return c.json({ ok: true });
+});
+
 /** A finalist this judge may see: assigned to them (once the challenge uses assignments) and not flagged as a conflict. */
 async function judgeTeam(c: Context<AppEnv>, x: { email: string; ch: Ch }) {
   return c.env.DB.prepare(`SELECT id, name FROM teams t WHERE t.id = ?1 AND t.challenge_id = ?2 AND t.status IN ${FINALIST} AND ${judgeSees("?2", "?3", "t.id")}`)

@@ -10,7 +10,11 @@ import { PushSetting } from "./OrgTeam";
 
 export function Profile() {
   const { me, reload } = useAuth();
-  const [form, setForm] = useState({ name: me?.name ?? "", bio: me?.bio ?? "", institution: me?.institution ?? "", location: me?.location ?? "", skills: me?.skills.join(", ") ?? "" });
+  const [form, setForm] = useState({
+    name: me?.name ?? "", bio: me?.bio ?? "", institution: me?.institution ?? "", location: me?.location ?? "", skills: me?.skills.join(", ") ?? "",
+    handle: me?.handle ?? "", github: me?.links?.github ?? "", linkedin: me?.links?.linkedin ?? "", website: me?.links?.website ?? "",
+  });
+  const [isPublic, setIsPublic] = useState(!!me?.public_profile);
   const [msg, setMsg] = useState<{ kind: "ok" | "err"; text: string } | null>(null);
   const [teams, setTeams] = useState<{ id: string; name: string; status: string; title: string; cslug: string; oslug: string; oname: string }[]>([]);
   useEffect(() => { if (me) api<{ teams: typeof teams }>("/teams/mine").then((r) => setTeams(r.teams)).catch(() => {}); }, [me?.id]);
@@ -19,7 +23,11 @@ export function Profile() {
   async function save(e: React.FormEvent) {
     e.preventDefault();
     try {
-      await api("/me", { method: "PUT", json: { ...form, skills: form.skills.split(",").map((s) => s.trim()).filter(Boolean) } });
+      const { github, linkedin, website, handle, ...rest } = form;
+      // Other link names someone saved from the app stay as they are.
+      const links: Record<string, string> = { ...(me?.links ?? {}) };
+      for (const [k, v] of Object.entries({ github, linkedin, website })) { if (v.trim()) links[k] = v.trim(); else delete links[k]; }
+      await api("/me", { method: "PUT", json: { ...rest, skills: form.skills.split(",").map((s) => s.trim()).filter(Boolean), links, handle: handle.trim().toLowerCase() || null, public_profile: isPublic && !!handle.trim() } });
       await reload(); setMsg({ kind: "ok", text: "Saved" });
     } catch (err) { setMsg({ kind: "err", text: (err as Error).message }); }
   }
@@ -45,6 +53,17 @@ export function Profile() {
         <label htmlFor="l">Location</label><input id="l" value={form.location} onChange={set("location")} />
         <label htmlFor="s">Skills (comma separated)</label><input id="s" value={form.skills} onChange={set("skills")} />
         <label htmlFor="b">Bio</label><textarea id="b" rows={4} value={form.bio} onChange={set("bio")} />
+        <div className="row">
+          <div><label htmlFor="lg">GitHub</label><input id="lg" type="url" placeholder="https://github.com/…" value={form.github} onChange={set("github")} /></div>
+          <div><label htmlFor="ll">LinkedIn</label><input id="ll" type="url" placeholder="https://linkedin.com/in/…" value={form.linkedin} onChange={set("linkedin")} /></div>
+          <div><label htmlFor="lw">Website</label><input id="lw" type="url" placeholder="https://" value={form.website} onChange={set("website")} /></div>
+        </div>
+        <h2 style={{ marginTop: 28 }}>Public profile</h2>
+        <p className="muted" style={{ marginTop: 0 }}>Off unless you turn it on. It shows your name, bio, institution, location, skills, links, teams and certificates, never your email. People with a public profile are also named in "Who's coming" on challenges they join.</p>
+        <label htmlFor="h">Profile address</label>
+        <div style={{ display: "flex", gap: 6, alignItems: "center" }}><span className="muted">{window.location.host}/u/</span><input id="h" maxLength={30} pattern="[a-z0-9][a-z0-9\-]{1,28}[a-z0-9]" title="3 to 30 lowercase letters, numbers or dashes" placeholder="your-name" value={form.handle} onChange={(e) => setForm({ ...form, handle: e.target.value.toLowerCase() })} /></div>
+        <label className="check"><input type="checkbox" checked={isPublic} onChange={(e) => setIsPublic(e.target.checked)} />Make my profile public</label>
+        {me.public_profile && me.handle && <p style={{ fontSize: 14 }}>Live at <Link to={`/u/${me.handle}`}>/u/{me.handle}</Link></p>}
         <div className="actions"><button type="submit">Save</button></div>
         {msg && <Notice kind={msg.kind}>{msg.text}</Notice>}
       </form>
