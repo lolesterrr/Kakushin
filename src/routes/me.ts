@@ -97,17 +97,22 @@ me.delete("/", async (c) => {
   await db.batch([
     ...owned.filter((o) => o.heir).map((o) => db.prepare("UPDATE memberships SET role = 'owner' WHERE org_id = ? AND user_id = ?").bind(o.id, o.heir)),
     ...orgsToDelete.flatMap((o) => [
-      ...["criteria", "judges"].map((table) => db.prepare(`DELETE FROM ${table} WHERE challenge_id IN (SELECT id FROM challenges WHERE org_id = ?)`).bind(o.id)),
+      db.prepare("DELETE FROM application_scores WHERE criterion_id IN (SELECT id FROM criteria WHERE challenge_id IN (SELECT id FROM challenges WHERE org_id = ?))").bind(o.id),
+      db.prepare("DELETE FROM announcements WHERE challenge_id IN (SELECT id FROM challenges WHERE org_id = ?)").bind(o.id),
+      ...["judge_assignments", "judge_conflicts", "criteria", "judges"].map((table) => db.prepare(`DELETE FROM ${table} WHERE challenge_id IN (SELECT id FROM challenges WHERE org_id = ?)`).bind(o.id)),
       ...["challenges", "memberships", "follows", "announcements", "org_invites"].map((table) => db.prepare(`DELETE FROM ${table} WHERE org_id = ?`).bind(o.id)),
       db.prepare("DELETE FROM organizations WHERE id = ?").bind(o.id),
     ]),
     ...led.filter((t) => t.heir).map((t) => db.prepare("UPDATE teams SET lead_user_id = ? WHERE id = ?").bind(t.heir, t.id)),
-    ...solo.flatMap((t) => [byTeam("scores", t.id), byTeam("certificates", t.id), byTeam("submissions", t.id), byTeam("applications", t.id), byTeam("team_members", t.id),
+    ...solo.flatMap((t) => [byTeam("scores", t.id), byTeam("application_scores", t.id), byTeam("judge_assignments", t.id), byTeam("judge_conflicts", t.id), byTeam("certificates", t.id), byTeam("submissions", t.id), byTeam("applications", t.id), byTeam("team_members", t.id),
       db.prepare("DELETE FROM teams WHERE id = ?").bind(t.id)]),
     // Children first, so this works whether or not the database enforces ON DELETE CASCADE.
     ...["sessions", "memberships", "team_members", "certificates", "notifications", "follows", "interests", "push_tokens", "notification_settings"]
       .map((table) => db.prepare(`DELETE FROM ${table} WHERE user_id = ?`).bind(u.id)),
     db.prepare("DELETE FROM scores WHERE judge_user_id = ?").bind(u.id),
+    db.prepare("DELETE FROM application_scores WHERE reviewer_user_id = ?").bind(u.id),
+    db.prepare("DELETE FROM judge_assignments WHERE lower(email) = ?").bind(email),
+    db.prepare("DELETE FROM judge_conflicts WHERE lower(email) = ?").bind(email),
     db.prepare("DELETE FROM judges WHERE lower(email) = ?").bind(email),
     db.prepare("DELETE FROM org_invites WHERE lower(email) = ?").bind(email),
     db.prepare("DELETE FROM login_tokens WHERE lower(email) = ?").bind(email),
