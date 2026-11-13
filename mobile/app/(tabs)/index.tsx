@@ -12,6 +12,7 @@ import { shadow, useTheme } from "../../lib/theme";
 import { Banner, Scrim } from "../../components/Banner";
 import { Body, DaysStamp, Hand, Loading, Notice, Pill, Screen } from "../../components/ui";
 import { SafeAreaView } from "react-native-safe-area-context";
+import { RedLight } from "../../components/RedLight";
 
 const TILTS = [3, -2, 2];
 const FILLS = ["#c8321f", "#2f4f8f", "#2f4f8f"];
@@ -55,7 +56,7 @@ export default function Explore() {
       <SafeAreaView edges={["top"]} style={{ gap: 6 }}>
         <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between" }}>
           <View style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
-            <View style={{ width: 12, height: 12, borderRadius: 6, backgroundColor: "#D93A2B" }} />
+            <RedLight size={12} />
             <Text style={{ color: t.ink, fontSize: 18, fontWeight: "700" }}>Kakushin</Text>
           </View>
           <Pressable onPress={() => router.push("/profile")} accessibilityRole="button" accessibilityLabel="Your profile" style={{ width: 44, height: 44, borderRadius: 22, backgroundColor: t.ink, alignItems: "center", justifyContent: "center" }}>
