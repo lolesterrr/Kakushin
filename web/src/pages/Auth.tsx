@@ -14,10 +14,35 @@ export function Login() {
   const [digits, setDigits] = useState<string[]>(["", "", "", "", "", ""]);
   const boxes = useRef<(HTMLInputElement | null)[]>([]);
   const [siteKey, setSiteKey] = useState<string | null>(null);
+  const [googleId, setGoogleId] = useState<string | null>(null);
+  const googleBtn = useRef<HTMLDivElement>(null);
   const [captcha, setCaptcha] = useState("");
   const widget = useRef<HTMLDivElement>(null);
   const next = params.get("next");
-  useEffect(() => { api<{ turnstile_site_key: string | null }>("/auth/config").then((r) => setSiteKey(r.turnstile_site_key)).catch(() => {}); }, []);
+  useEffect(() => { api<{ turnstile_site_key: string | null; google_client_id?: string | null }>("/auth/config").then((r) => { setSiteKey(r.turnstile_site_key); setGoogleId(r.google_client_id ?? null); }).catch(() => {}); }, []);
+  // "Continue with Google": Google Identity Services draws the button and hands back a signed ID token, which the server checks.
+  useEffect(() => {
+    if (!googleId || state !== "idle" || !googleBtn.current) return;
+    const el = googleBtn.current;
+    type Gsi = { accounts: { id: { initialize: (o: object) => void; renderButton: (e: HTMLElement, o: object) => void } } };
+    const draw = () => {
+      const g = (window as unknown as { google?: Gsi }).google; if (!g) return;
+      g.accounts.id.initialize({
+        client_id: googleId, ux_mode: "popup", use_fedcm_for_prompt: true,
+        callback: (r: { credential?: string }) => {
+          if (!r.credential) return;
+          setState("sending"); setMsg("");
+          api("/auth/google", { method: "POST", json: { credential: r.credential } })
+            .then(async () => { await reload(); nav(takeNext(), { replace: true }); })
+            .catch((err: Error) => { setState("error"); setMsg(err.message); });
+        },
+      });
+      g.accounts.id.renderButton(el, { type: "standard", theme: "outline", size: "large", text: signup ? "signup_with" : "continue_with", shape: "rectangular", width: Math.min(320, Math.max(220, el.clientWidth || 320)) });
+    };
+    if ((window as unknown as { google?: unknown }).google) draw();
+    else if (!document.getElementById("google-gsi")) { const sc = document.createElement("script"); sc.id = "google-gsi"; sc.src = "https://accounts.google.com/gsi/client"; sc.async = true; sc.onload = draw; document.head.appendChild(sc); }
+    else document.getElementById("google-gsi")!.addEventListener("load", draw);
+  }, [googleId, state]);
   // Cloudflare Turnstile, only when the server has keys. The widget script loads from Cloudflare.
   useEffect(() => {
     if (!siteKey || !widget.current) return;
@@ -72,6 +97,8 @@ export function Login() {
           {msg && <Notice kind="err">{msg}</Notice>}
         </div>
       ) : (
+        <>
+        {googleId && <><div ref={googleBtn} style={{ margin: "20px 0 4px", minHeight: 44 }} /><p className="muted" style={{ margin: "8px 0 0" }}>or use your email</p></>}
         <form onSubmit={submit}>
           <label htmlFor="email">Email</label>
           <input id="email" type="email" required autoComplete="email" value={email} onChange={(e) => setEmail(e.target.value)} />
@@ -85,6 +112,7 @@ export function Login() {
           {state === "error" && <Notice kind="err">{msg}</Notice>}
           <p className="muted" style={{ fontSize: 13 }}>By continuing you agree to the <Link to="/terms">terms of use</Link> and the <Link to="/privacy">privacy policy</Link>.</p>
         </form>
+        </>
       )}
     </div>
   );

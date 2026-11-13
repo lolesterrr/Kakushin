@@ -2,7 +2,7 @@ import React, { useEffect } from "react";
 import { Link } from "react-router-dom";
 
 // Plain-language policies. Change the wording here; the app links to these pages from the footer and sign-in screens.
-const CONTACT = "hello@kakushin.dpdns.org";
+const CONTACT = "hello@kakushinhub.site";
 const UPDATED = "November 2026";
 
 function Doc({ title, children }: { title: string; children: React.ReactNode }) {
