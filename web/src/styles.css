@@ -287,3 +287,12 @@ table tbody tr:hover { background: var(--paper-2); }
 .search-row input { flex: 1 1 260px; min-width: 0; }
 .search-row select { flex: 0 1 auto; width: auto; }
 @media (max-width: 640px) { .secnav { padding: 10px 16px; } }
+
+/* Day 6: live page */
+.live { padding: 40px 24px 24px; text-align: center; }
+.live-now { font-family: var(--display); font-weight: 800; font-size: 28px; margin: 12px 0 0; }
+.live-big { font-family: var(--display); font-weight: 900; font-size: clamp(64px, 18vw, 180px); line-height: 1; margin: 8px 0; font-variant-numeric: tabular-nums; letter-spacing: -0.03em; }
+.live-cut { display: inline-flex; flex-direction: column; align-items: center; gap: 4px; margin-top: 20px; padding: 14px 24px; border: 2px solid var(--ink); border-radius: 12px; }
+.live-cut b { font-family: var(--display); font-size: 40px; font-variant-numeric: tabular-nums; }
+.live-cut.closed { background: var(--red); border-color: var(--red); color: #fff; }
+.timeline li.now b { color: var(--red-text); }

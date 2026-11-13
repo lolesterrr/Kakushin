@@ -169,7 +169,9 @@ orgChallenges.get("/:slug/challenges/:cslug", async (c) => {
     ? (await c.env.DB.prepare("SELECT display_name, title FROM judges WHERE challenge_id = ? AND display_name IS NOT NULL AND display_name != '' ORDER BY invited_at")
       .bind(row.id).all<{ display_name: string; title: string | null }>()).results.map((j) => ({ name: j.display_name, title: j.title ?? "" }))
     : [];
-  return c.json({ challenge: { ...challengeOut(row, access.org), criteria, judges }, role: access.role });
+  // Day 6: the event-day agenda shows in the timeline, and the app needs to know whether check-in passes exist.
+  const { results: agenda } = await c.env.DB.prepare("SELECT id, kind, label, starts_at, ends_at FROM challenge_agenda WHERE challenge_id = ? ORDER BY starts_at").bind(row.id).all();
+  return c.json({ challenge: { ...challengeOut(row, access.org), criteria, judges, agenda, checkin_enabled: !!(row as ChallengeRow & { checkin_enabled?: number }).checkin_enabled }, role: access.role });
 });
 
 orgChallenges.put("/:slug/challenges/:cslug", async (c) => {
@@ -359,7 +361,7 @@ orgChallenges.delete("/:slug/challenges/:cslug", async (c) => {
   if (row.status !== "draft") return c.json({ error: "Only drafts can be deleted" }, 409);
   // A duplicated draft brings its rubric with it, so the criteria go first in case foreign keys are not enforced.
   await c.env.DB.batch([
-    c.env.DB.prepare("DELETE FROM criteria WHERE challenge_id = ?").bind(row.id),
+    ...["criteria", "challenge_agenda", "live_alerts"].map((t) => c.env.DB.prepare(`DELETE FROM ${t} WHERE challenge_id = ?`).bind(row.id)),
     c.env.DB.prepare("DELETE FROM challenges WHERE id = ?").bind(row.id),
   ]);
   if (row.cover_key) await c.env.FILES.delete(row.cover_key);
