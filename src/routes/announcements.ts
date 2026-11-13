@@ -26,7 +26,7 @@ async function adminOrg(c: Context<AppEnv>) {
 
 orgAnnouncements.get("/:slug/announcements", async (c) => {
   const x = await adminOrg(c); if ("err" in x) return x.err;
-  const { results } = await c.env.DB.prepare("SELECT id, title, body, link, recipients, created_at FROM announcements WHERE org_id = ? ORDER BY created_at DESC LIMIT 20").bind(x.org.id).all();
+  const { results } = await c.env.DB.prepare("SELECT id, title, body, link, recipients, created_at FROM announcements WHERE org_id = ? AND challenge_id IS NULL ORDER BY created_at DESC LIMIT 20").bind(x.org.id).all();
   const f = await c.env.DB.prepare("SELECT COUNT(*) AS n FROM follows WHERE org_id = ?").bind(x.org.id).first<{ n: number }>();
   return c.json({ items: results, followers: f?.n ?? 0 });
 });
@@ -36,7 +36,7 @@ orgAnnouncements.post("/:slug/announcements", async (c) => {
   if (x.org.suspended) return c.json({ error: "Your organisation is suspended" }, 403);
   const parsed = body.safeParse(await c.req.json().catch(() => null));
   if (!parsed.success) return c.json({ error: parsed.error.issues[0]?.message ?? "Check the announcement" }, 400);
-  const recent = await c.env.DB.prepare("SELECT COUNT(*) AS n FROM announcements WHERE org_id = ? AND created_at > ?").bind(x.org.id, Date.now() - 86400000).first<{ n: number }>();
+  const recent = await c.env.DB.prepare("SELECT COUNT(*) AS n FROM announcements WHERE org_id = ? AND challenge_id IS NULL AND created_at > ?").bind(x.org.id, Date.now() - 86400000).first<{ n: number }>();
   if ((recent?.n ?? 0) >= 5) return c.json({ error: "You can send up to 5 announcements a day. Try again tomorrow." }, 429);
   const now = Date.now(), p = parsed.data;
   const link = p.link || `/o/${x.org.slug}`;

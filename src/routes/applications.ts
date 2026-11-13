@@ -4,6 +4,8 @@ import type { AppEnv } from "../types";
 import { loadOrg } from "../lib/access";
 import { pushLater } from "../lib/push";
 import { notifyTeam } from "../lib/mail";
+import { criteriaOf, saveCriteria } from "./judging";
+import { judgeTotal } from "../lib/scoring";
 
 /** Organiser side: /api/orgs/:slug/challenges/:cslug/applications... */
 export const orgApplications = new Hono<AppEnv>();
@@ -18,8 +20,8 @@ async function load(c: Parameters<typeof loadOrg>[0], slug: string, cslug: strin
   const access = await loadOrg(c, slug);
   if (!access) return { error: { msg: "Not found", code: 404 as const } };
   if (!access.role) return { error: { msg: "Only organisation admins can do that", code: 403 as const } };
-  const ch = await c.env.DB.prepare("SELECT id, slug, title, questions FROM challenges WHERE org_id = ? AND slug = ?")
-    .bind(access.org.id, cslug).first<{ id: string; slug: string; title: string; questions: string }>();
+  const ch = await c.env.DB.prepare("SELECT id, slug, title, status, questions FROM challenges WHERE org_id = ? AND slug = ?")
+    .bind(access.org.id, cslug).first<{ id: string; slug: string; title: string; status: string; questions: string }>();
   if (!ch) return { error: { msg: "Not found", code: 404 as const } };
   return { org: access.org, ch, questions: JSON.parse(ch.questions) as Q[] };
 }
@@ -34,10 +36,28 @@ async function list(c: Parameters<typeof loadOrg>[0], challengeId: string) {
      FROM team_members m JOIN users u ON u.id = m.user_id JOIN teams t ON t.id = m.team_id
      WHERE t.challenge_id = ? AND t.id IN (SELECT team_id FROM applications) ORDER BY m.joined_at`,
   ).bind(challengeId).all<{ team_id: string; name: string | null; email: string; institution: string | null; is_lead: number }>();
-  return results.map((r) => ({
-    ...r, answers: JSON.parse(r.answers) as Record<string, string>,
-    members: ms.filter((m) => m.team_id === r.team_id).map((m) => ({ name: m.name, email: m.email, institution: m.institution, is_lead: !!m.is_lead })),
-  }));
+  const criteria = await criteriaOf(c, challengeId, "application");
+  const { results: sc } = await c.env.DB.prepare(
+    `SELECT s.reviewer_user_id, s.team_id, s.criterion_id, s.score, s.comment FROM application_scores s
+     JOIN criteria cr ON cr.id = s.criterion_id WHERE cr.challenge_id = ? AND cr.stage = 'application'`,
+  ).bind(challengeId).all<{ reviewer_user_id: string; team_id: string; criterion_id: string; score: number; comment: string }>();
+  const me = c.get("user")!.id;
+  return results.map((r) => {
+    const mine = sc.filter((s) => s.team_id === r.team_id);
+    const totals = [...new Set(mine.map((s) => s.reviewer_user_id))]
+      .map((rev) => judgeTotal(criteria, new Map(mine.filter((s) => s.reviewer_user_id === rev).map((s) => [s.criterion_id, s.score]))))
+      .filter((t): t is number => t !== null);
+    return {
+      ...r, answers: JSON.parse(r.answers) as Record<string, string>,
+      members: ms.filter((m) => m.team_id === r.team_id).map((m) => ({ name: m.name, email: m.email, institution: m.institution, is_lead: !!m.is_lead })),
+      // Average of the reviewers who scored every application criterion, 0 to 100.
+      review: {
+        average: totals.length ? Math.round((totals.reduce((a, t) => a + t, 0) / totals.length) * 100) / 100 : null,
+        reviewers: totals.length,
+        mine: mine.filter((s) => s.reviewer_user_id === me).map((s) => ({ criterion_id: s.criterion_id, score: s.score, comment: s.comment })),
+      },
+    };
+  });
 }
 
 /** Numbers and the newest applications for the organiser's challenge overview. */
@@ -54,7 +74,45 @@ orgApplications.get("/:slug/challenges/:cslug/overview", async (c) => {
 orgApplications.get("/:slug/challenges/:cslug/applications", async (c) => {
   const x = await load(c, c.req.param("slug"), c.req.param("cslug"));
   if ("error" in x) return c.json({ error: x.error!.msg }, x.error!.code);
-  return c.json({ questions: x.questions, applications: await list(c, x.ch.id) });
+  return c.json({ questions: x.questions, criteria: await criteriaOf(c, x.ch.id, "application"), stage: x.ch.status, applications: await list(c, x.ch.id) });
+});
+
+// ---- the application rubric ----
+orgApplications.get("/:slug/challenges/:cslug/application-criteria", async (c) => {
+  const x = await load(c, c.req.param("slug"), c.req.param("cslug"));
+  if ("error" in x) return c.json({ error: x.error!.msg }, x.error!.code);
+  return c.json({ criteria: await criteriaOf(c, x.ch.id, "application") });
+});
+
+orgApplications.put("/:slug/challenges/:cslug/application-criteria", async (c) => {
+  const x = await load(c, c.req.param("slug"), c.req.param("cslug"));
+  if ("error" in x) return c.json({ error: x.error!.msg }, x.error!.code);
+  return saveCriteria(c, x.ch, "application");
+});
+
+/** Any organisation admin scores an application. Each admin has their own scores; the list shows the average. */
+orgApplications.put("/:slug/challenges/:cslug/applications/:teamId/scores", async (c) => {
+  const x = await load(c, c.req.param("slug"), c.req.param("cslug"));
+  if ("error" in x) return c.json({ error: x.error!.msg }, x.error!.code);
+  const team = await c.env.DB.prepare("SELECT t.id FROM teams t JOIN applications a ON a.team_id = t.id WHERE t.id = ? AND t.challenge_id = ?")
+    .bind(c.req.param("teamId"), x.ch.id).first<{ id: string }>();
+  if (!team) return c.json({ error: "Not found" }, 404);
+  const parsed = z.object({ scores: z.array(z.object({ criterion_id: z.string(), score: z.number().int().min(0), comment: z.string().trim().max(1000).default("") })).min(1).max(10) })
+    .safeParse(await c.req.json().catch(() => null));
+  if (!parsed.success) return c.json({ error: "Check your scores" }, 400);
+  const criteria = new Map((await criteriaOf(c, x.ch.id, "application")).map((r) => [r.id, r]));
+  if (!criteria.size) return c.json({ error: "Set up the application rubric first" }, 409);
+  for (const s of parsed.data.scores) {
+    const cr = criteria.get(s.criterion_id);
+    if (!cr) return c.json({ error: "Unknown criterion" }, 400);
+    if (s.score > cr.max_score) return c.json({ error: `${cr.name} is scored out of ${cr.max_score}` }, 400);
+  }
+  const me = c.get("user")!.id, now = Date.now();
+  await c.env.DB.batch(parsed.data.scores.map((s) => c.env.DB.prepare(
+    `INSERT INTO application_scores (reviewer_user_id, team_id, criterion_id, score, comment, updated_at) VALUES (?, ?, ?, ?, ?, ?)
+     ON CONFLICT(reviewer_user_id, team_id, criterion_id) DO UPDATE SET score = excluded.score, comment = excluded.comment, updated_at = excluded.updated_at`,
+  ).bind(me, team.id, s.criterion_id, s.score, s.comment, now)));
+  return c.json({ ok: true });
 });
 
 const STATUS = z.enum(["applied", "shortlisted", "rejected", "finalist"]);
@@ -126,11 +184,11 @@ orgApplications.get("/:slug/challenges/:cslug/applications.csv", async (c) => {
   const x = await load(c, c.req.param("slug"), c.req.param("cslug"));
   if ("error" in x) return c.json({ error: x.error!.msg }, x.error!.code);
   const rows = await list(c, x.ch.id);
-  const head = ["Team", "Status", "Submitted", "Members", "Emails", "Institutions", ...x.questions.map((q) => q.label), "Reviewer note"];
+  const head = ["Team", "Status", "Submitted", "Review average", "Reviewers", "Members", "Emails", "Institutions", ...x.questions.map((q) => q.label), "Reviewer note"];
   const lines = [head.map(cell).join(",")];
   for (const r of rows) {
     lines.push([
-      r.name, r.status, new Date(r.submitted_at).toISOString(),
+      r.name, r.status, new Date(r.submitted_at).toISOString(), r.review.average ?? "", r.review.reviewers,
       r.members.map((m) => m.name ?? m.email).join("; "), r.members.map((m) => m.email).join("; "),
       [...new Set(r.members.map((m) => m.institution).filter(Boolean))].join("; "),
       ...x.questions.map((q) => r.answers[q.id] ?? ""), r.reviewer_note,

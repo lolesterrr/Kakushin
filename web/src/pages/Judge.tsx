@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from "react";
-import { Link, Navigate, useParams } from "react-router-dom";
+import { Link, Navigate, useNavigate, useParams } from "react-router-dom";
 import { api } from "../api";
 import { useAuth } from "../auth";
 import { Band, Notice, NumSection, Tag } from "../ui";
@@ -61,6 +61,7 @@ export function JudgeTeam() {
   const [vals, setVals] = useState<Record<string, { score: string; comment: string }>>({});
   const [msg, setMsg] = useState<Msg>(null);
   const [err, setErr] = useState("");
+  const nav = useNavigate();
   useEffect(() => {
     if (!me) return;
     api<any>(`/judge/${slug}/${cslug}/teams/${teamId}`).then((r) => {
@@ -85,10 +86,15 @@ export function JudgeTeam() {
     try { await api(`/judge/${slug}/${cslug}/teams/${teamId}/scores`, { method: "PUT", json: { scores } }); setMsg({ kind: "ok", text: complete ? "Scores saved. This team is fully scored." : "Scores saved. Score the remaining criteria to finish this team." }); }
     catch (err) { setMsg({ kind: "err", text: (err as Error).message }); }
   }
+  async function conflict() {
+    if (!confirm(`Step back from judging ${d.team.name}? Use this if you know someone on the team or have another reason you cannot judge it fairly. Any scores you gave it are removed and the organiser is told, so they can give the team another judge.`)) return;
+    try { await api(`/judge/${slug}/${cslug}/teams/${teamId}/conflict`, { method: "POST" }); nav(`/judge/${slug}/${cslug}`); }
+    catch (err) { setMsg({ kind: "err", text: (err as Error).message }); }
+  }
   const p = d.pitch;
   return (
     <>
-      <Band crumb="All teams" to={`/judge/${slug}/${cslug}`} title={d.team.name} tags={<span>{d.team.members.map((m: any) => m.name).join(", ")}</span>} />
+      <Band crumb="All teams" to={`/judge/${slug}/${cslug}`} title={d.team.name} tags={d.blind ? <span>Blind review: member names are hidden</span> : <span>{d.team.members.map((m: any) => m.institution ? `${m.name} (${m.institution})` : m.name).join(", ")}</span>} />
       <NumSection n="01" title="Pitch">
         {!p ? <p className="muted">This team has not added a pitch yet.</p> : (
           <ul className="todo">
@@ -117,7 +123,10 @@ export function JudgeTeam() {
             );
           })}
           <p style={{ fontFamily: "var(--display)", fontWeight: 800, fontSize: 22 }}>Weighted total: {total === null ? "score every criterion to see it" : `${total} / 100`}</p>
-          {!locked && <div className="actions"><button type="submit">Save scores</button></div>}
+          <div className="actions">
+            {!locked && <button type="submit">Save scores</button>}
+            {!d.own_team && <button type="button" className="ghost" onClick={conflict}>I know this team</button>}
+          </div>
           {msg && <Notice kind={msg.kind}>{msg.text}</Notice>}
         </form>
       </NumSection>

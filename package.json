@@ -11,7 +11,7 @@
     "db:migrate:remote": "wrangler d1 migrations apply kakushin --remote",
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
-    "test:e2e": "node tests/e2e/isolation.mjs && node tests/e2e/day2.mjs && node tests/e2e/day3.mjs"
+    "test:e2e": "node tests/e2e/isolation.mjs && node tests/e2e/day2.mjs && node tests/e2e/day3.mjs && node tests/e2e/day4.mjs"
   },
   "dependencies": {
     "@pdf-lib/fontkit": "^1.1.1",

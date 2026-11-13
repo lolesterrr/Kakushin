@@ -1,6 +1,7 @@
 import { Hono, type Context } from "hono";
 import { z } from "zod";
 import type { AppEnv } from "../types";
+import { judgeSees } from "../lib/assign";
 import { newId } from "../lib/crypto";
 
 /** Participant pitch routes, mounted under /api/teams. */
@@ -96,7 +97,7 @@ decks.get("/:teamId", async (c) => {
   const allowed = await c.env.DB.prepare(
     `SELECT 1 AS ok WHERE EXISTS (SELECT 1 FROM team_members WHERE team_id = ?1 AND user_id = ?2)
        OR EXISTS (SELECT 1 FROM memberships WHERE org_id = ?3 AND user_id = ?2)
-       OR EXISTS (SELECT 1 FROM judges WHERE challenge_id = ?4 AND email = ?5)`,
+       OR (EXISTS (SELECT 1 FROM judges WHERE challenge_id = ?4 AND email = ?5) AND ${judgeSees("?4", "?5", "?1")})`,
   ).bind(teamId, user.id, row.org_id, row.challenge_id, user.email.toLowerCase()).first();
   if (!allowed) return c.json({ error: "Not found" }, 404);
   const obj = await c.env.FILES.get(row.deck_key);
