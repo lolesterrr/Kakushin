@@ -95,7 +95,13 @@ export function AdminOrg() {
   }
   async function logo(e: React.ChangeEvent<HTMLInputElement>) {
     const f = e.target.files?.[0]; if (!f) return;
-    try { await uploadImage(`/orgs/${slug}/logo`, f); setMsg({ kind: "ok", text: "Logo updated" }); await load(); }
+    try {
+      await uploadImage(`/orgs/${slug}/logo`, f);
+      // Certificates print a small JPEG copy, which is cheap for the server to put in a PDF. Best effort.
+      const print = await printCopy(f).catch(() => null);
+      if (print) await uploadImage(`/orgs/${slug}/logo/print`, print).catch(() => {});
+      setMsg({ kind: "ok", text: "Logo updated" }); await load();
+    }
     catch (err) { setMsg({ kind: "err", text: (err as Error).message }); }
     e.target.value = "";
   }
@@ -304,4 +310,22 @@ export function AdminChallenge() {
       </div>
     </>
   );
+}
+
+/** A 256-pixel JPEG of the logo on the certificate's paper colour (JPEG has no transparency). */
+async function printCopy(file: File): Promise<File | null> {
+  const url = URL.createObjectURL(file);
+  try {
+    const img = new Image();
+    await new Promise<void>((ok, fail) => { img.onload = () => ok(); img.onerror = () => fail(new Error("load")); img.src = url; });
+    const k = Math.min(1, 256 / Math.max(img.naturalWidth, img.naturalHeight));
+    const canvas = document.createElement("canvas");
+    canvas.width = Math.max(1, Math.round(img.naturalWidth * k)); canvas.height = Math.max(1, Math.round(img.naturalHeight * k));
+    const g = canvas.getContext("2d");
+    if (!g) return null;
+    g.fillStyle = "#F5F2ED"; g.fillRect(0, 0, canvas.width, canvas.height);
+    g.drawImage(img, 0, 0, canvas.width, canvas.height);
+    const blob = await new Promise<Blob | null>((ok) => canvas.toBlob(ok, "image/jpeg", 0.9));
+    return blob ? new File([blob], "logo-print.jpg", { type: "image/jpeg" }) : null;
+  } finally { URL.revokeObjectURL(url); }
 }

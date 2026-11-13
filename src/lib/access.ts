@@ -3,7 +3,7 @@ import type { AppEnv } from "../types";
 
 export interface OrgRow {
   id: string; slug: string; name: string; type: string;
-  logo_key: string | null; website: string | null; plan: string; created_at: number; verified: number; suspended: number;
+  logo_key: string | null; logo_print_key: string | null; website: string | null; plan: string; created_at: number; verified: number; suspended: number;
 }
 export type OrgRole = "owner" | "admin";
 
