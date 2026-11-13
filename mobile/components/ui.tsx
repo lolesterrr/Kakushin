@@ -91,3 +91,21 @@ export function DaysStamp({ days, fill = FILL.red, tilt = 3 }: { days: number; f
     </View>
   );
 }
+
+/** Shown when a screen is on its saved copy because the network failed. */
+export function Offline() {
+  const t = useTheme();
+  return <Text accessibilityRole="alert" style={{ color: t.muted, fontSize: 13, fontWeight: "600" }}>No connection. Showing what was saved; pull down to try again.</Text>;
+}
+
+/** A card for screens that need an account, so signed-out visitors see why instead of a dead end. */
+export function SignInCard({ title, body, onSignIn }: { title: string; body: string; onSignIn: () => void }) {
+  const t = useTheme();
+  return (
+    <View style={[{ backgroundColor: t.card, borderWidth: 1, borderColor: t.line, borderRadius: 20, padding: 20, gap: 10 }, shadow(0.08)]}>
+      <Text accessibilityRole="header" style={{ color: t.ink, fontFamily: F.display, fontSize: 22, lineHeight: 26 }}>{title}</Text>
+      <Text style={{ color: t.muted, fontSize: 16, lineHeight: 23 }}>{body}</Text>
+      <Button title="Sign in or create an account" onPress={onSignIn} />
+    </View>
+  );
+}

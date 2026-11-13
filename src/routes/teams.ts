@@ -46,7 +46,7 @@ async function members(c: { env: AppEnv["Bindings"] }, teamId: string) {
 async function teamOut(c: { env: AppEnv["Bindings"] }, t: TeamRow, viewerId: string) {
   const app = await c.env.DB.prepare("SELECT answers, submitted_at FROM applications WHERE team_id = ?").bind(t.id).first<{ answers: string; submitted_at: number }>();
   return {
-    id: t.id, name: t.name, status: t.status, invite_code: t.invite_code, is_lead: t.lead_user_id === viewerId,
+    id: t.id, name: t.name, status: t.status, placement: t.placement, invite_code: t.invite_code, is_lead: t.lead_user_id === viewerId,
     members: (await members(c, t.id)).map((m) => ({ id: m.id, name: m.name || m.email.split("@")[0], is_lead: m.id === t.lead_user_id })),
     application: app ? { answers: JSON.parse(app.answers) as Record<string, string>, submitted_at: app.submitted_at } : null,
   };
@@ -107,11 +107,14 @@ teams.get("/mine", async (c) => {
   const user = c.get("user");
   if (!user) return c.json({ error: "Not signed in" }, 401);
   const { results } = await c.env.DB.prepare(
-    `SELECT t.id, t.name, t.status, ch.title, ch.slug AS cslug, o.slug AS oslug, o.name AS oname
+    `SELECT t.id, t.name, t.status, t.placement, ch.title, ch.slug AS cslug, o.slug AS oslug, o.name AS oname, o.logo_key,
+       ch.status AS cstatus, ch.applications_close_at, ch.pitch_due_at,
+       EXISTS (SELECT 1 FROM submissions s WHERE s.team_id = t.id) AS has_pitch
      FROM team_members m JOIN teams t ON t.id = m.team_id JOIN challenges ch ON ch.id = t.challenge_id JOIN organizations o ON o.id = ch.org_id
      WHERE m.user_id = ? ORDER BY t.created_at DESC`,
-  ).bind(user.id).all();
-  return c.json({ teams: results });
+  ).bind(user.id).all<Record<string, unknown> & { logo_key: string | null; has_pitch: number }>();
+  // The dates and pitch flag let the app set its own reminders on the phone.
+  return c.json({ teams: results.map(({ logo_key, has_pitch, ...r }) => ({ ...r, logo_url: fileUrl(logo_key), has_pitch: !!has_pitch })) });
 });
 
 // Public preview so an invite link can show what you are joining before you sign in.

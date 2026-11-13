@@ -1,14 +1,14 @@
 import React from "react";
-import { Redirect, Tabs } from "expo-router";
+import { Tabs } from "expo-router";
 import { useAuth } from "../../lib/auth";
 import { useTheme } from "../../lib/theme";
 import { TabBar } from "../../components/TabBar";
 
 export default function TabsLayout() {
-  const { ready, me } = useAuth();
+  const { ready } = useAuth();
   const t = useTheme();
   if (!ready) return null;
-  if (!me) return <Redirect href="/sign-in" />;
+  // Explore and challenges are open to everyone; My teams and Inbox ask for sign-in on their own screens.
   return (
     <Tabs tabBar={(p) => <TabBar {...(p as unknown as React.ComponentProps<typeof TabBar>)} />}
       screenOptions={{ headerStyle: { backgroundColor: t.bg }, headerShadowVisible: false, headerTintColor: t.ink, headerTitleStyle: { fontWeight: "800" } }}>
