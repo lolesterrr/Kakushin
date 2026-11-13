@@ -8,7 +8,7 @@ import { useAuth } from "../../../lib/auth";
 import { toSignIn } from "../../../lib/nav";
 import { shareInvite } from "../../../lib/share";
 import { challengeDetail, follows as followsSchema, teamResponse, type ChallengeDetail, type Team } from "../../../lib/schemas";
-import { daysLeft, fmtDate, teamSize } from "../../../lib/format";
+import { clock, daysLeft, fmtDate, teamSize } from "../../../lib/format";
 import { useLoad } from "../../../lib/useLoad";
 import { useTheme } from "../../../lib/theme";
 import { Banner, Scrim } from "../../../components/Banner";
@@ -25,7 +25,7 @@ export default function ChallengeScreen() {
   const { me } = useAuth();
   const base = `/orgs/${org}/challenges/${slug}`;
   const here = `/challenge/${org}/${slug}`;
-  const ch = useLoad(async () => (await api(base, { schema: challengeDetail })).challenge, [base], { cache: `challenge.${org}.${slug}` });
+  const ch = useLoad(async () => { const r = await api(base, { schema: challengeDetail }); return { ...r.challenge, role: r.role ?? null }; }, [base, me?.id], { cache: `challenge.${org}.${slug}` });
   // Signed out, there is no team or follow to load: the screen still shows everything else.
   const tm = useLoad(async () => (me ? (await api(`${base}/team`, { schema: teamResponse })).team : null), [base, me?.id]);
   const fol = useLoad(async () => (me ? await api("/follows", { schema: followsSchema }) : null), [me?.id]);
@@ -117,6 +117,15 @@ export default function ChallengeScreen() {
 
       {msg ? <Notice kind={msg.kind}>{msg.text}</Notice> : null}
       {c.results_published ? <Button title="See the results" onPress={() => router.push(`/results/${org}/${slug}`)} /> : null}
+      {c.status !== "draft" && c.status !== "completed" && (c.agenda.length > 0 || c.checkin_enabled || c.role) ? (
+        <>
+          <H2>Event day</H2>
+          {c.agenda.length > 0 ? <Button title="Open the live page" onPress={() => router.push(`/live/${org}/${slug}`)} /> : null}
+          {c.checkin_enabled && tm.data && tm.data.status !== "rejected" ? <Button title="My check-in pass" kind="ghost" onPress={() => router.push(`/pass/${org}/${slug}`)} /> : null}
+          {c.checkin_enabled && c.role ? <Button title="Check people in" kind="ghost" onPress={() => router.push(`/checkin/${org}/${slug}`)} /> : null}
+          {c.role && !c.checkin_enabled && !c.agenda.length ? <Body muted>Add an agenda or turn on check-in from Event day on the web.</Body> : null}
+        </>
+      ) : null}
       <TeamPanel org={org} slug={slug} c={c} team={tm.data} loaded={teamLoaded} signedIn={!!me} onChange={refresh} />
         </View>
       </Screen>
@@ -202,6 +211,7 @@ function Timeline({ c }: { c: ChallengeDetail }) {
   if (c.applications_open_at) rows.push({ label: "Applications open", at: c.applications_open_at });
   if (c.applications_close_at) rows.push({ label: "Applications close", at: c.applications_close_at });
   if (c.pitch_due_at) rows.push({ label: "Pitches due", at: c.pitch_due_at });
+  for (const b of c.agenda) rows.push({ label: `${clock(b.starts_at)} to ${clock(b.ends_at)}  ${b.label}`, at: b.starts_at });
   rows.sort((a, b) => a.at - b.at);
   if (rows.length < 2 && !c.timeline.length) return null;
   return (

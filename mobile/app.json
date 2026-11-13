@@ -26,6 +26,14 @@
             "backgroundColor": "#111111"
           }
         }
+      ],
+      [
+        "expo-camera",
+        {
+          "cameraPermission": "Kakushin uses the camera to scan check-in passes at events.",
+          "microphonePermission": false,
+          "recordAudioAndroid": false
+        }
       ]
     ],
     "experiments": {
