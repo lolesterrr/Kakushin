@@ -9,7 +9,24 @@
     "plugins": [
       "expo-router",
       "expo-secure-store",
-      "expo-notifications"
+      [
+        "expo-notifications",
+        {
+          "color": "#c8321f"
+        }
+      ],
+      [
+        "expo-splash-screen",
+        {
+          "image": "./assets/splash-icon.png",
+          "imageWidth": 180,
+          "resizeMode": "contain",
+          "backgroundColor": "#111111",
+          "dark": {
+            "backgroundColor": "#111111"
+          }
+        }
+      ]
     ],
     "experiments": {
       "typedRoutes": false
@@ -19,11 +36,33 @@
       "bundleIdentifier": "app.kakushin.mobile"
     },
     "android": {
-      "package": "app.kakushin.mobile"
+      "package": "app.kakushin.mobile",
+      "adaptiveIcon": {
+        "foregroundImage": "./assets/adaptive-icon.png",
+        "backgroundColor": "#111111"
+      },
+      "intentFilters": [
+        {
+          "action": "VIEW",
+          "data": [
+            {
+              "scheme": "https",
+              "host": "kakushinhub.site",
+              "pathPrefix": "/join/"
+            }
+          ],
+          "category": [
+            "BROWSABLE",
+            "DEFAULT"
+          ]
+        }
+      ]
     },
     "web": {
       "bundler": "metro",
-      "output": "single"
-    }
+      "output": "single",
+      "favicon": "./assets/icon.png"
+    },
+    "icon": "./assets/icon.png"
   }
 }

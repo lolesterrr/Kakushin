@@ -1,9 +1,11 @@
 import React, { useState } from "react";
-import { Pressable, Share, Text, View } from "react-native";
+import { Pressable, Text, View } from "react-native";
 import Svg, { Circle, Path, Rect } from "react-native-svg";
-import { Stack, useLocalSearchParams, useRouter } from "expo-router";
+import { Redirect, Stack, useLocalSearchParams, useRouter } from "expo-router";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { api } from "../../../lib/api";
+import { shareInvite } from "../../../lib/share";
+import { useAuth } from "../../../lib/auth";
 import { challengeDetail, teamResponse, type ChallengeDetail, type Question, type Team } from "../../../lib/schemas";
 import { fmtDate, teamSize } from "../../../lib/format";
 import { F } from "../../../lib/fonts";
@@ -25,6 +27,7 @@ export default function Apply() {
   const { org, slug } = useLocalSearchParams<{ org: string; slug: string }>();
   const router = useRouter();
   const t = useTheme();
+  const { me } = useAuth();
   const base = `/orgs/${org}/challenges/${slug}`;
   const ch = useLoad(async () => (await api(base, { schema: challengeDetail })).challenge, [base]);
   const tm = useLoad(async () => (await api(`${base}/team`, { schema: teamResponse })).team, [base]);
@@ -37,6 +40,8 @@ export default function Apply() {
 
   const c = ch.data;
   const team = tm.data;
+  // Applying needs an account; the sign-in screen brings the person straight back here.
+  if (!me) return <Redirect href={{ pathname: "/sign-in", params: { next: `/apply/${org}/${slug}` } } as never} />;
   if (!c || !tm.loaded) return <Screen><Stack.Screen options={{ headerShown: false }} />{ch.err ? <Notice kind="err">{ch.err}</Notice> : <Loading />}</Screen>;
 
   const open = c.status === "open" && (!c.applications_close_at || Date.now() < c.applications_close_at) && (!c.applications_open_at || Date.now() >= c.applications_open_at);
@@ -190,7 +195,7 @@ function TeamStep({ base, c, team, sizeOk, onChange, onNext }: { base: string; c
     );
   }
 
-  const share = () => void Share.share({ message: `Join my team "${team.name}" for ${c.title} on Kakushin. Invite code: ${team.invite_code}` }).catch(() => {});
+  const share = () => void shareInvite(team, c.title);
   return (
     <>
       <Hand>Step one</Hand>
@@ -210,8 +215,8 @@ function TeamStep({ base, c, team, sizeOk, onChange, onNext }: { base: string; c
       <Card>
         <Label>Invite code</Label>
         <Text selectable style={{ color: t.ink, fontFamily: F.display, fontSize: 30, letterSpacing: 4 }}>{team.invite_code}</Text>
-        <Body muted style={{ fontSize: 13 }}>Teammates open this challenge in the app and join with it.</Body>
-        <Button title="Share the code" kind="ghost" onPress={share} />
+        <Body muted style={{ fontSize: 13 }}>Send the link: it opens the app, or the web page if they do not have it yet.</Body>
+        <Button title="Share invite" kind="ghost" onPress={share} />
       </Card>
       {sizeOk ? <Body muted>Team size is good ({team.members.length} of {sizeText}). You can also keep going and invite people before you send.</Body> : <Notice kind="err">This challenge needs teams of {sizeText}. You have {team.members.length} so far. You can answer now and invite people before you send.</Notice>}
       <Button title="Continue" onPress={onNext} />

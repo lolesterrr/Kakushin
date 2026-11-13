@@ -1,10 +1,12 @@
 import React, { useState } from "react";
-import { Linking, Pressable, Text, View } from "react-native";
+import { Pressable, Text, View } from "react-native";
 import Svg, { Path } from "react-native-svg";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Stack, useLocalSearchParams, useRouter } from "expo-router";
 import { api } from "../../../lib/api";
-import { API_URL } from "../../../lib/config";
+import { useAuth } from "../../../lib/auth";
+import { toSignIn } from "../../../lib/nav";
+import { shareInvite } from "../../../lib/share";
 import { challengeDetail, follows as followsSchema, teamResponse, type ChallengeDetail, type Team } from "../../../lib/schemas";
 import { daysLeft, fmtDate, teamSize } from "../../../lib/format";
 import { useLoad } from "../../../lib/useLoad";
@@ -12,26 +14,31 @@ import { useTheme } from "../../../lib/theme";
 import { Banner, Scrim } from "../../../components/Banner";
 import { F } from "../../../lib/fonts";
 import { shadow } from "../../../lib/theme";
-import { Body, Button, Card, DaysStamp, H2, Label, Loading, Notice, Pill, Screen, StatusStamp } from "../../../components/ui";
+import { Body, Button, Card, DaysStamp, H2, Label, Loading, Notice, Offline, Pill, Screen, StatusStamp } from "../../../components/ui";
 
 export default function ChallengeScreen() {
   const { org, slug } = useLocalSearchParams<{ org: string; slug: string }>();
   const t = useTheme();
+  const router = useRouter();
+  const { me } = useAuth();
   const base = `/orgs/${org}/challenges/${slug}`;
-  const ch = useLoad(async () => (await api(base, { schema: challengeDetail })).challenge, [base]);
-  const tm = useLoad(async () => (await api(`${base}/team`, { schema: teamResponse })).team, [base]);
-  const fol = useLoad(() => api("/follows", { schema: followsSchema }), []);
+  const here = `/challenge/${org}/${slug}`;
+  const ch = useLoad(async () => (await api(base, { schema: challengeDetail })).challenge, [base], { cache: `challenge.${org}.${slug}` });
+  // Signed out, there is no team or follow to load: the screen still shows everything else.
+  const tm = useLoad(async () => (me ? (await api(`${base}/team`, { schema: teamResponse })).team : null), [base, me?.id]);
+  const fol = useLoad(async () => (me ? await api("/follows", { schema: followsSchema }) : null), [me?.id]);
   const [msg, setMsg] = useState<{ kind: "ok" | "err"; text: string } | null>(null);
 
   const c = ch.data;
   const following = !!fol.data?.orgs.some((o) => o.slug === org);
   async function toggleFollow() {
+    if (!me) { toSignIn(router, here); return; }
     try { await api(`/follows/orgs/${org}`, { method: following ? "DELETE" : "PUT" }); await fol.reload(); }
     catch (e) { setMsg({ kind: "err", text: (e as Error).message }); }
   }
   const refresh = async () => { await Promise.all([ch.refresh(), tm.refresh()]); };
 
-  if (!c) return <Screen>{ch.err ? <Notice kind="err">{ch.err === "Not found" ? "We could not find that challenge." : ch.err}</Notice> : <Loading />}</Screen>;
+  if (!c) return <Screen><Stack.Screen options={{ headerShown: false }} />{ch.err ? <Notice kind="err">{ch.err === "Not found" ? "We could not find that challenge." : ch.err}</Notice> : <Loading />}</Screen>;
   const d = daysLeft(c.applications_close_at);
   const teamLoaded = tm.loaded;
   return (
@@ -45,12 +52,13 @@ export default function ChallengeScreen() {
           <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between", gap: 8 }}>
             <View style={{ flexDirection: "row", alignItems: "center", gap: 8, flex: 1 }}>
               <Pill text={c.status === "open" ? "Open" : c.status} />
-              <Text numberOfLines={1} style={{ flex: 1, color: t.muted, fontSize: 12, fontWeight: "700", letterSpacing: 1.2, textTransform: "uppercase" }}>{c.org.name}</Text>
+              <Text numberOfLines={1} accessibilityRole="link" accessibilityHint="Opens the organisation" onPress={() => router.push(`/org/${org}`)} style={{ flex: 1, color: t.muted, fontSize: 12, fontWeight: "700", letterSpacing: 1.2, textTransform: "uppercase", textDecorationLine: "underline" }}>{c.org.name}</Text>
             </View>
             <Pressable onPress={toggleFollow} accessibilityRole="button" style={{ minHeight: 40, paddingHorizontal: 14, borderRadius: 999, borderWidth: 1.5, borderColor: t.ink, justifyContent: "center" }}>
               <Text style={{ color: t.ink, fontSize: 13, fontWeight: "700" }}>{following ? "Following" : "Follow"}</Text>
             </Pressable>
           </View>
+          {ch.stale ? <Offline /> : null}
           <Text accessibilityRole="header" style={{ color: t.ink, fontFamily: F.display, fontSize: 32, lineHeight: 34, letterSpacing: -0.6 }}>{c.title}</Text>
           {c.summary ? <Body muted>{c.summary}</Body> : null}
           {c.topics.length ? <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 8 }}>{c.topics.map((x) => <Pill key={x} text={x} />)}</View> : null}
@@ -80,8 +88,8 @@ export default function ChallengeScreen() {
       ) : null}
 
       {msg ? <Notice kind={msg.kind}>{msg.text}</Notice> : null}
-      <TeamPanel org={org} slug={slug} c={c} team={tm.data} loaded={teamLoaded} onChange={refresh} />
-      {c.results_published ? <Button title="See results on the web" kind="ghost" onPress={() => void Linking.openURL(`${API_URL}/o/${org}/c/${slug}#results`)} /> : null}
+      {c.results_published ? <Button title="See the results" onPress={() => router.push(`/results/${org}/${slug}`)} /> : null}
+      <TeamPanel org={org} slug={slug} c={c} team={tm.data} loaded={teamLoaded} signedIn={!!me} onChange={refresh} />
         </View>
       </Screen>
       <BackButton />
@@ -89,7 +97,7 @@ export default function ChallengeScreen() {
   );
 }
 
-function TeamPanel({ org, slug, c, team, loaded, onChange }: { org: string; slug: string; c: ChallengeDetail; team: Team | null; loaded: boolean; onChange: () => Promise<void> }) {
+function TeamPanel({ org, slug, c, team, loaded, signedIn, onChange }: { org: string; slug: string; c: ChallengeDetail; team: Team | null; loaded: boolean; signedIn: boolean; onChange: () => Promise<void> }) {
   const t = useTheme();
   const router = useRouter();
   const [msg, setMsg] = useState<{ kind: "ok" | "err"; text: string } | null>(null);
@@ -104,7 +112,16 @@ function TeamPanel({ org, slug, c, team, loaded, onChange }: { org: string; slug
 
   if (!team) {
     if (!open) return <Card><Body muted>This challenge is not taking applications.</Body></Card>;
-    return <Button title="Apply now" onPress={() => router.push(`/apply/${org}/${slug}`)} />;
+    const apply = `/apply/${org}/${slug}`;
+    if (!signedIn) {
+      return (
+        <>
+          <Button title="Apply now" onPress={() => toSignIn(router, apply)} />
+          <Body muted style={{ fontSize: 13 }}>You sign in with your email first. It takes a minute, and you come straight back here.</Body>
+        </>
+      );
+    }
+    return <Button title="Apply now" onPress={() => router.push(apply)} />;
   }
 
   const canApply = team.is_lead && (team.status === "forming" || team.status === "applied") && open;
@@ -123,7 +140,8 @@ function TeamPanel({ org, slug, c, team, loaded, onChange }: { org: string; slug
           <>
             <Label>Invite code</Label>
             <Text selectable style={{ color: t.ink, fontSize: 24, fontWeight: "900", letterSpacing: 3 }}>{team.invite_code}</Text>
-            <Body muted style={{ fontSize: 13 }}>Share this code. Teammates open this challenge in the app and join with it.</Body>
+            <Body muted style={{ fontSize: 13 }}>Send the invite link. It opens the app, or the web page for anyone without it.</Body>
+            <View style={{ marginTop: 6 }}><Button title="Share invite" kind="ghost" onPress={() => void shareInvite(team, c.title)} /></View>
           </>
         ) : null}
       </Card>

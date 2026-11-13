@@ -1,7 +1,10 @@
 import React, { createContext, useCallback, useContext, useEffect, useState } from "react";
 import { api, clearToken, loadToken, saveToken, setSignedOutHandler } from "./api";
-import { me as meSchema, type Me } from "./schemas";
+import { me as meSchema, myTeams, type Me } from "./schemas";
 import { registerForPush, unregisterPush } from "./push";
+import { syncPrefs } from "./prefs";
+import { clearSaved } from "./store";
+import { clearReminders, setServerPushes, syncReminders } from "./reminders";
 
 interface AuthState {
   ready: boolean; me: Me | null;
@@ -22,12 +25,22 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }, []);
 
   useEffect(() => {
-    setSignedOutHandler(() => setMe(null));
+    setSignedOutHandler(() => { setMe(null); void clearSaved(); void clearReminders(); });
     (async () => { if (await loadToken()) await reload(); setReady(true); })();
   }, [reload]);
 
-  // Once signed in, make sure the server knows this phone so pushes can reach it. The server honours the on/off setting.
-  useEffect(() => { if (me) void registerForPush(); }, [me?.id]); // eslint-disable-line react-hooks/exhaustive-deps
+  // Once signed in: tell the server about this phone so pushes reach it (it honours the on/off setting), send any
+  // onboarding picks to the account, and set deadline reminders on the phone when server pushes cannot reach it.
+  useEffect(() => {
+    if (!me) return;
+    void syncPrefs();
+    void (async () => {
+      const state = await registerForPush();
+      const settings = await api<{ push: boolean }>("/inbox/settings").catch(() => ({ push: true }));
+      setServerPushes(state === "ready" && settings.push);
+      await syncReminders((await api("/teams/mine", { schema: myTeams })).teams);
+    })().catch(() => {});
+  }, [me?.id]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const value: AuthState = {
     ready, me, reload,
@@ -36,7 +49,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       const r = await api<{ token: string }>("/auth/verify", { method: "POST", json: { email: email.trim().toLowerCase(), code } });
       await saveToken(r.token); await reload();
     },
-    signOut: async () => { await unregisterPush(); try { await api("/auth/logout", { method: "POST" }); } catch { /* already gone */ } await clearToken(); setMe(null); },
+    signOut: async () => { await unregisterPush(); try { await api("/auth/logout", { method: "POST" }); } catch { /* already gone */ } await clearToken(); setMe(null); await clearSaved(); await clearReminders(); },
   };
   return <Ctx.Provider value={value}>{children}</Ctx.Provider>;
 }

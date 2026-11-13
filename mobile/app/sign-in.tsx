@@ -1,8 +1,10 @@
 import React, { useEffect, useState } from "react";
-import { Text, View } from "react-native";
+import { Pressable, Text, View } from "react-native";
 import * as WebBrowser from "expo-web-browser";
 import { API_URL } from "../lib/config";
-import { Redirect } from "expo-router";
+import { Redirect, useLocalSearchParams, useRouter } from "expo-router";
+import Svg, { Path } from "react-native-svg";
+import { safeNext } from "../lib/nav";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useAuth } from "../lib/auth";
 import { useTheme } from "../lib/theme";
@@ -16,6 +18,8 @@ import { RedLight } from "../components/RedLight";
 export default function SignIn() {
   const { me, ready, requestCode, verify } = useAuth();
   const t = useTheme();
+  const router = useRouter();
+  const { next } = useLocalSearchParams<{ next?: string }>();
   const [email, setEmail] = useState("");
   const [code, setCode] = useState("");
   const [step, setStep] = useState<"email" | "code">("email");
@@ -30,7 +34,8 @@ export default function SignIn() {
   }, []);
   const newCheck = () => { setToken(null); setCheck((n) => n + 1); };
 
-  if (ready && me) return <Redirect href="/" />;
+  if (ready && me) return <Redirect href={safeNext(next) as never} />;
+  const close = () => (router.canGoBack() ? router.back() : router.replace("/"));
 
   async function send() {
     if (needsCheck && !token) { setErr("Wait for the check below to finish, then try again."); return; }
@@ -55,6 +60,11 @@ export default function SignIn() {
           <RedLight size={14} />
           <Text style={{ fontSize: 20, fontWeight: "700", color: "#111111" }}>Kakushin</Text>
         </View>
+      </SafeAreaView>
+      <SafeAreaView edges={["top"]} style={{ position: "absolute", top: 0, right: 16 }}>
+        <Pressable onPress={close} accessibilityRole="button" accessibilityLabel="Not now, keep browsing" style={[{ marginTop: 2, width: 44, height: 44, borderRadius: 22, backgroundColor: "#F6F4EEEB", alignItems: "center", justifyContent: "center" }, shadow(0.3)]}>
+          <Svg width={16} height={16} viewBox="0 0 18 18" fill="none" stroke="#111111" strokeWidth={2.6} strokeLinecap="round"><Path d="M4 4l10 10M14 4L4 14" /></Svg>
+        </Pressable>
       </SafeAreaView>
       <View style={[{ flex: 1, marginTop: 290, backgroundColor: t.bg, borderTopLeftRadius: 28, borderTopRightRadius: 28, padding: 24, paddingBottom: 32, gap: 16 }, shadow(0.3)]}>
         {step === "code" ? <Hand>Check your email</Hand> : <Hand>Welcome</Hand>}
