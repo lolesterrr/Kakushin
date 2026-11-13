@@ -3,6 +3,7 @@ import { z } from "zod";
 import type { AppEnv } from "../types";
 import { judgeSees } from "../lib/assign";
 import { newId } from "../lib/crypto";
+import { parseRepo, repoUrl } from "../lib/github";
 
 /** Participant pitch routes, mounted under /api/teams. */
 export const pitch = new Hono<AppEnv>();
@@ -24,8 +25,8 @@ async function memberTeam(c: Context<AppEnv>, teamId: string): Promise<TeamCtx |
   return row ? { team: row, due: row.due, chStatus: row.chStatus } : null;
 }
 
-const pitchOut = (r: { deck_name: string | null; deck_key: string | null; video_url: string; demo_url: string; notes: string; updated_at: number } | null) =>
-  r ? { has_deck: !!r.deck_key, deck_name: r.deck_name, video_url: r.video_url, demo_url: r.demo_url, notes: r.notes, updated_at: r.updated_at } : null;
+const pitchOut = (r: { deck_name: string | null; deck_key: string | null; video_url: string; demo_url: string; repo_url?: string; notes: string; updated_at: number } | null) =>
+  r ? { has_deck: !!r.deck_key, deck_name: r.deck_name, video_url: r.video_url, demo_url: r.demo_url, repo_url: r.repo_url ?? "", notes: r.notes, updated_at: r.updated_at } : null;
 
 pitch.get("/:id/pitch", async (c) => {
   if (!c.get("user")) return c.json({ error: "Not signed in" }, 401);
@@ -43,6 +44,9 @@ function guard(x: TeamCtx): string | null {
 }
 
 const link = z.string().trim().max(300).refine((v) => v === "" || /^https?:\/\/\S+$/i.test(v), { message: "Links must start with http:// or https://" });
+/** A public github.com repo, stored as https://github.com/owner/name. Empty clears it. */
+const repo = z.string().trim().max(300).refine((v) => v === "" || parseRepo(v) !== null, { message: "Use a github.com repository link, like https://github.com/your-team/project" })
+  .transform((v) => (v === "" ? "" : repoUrl(parseRepo(v)!)));
 
 pitch.put("/:id/pitch", async (c) => {
   if (!c.get("user")) return c.json({ error: "Not signed in" }, 401);
@@ -50,14 +54,16 @@ pitch.put("/:id/pitch", async (c) => {
   if (!x) return c.json({ error: "Not found" }, 404);
   const why = guard(x);
   if (why) return c.json({ error: why }, 409);
-  const parsed = z.object({ video_url: link.default(""), demo_url: link.default(""), notes: z.string().trim().max(2000).default("") })
+  // repo_url left out keeps what is stored, so an app from before day 6 cannot wipe it.
+  const parsed = z.object({ video_url: link.default(""), demo_url: link.default(""), repo_url: repo.optional(), notes: z.string().trim().max(2000).default("") })
     .safeParse(await c.req.json().catch(() => null));
   if (!parsed.success) return c.json({ error: parsed.error.issues[0]?.message ?? "Check your pitch details" }, 400);
   const p = parsed.data;
   await c.env.DB.prepare(
-    `INSERT INTO submissions (id, team_id, video_url, demo_url, notes, updated_at) VALUES (?, ?, ?, ?, ?, ?)
-     ON CONFLICT(team_id) DO UPDATE SET video_url = excluded.video_url, demo_url = excluded.demo_url, notes = excluded.notes, updated_at = excluded.updated_at`,
-  ).bind(newId(), x.team.id, p.video_url, p.demo_url, p.notes, Date.now()).run();
+    `INSERT INTO submissions (id, team_id, video_url, demo_url, repo_url, notes, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?)
+     ON CONFLICT(team_id) DO UPDATE SET video_url = excluded.video_url, demo_url = excluded.demo_url,
+       repo_url = CASE WHEN ? THEN excluded.repo_url ELSE submissions.repo_url END, notes = excluded.notes, updated_at = excluded.updated_at`,
+  ).bind(newId(), x.team.id, p.video_url, p.demo_url, p.repo_url ?? "", p.notes, Date.now(), p.repo_url !== undefined ? 1 : 0).run();
   return c.json({ ok: true });
 });
 
