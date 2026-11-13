@@ -1,5 +1,5 @@
 import React, { useState } from "react";
-import { Pressable, Text, View } from "react-native";
+import { Image, Linking, Pressable, Text, View } from "react-native";
 import Svg, { Path } from "react-native-svg";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Stack, useLocalSearchParams, useRouter } from "expo-router";
@@ -12,6 +12,8 @@ import { daysLeft, fmtDate, teamSize } from "../../../lib/format";
 import { useLoad } from "../../../lib/useLoad";
 import { useTheme } from "../../../lib/theme";
 import { Banner, Scrim } from "../../../components/Banner";
+import { Markdown } from "../../../components/Markdown";
+import { API_URL } from "../../../lib/config";
 import { F } from "../../../lib/fonts";
 import { shadow } from "../../../lib/theme";
 import { Body, Button, Card, DaysStamp, H2, Label, Loading, Notice, Offline, Pill, Screen, StatusStamp } from "../../../components/ui";
@@ -69,8 +71,34 @@ export default function ChallengeScreen() {
           </View>
           {d !== null && d > 0 ? <View style={{ flexDirection: "row" }}><DaysStamp days={d} tilt={-2} /></View> : null}
 
-      {c.description ? <><H2>About</H2><Body>{c.description}</Body></> : null}
-      {c.prizes ? <><H2>Prizes</H2><Body>{c.prizes}</Body></> : null}
+      {c.description ? <><H2>About</H2><Markdown text={c.description} /></> : null}
+      {c.rules ? <><H2>Rules</H2><Markdown text={c.rules} /></> : null}
+      <Timeline c={c} />
+      {c.prizes ? <><H2>Prizes</H2><Markdown text={c.prizes} /></> : null}
+      {c.judges.length ? (
+        <>
+          <H2>Judges</H2>
+          {c.judges.map((j, i) => <Body key={i}><Text style={{ fontWeight: "700" }}>{j.name}</Text>{j.title ? <Text style={{ color: t.muted }}>  ·  {j.title}</Text> : null}</Body>)}
+        </>
+      ) : null}
+      {c.sponsors.length ? (
+        <>
+          <H2>Sponsors</H2>
+          <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 16, alignItems: "center" }}>
+            {c.sponsors.map((x, i) => (
+              <Pressable key={i} disabled={!x.url} onPress={() => x.url && void Linking.openURL(x.url)} accessibilityRole={x.url ? "link" : undefined} accessibilityLabel={x.name}>
+                {x.logo_url ? <Image source={{ uri: `${API_URL}${x.logo_url}` }} style={{ width: 120, height: 48 }} resizeMode="contain" /> : <Text style={{ color: t.ink, fontWeight: "700", fontSize: 16 }}>{x.name}</Text>}
+              </Pressable>
+            ))}
+          </View>
+        </>
+      ) : null}
+      {c.faq.length ? (
+        <>
+          <H2>FAQ</H2>
+          {c.faq.map((x, i) => <Faq key={i} q={x.q} a={x.a} />)}
+        </>
+      ) : null}
       {c.criteria.length ? (
         <>
           <H2>How you will be scored</H2>
@@ -164,6 +192,42 @@ function TeamPanel({ org, slug, c, team, loaded, signedIn, onChange }: { org: st
       ) : null}
       {msg ? <Notice kind={msg.kind}>{msg.text}</Notice> : null}
     </>
+  );
+}
+
+/** The application and pitch dates plus the organiser's own, in order. Past steps are faded. */
+function Timeline({ c }: { c: ChallengeDetail }) {
+  const t = useTheme();
+  const rows = [...c.timeline];
+  if (c.applications_open_at) rows.push({ label: "Applications open", at: c.applications_open_at });
+  if (c.applications_close_at) rows.push({ label: "Applications close", at: c.applications_close_at });
+  if (c.pitch_due_at) rows.push({ label: "Pitches due", at: c.pitch_due_at });
+  rows.sort((a, b) => a.at - b.at);
+  if (rows.length < 2 && !c.timeline.length) return null;
+  return (
+    <>
+      <H2>Timeline</H2>
+      {rows.map((r, i) => (
+        <View key={i} style={{ flexDirection: "row", gap: 12, opacity: r.at < Date.now() ? 0.55 : 1 }}>
+          <Text style={{ color: t.muted, fontSize: 14, width: 96 }}>{fmtDate(r.at)}</Text>
+          <Text style={{ color: t.ink, fontSize: 16, fontWeight: "600", flex: 1 }}>{r.label}</Text>
+        </View>
+      ))}
+    </>
+  );
+}
+
+function Faq({ q, a }: { q: string; a: string }) {
+  const t = useTheme();
+  const [open, setOpen] = useState(false);
+  return (
+    <View style={{ borderBottomWidth: 1, borderBottomColor: t.line, paddingVertical: 10, gap: 8 }}>
+      <Pressable onPress={() => setOpen(!open)} accessibilityRole="button" accessibilityState={{ expanded: open }} style={{ flexDirection: "row", justifyContent: "space-between", gap: 8 }}>
+        <Text style={{ color: t.ink, fontSize: 16, fontWeight: "700", flex: 1 }}>{q}</Text>
+        <Text style={{ color: t.muted, fontSize: 18 }}>{open ? "−" : "+"}</Text>
+      </Pressable>
+      {open ? <Markdown text={a} /> : null}
+    </View>
   );
 }
 

@@ -10,7 +10,7 @@ export const challengeCard = z.object({
   applications_close_at: z.number().nullable(), org,
 });
 export type ChallengeCard = z.infer<typeof challengeCard>;
-export const challengeList = z.object({ challenges: z.array(challengeCard) });
+export const challengeList = z.object({ challenges: z.array(challengeCard), next: z.string().nullable().optional() });
 
 export const question = z.object({
   id: z.string(), label: z.string(), type: z.enum(["short_text", "long_text", "choice", "url"]),
@@ -24,6 +24,12 @@ export const challengeDetail = z.object({
     applications_open_at: z.number().nullable(), pitch_due_at: z.number().nullable(),
     questions: z.array(question), results_published: z.number().optional(),
     criteria: z.array(z.object({ name: z.string(), description: z.string(), weight: z.number(), max_score: z.number() })).default([]),
+    // Day 5: full challenge pages. Optional so the app still reads an older server.
+    rules: z.string().default(""),
+    faq: z.array(z.object({ q: z.string(), a: z.string() })).default([]),
+    timeline: z.array(z.object({ label: z.string(), at: z.number() })).default([]),
+    sponsors: z.array(z.object({ name: z.string(), url: z.string().nullable().optional(), logo_url: z.string().nullable().optional() })).default([]),
+    judges: z.array(z.object({ name: z.string(), title: z.string() })).default([]),
   }),
 });
 export type ChallengeDetail = z.infer<typeof challengeDetail>["challenge"];

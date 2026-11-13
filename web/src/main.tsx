@@ -5,7 +5,8 @@ import { AuthProvider, SignedInOnly } from "./auth";
 import { Layout } from "./ui";
 import { Login, Verify } from "./pages/Auth";
 import { Profile } from "./pages/Profile";
-import { ChallengePublic, Explore, Home, OrgPublic } from "./pages/Public";
+import { ChallengePublic, Explore, Home, OrgPublic, Winners } from "./pages/Public";
+import { PersonPage } from "./pages/People";
 import { Join } from "./pages/Team";
 import { AdminJudging } from "./pages/Judging";
 import { AdminMessages } from "./pages/Messages";
@@ -48,6 +49,8 @@ function App() {
       <Routes>
         <Route path="/" element={<Home />} />
         <Route path="/challenges" element={<Explore />} />
+        <Route path="/challenges/winners" element={<Winners />} />
+        <Route path="/u/:handle" element={<PersonPage />} />
         <Route path="/login" element={<Login />} />
         <Route path="/auth/verify" element={<Verify />} />
         <Route path="/profile" element={<SignedInOnly><Profile /></SignedInOnly>} />

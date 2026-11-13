@@ -24,6 +24,32 @@ export function JudgeHome() {
   );
 }
 
+/** The name and title shown in the judges section of the public page, if the organiser turns it on. */
+function JudgeProfile({ slug, cslug }: { slug: string; cslug: string }) {
+  const [f, setF] = useState<{ display_name: string; title: string; shown: boolean } | null>(null);
+  const [msg, setMsg] = useState<{ kind: "ok" | "err"; text: string } | null>(null);
+  useEffect(() => { api<NonNullable<typeof f>>(`/judge/${slug}/${cslug}/profile`).then(setF).catch(() => {}); }, [slug, cslug]);
+  if (!f) return null;
+  async function save(e: React.FormEvent) {
+    e.preventDefault(); setMsg(null);
+    try { await api(`/judge/${slug}/${cslug}/profile`, { method: "PUT", json: { display_name: f!.display_name, title: f!.title } }); setMsg({ kind: "ok", text: "Saved" }); }
+    catch (err) { setMsg({ kind: "err", text: (err as Error).message }); }
+  }
+  return (
+    <NumSection n="03" title="On the challenge page">
+      <p className="muted" style={{ marginTop: 0, maxWidth: 640 }}>
+        Add the name and title you want participants to see. {f.shown ? "The organiser shows judges on the page, so this appears once you save it." : "The organiser has not turned on the judges section, so nothing shows yet."} Leave the name empty to stay off the page. Your email is never shown.
+      </p>
+      <form className="form" onSubmit={save} style={{ maxWidth: 480 }}>
+        <label htmlFor="jdn">Display name</label><input id="jdn" maxLength={80} value={f.display_name} onChange={(e) => setF({ ...f, display_name: e.target.value })} />
+        <label htmlFor="jdt">Title</label><input id="jdt" maxLength={120} placeholder="CTO, Example Ltd" value={f.title} onChange={(e) => setF({ ...f, title: e.target.value })} />
+        <div className="actions"><button type="submit">Save</button></div>
+        {msg && <Notice kind={msg.kind}>{msg.text}</Notice>}
+      </form>
+    </NumSection>
+  );
+}
+
 interface Crit { id: string; name: string; description: string; weight: number; max_score: number }
 
 export function JudgeChallenge() {
@@ -50,6 +76,7 @@ export function JudgeChallenge() {
             <span>{t.done ? <span className="tag moss">Scored</span> : t.partial ? <span className="tag gold">In progress</span> : <span className="tag sand">Not scored</span>} {!t.own_team && <Link className="btn small" to={`/judge/${slug}/${cslug}/teams/${t.id}`}>{t.done ? "Review" : "Score"}</Link>}</span></li>
         ))}</ul>
       </NumSection>
+      <JudgeProfile slug={slug!} cslug={cslug!} />
     </>
   );
 }

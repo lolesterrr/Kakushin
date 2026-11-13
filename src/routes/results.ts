@@ -63,7 +63,7 @@ orgResults.post("/:slug/challenges/:cslug/results/publish", async (c) => {
   const now = Date.now(), db = c.env.DB;
   // Each of these is a single statement, so a big event stays well inside the free query limit.
   await db.batch([
-    db.prepare("UPDATE challenges SET results_published = 1, status = 'completed' WHERE id = ?").bind(x.ch.id),
+    db.prepare("UPDATE challenges SET results_published = 1, status = 'completed', results_published_at = COALESCE(results_published_at, ?) WHERE id = ?").bind(now, x.ch.id),
     db.prepare(
       `INSERT OR IGNORE INTO certificates (id, code, user_id, challenge_id, team_id, kind, title, issued_at)
        SELECT lower(hex(randomblob(12))),

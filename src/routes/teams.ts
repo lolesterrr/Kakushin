@@ -10,7 +10,7 @@ interface ChRow {
   id: string; org_id: string; slug: string; title: string; status: string; team_min: number; team_max: number;
   applications_open_at: number | null; applications_close_at: number | null; questions: string;
 }
-interface TeamRow { id: string; challenge_id: string; name: string; invite_code: string; lead_user_id: string; status: string; placement: number | null; created_at: number }
+interface TeamRow { id: string; challenge_id: string; name: string; invite_code: string; lead_user_id: string; status: string; placement: number | null; created_at: number; show_project?: number }
 
 const CODE_CHARS = "ABCDEFGHJKMNPQRSTUVWXYZ23456789";
 const newCode = () => [...crypto.getRandomValues(new Uint8Array(8))].map((b) => CODE_CHARS[b % CODE_CHARS.length]).join("");
@@ -46,7 +46,7 @@ async function members(c: { env: AppEnv["Bindings"] }, teamId: string) {
 async function teamOut(c: { env: AppEnv["Bindings"] }, t: TeamRow, viewerId: string) {
   const app = await c.env.DB.prepare("SELECT answers, submitted_at FROM applications WHERE team_id = ?").bind(t.id).first<{ answers: string; submitted_at: number }>();
   return {
-    id: t.id, name: t.name, status: t.status, placement: t.placement, invite_code: t.invite_code, is_lead: t.lead_user_id === viewerId,
+    id: t.id, name: t.name, status: t.status, placement: t.placement, invite_code: t.invite_code, is_lead: t.lead_user_id === viewerId, show_project: !!t.show_project,
     members: (await members(c, t.id)).map((m) => ({ id: m.id, name: m.name || m.email.split("@")[0], is_lead: m.id === t.lead_user_id })),
     application: app ? { answers: JSON.parse(app.answers) as Record<string, string>, submitted_at: app.submitted_at } : null,
   };
@@ -96,6 +96,8 @@ orgTeams.post("/:slug/challenges/:cslug/team", async (c) => {
     c.env.DB.prepare("INSERT INTO teams (id, challenge_id, name, invite_code, lead_user_id, created_at) VALUES (?, ?, ?, ?, ?, ?)")
       .bind(id, x.ch.id, parsed.data.name, newCode(), user.id, Date.now()),
     c.env.DB.prepare("INSERT INTO team_members (team_id, user_id, joined_at) VALUES (?, ?, ?)").bind(id, user.id, Date.now()),
+    // In a team now, so no longer looking for one.
+    c.env.DB.prepare("DELETE FROM team_seekers WHERE challenge_id = ? AND user_id = ?").bind(x.ch.id, user.id),
   ]);
   return c.json({ ok: true }, 201);
 });
@@ -154,6 +156,7 @@ teams.post("/join", async (c) => {
     if (await myTeamFor(c, ch.id, user.id)) return c.json({ error: "You are already in a team for this challenge" }, 409);
     return c.json({ error: `This team is full (max ${ch.team_max})` }, 409);
   }
+  await c.env.DB.prepare("DELETE FROM team_seekers WHERE challenge_id = ? AND user_id = ?").bind(ch.id, user.id).run();
   const org = await c.env.DB.prepare("SELECT slug FROM organizations WHERE id = ?").bind(ch.org_id).first<{ slug: string }>();
   return c.json({ ok: true, org: org?.slug, challenge: ch.slug });
 });
