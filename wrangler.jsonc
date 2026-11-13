@@ -35,10 +35,11 @@
     "consumers": [{ "queue": "kakushin-outbox", "max_batch_size": 10, "max_batch_timeout": 5, "max_retries": 5 }]
   },
   "vars": {
-    "APP_URL": "https://kakushin.dpdns.org",
-    "EMAIL_FROM": "Kakushin <hello@kakushin.dpdns.org>",
+    "APP_URL": "https://kakushinhub.site",
+    "EMAIL_FROM": "Kakushin <hello@kakushinhub.site>",
     // Turnstile is on once the TURNSTILE_SECRET secret also exists. The site key is public.
-    "TURNSTILE_SITE_KEY": "0x4AAAAAAF-y0jx3QbNi20hH",
-    "TURNSTILE_HOSTNAMES": "kakushin.dpdns.org"
+    "TURNSTILE_SITE_KEY": "0x4AAAAAAF_SKqOjWYQqUmrJ",
+    // The same widget covers both addresses, so the old one keeps working while people move over.
+    "TURNSTILE_HOSTNAMES": "kakushinhub.site,kakushin.dpdns.org"
   }
 }
