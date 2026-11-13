@@ -128,10 +128,12 @@ export function JudgeTeam() {
             {p.has_deck && <li><span>Pitch deck</span><a className="btn small" href={`/api/decks/${d.team.id}`} target="_blank" rel="noopener noreferrer">Open PDF</a></li>}
             {p.video_url && <li><span>Video</span><a href={p.video_url} target="_blank" rel="noopener noreferrer">{p.video_url}</a></li>}
             {p.demo_url && <li><span>Demo</span><a href={p.demo_url} target="_blank" rel="noopener noreferrer">{p.demo_url}</a></li>}
+            {p.repo_url && <li><span>Code</span><a href={p.repo_url} target="_blank" rel="noopener noreferrer">{p.repo_url}</a></li>}
             {p.notes && <li><span style={{ whiteSpace: "pre-wrap" }}>{p.notes}</span></li>}
           </ul>
         )}
       </NumSection>
+      {p?.repo_url && <RepoStats path={`/judge/${slug}/${cslug}/teams/${teamId}/repo`} />}
       <NumSection n="02" title="Score">
         {!d.scoring_open && <Notice kind="err">Scoring is not open yet. The organiser starts judging.</Notice>}
         <form onSubmit={save} className="form">
@@ -158,5 +160,33 @@ export function JudgeTeam() {
         </form>
       </NumSection>
     </>
+  );
+}
+
+interface Repo {
+  status: string; blind?: boolean; fetched_at?: number; not_on_team?: number;
+  contributors?: { login: string | null; member: string | null; on_team: boolean; commits: number }[];
+  no_commits?: { name: string; linked: boolean }[] | number;
+}
+
+/** Who pushed code to the team's repo, from GitHub (refreshed at most once an hour). */
+export function RepoStats({ path }: { path: string }) {
+  const [r, setR] = useState<Repo | null>(null);
+  useEffect(() => { api<Repo>(path).then(setR).catch(() => setR({ status: "unavailable" })); }, [path]);
+  if (!r) return <div className="section" style={{ paddingTop: 0 }}><p className="muted">Checking the repo on GitHub...</p></div>;
+  const why: Record<string, string> = { not_found: "GitHub cannot see this repo. It may be private or renamed.", rate_limited: "GitHub is busy. Try again in a few minutes.", unavailable: "GitHub could not be reached. Try again later." };
+  if (r.status !== "ok") return <div className="section" style={{ paddingTop: 0 }}><p className="muted">{why[r.status] ?? ""}</p></div>;
+  const list = r.contributors ?? [];
+  const missing = r.no_commits;
+  return (
+    <div className="section" style={{ paddingTop: 0 }}>
+      <p className="label" style={{ marginTop: 0 }}>Who pushed code</p>
+      {list.length === 0 ? <p className="muted">No commits yet.</p> : (
+        <p>{list.map((c, i) => <span key={i}>{i ? ", " : ""}<b>{r.blind ? (c.on_team ? "Team member" : "Not on the team") : c.member ?? c.login}</b> {c.commits}{!r.blind && !c.member ? " (not on the team)" : ""}</span>)}</p>
+      )}
+      {typeof missing === "number" ? (missing > 0 && <p className="muted">{missing} {missing === 1 ? "member has" : "members have"} no commits matched.</p>)
+        : missing && missing.length > 0 && <p className="muted">No commits matched for {missing.map((m) => m.linked ? m.name : `${m.name} (no GitHub link on their profile)`).join(", ")}.</p>}
+      <p className="muted" style={{ fontSize: 13 }}>Commits on the default branch, matched by the GitHub link on each member's profile.</p>
+    </div>
   );
 }

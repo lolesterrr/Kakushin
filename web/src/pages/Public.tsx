@@ -3,6 +3,7 @@ import { Link, useParams } from "react-router-dom";
 import { api, fmtDate } from "../api";
 import { useAuth } from "../auth";
 import { NextStep, TeamPanel, useMyTeam, type Question } from "./Team";
+import { CheckinPass, type Block } from "./Live";
 import { FollowButton } from "./Inbox";
 import { PublicResults } from "./Results";
 import { Banner, ChallengeCard, type ChallengeCardData, DeadlineStamp, Logo, Notice, Stamp, StatusPill, TopicPills } from "../ui";
@@ -233,11 +234,12 @@ interface ChallengeFull extends ChallengeCardData {
   criteria?: { name: string; description: string; weight: number; max_score: number }[];
   rules?: string; faq?: { q: string; a: string }[]; timeline?: { label: string; at: number }[];
   sponsors?: { name: string; url: string | null; logo_url: string | null }[]; judges?: { name: string; title: string }[];
+  agenda?: Block[]; checkin_enabled?: boolean;
 }
 
 /** Application and pitch dates plus the organiser's own, in order. */
 function timelineOf(c: ChallengeFull) {
-  const rows: { label: string; at: number }[] = [...(c.timeline ?? [])];
+  const rows: { label: string; at: number; end?: number }[] = [...(c.timeline ?? []), ...(c.agenda ?? []).map((b) => ({ label: b.label, at: b.starts_at, end: b.ends_at }))];
   if (c.applications_open_at) rows.push({ label: "Applications open", at: c.applications_open_at });
   if (c.applications_close_at) rows.push({ label: "Applications close", at: c.applications_close_at });
   if (c.pitch_due_at) rows.push({ label: "Pitches due", at: c.pitch_due_at });
@@ -326,7 +328,8 @@ export function ChallengePublic() {
       {tl.length > 0 && (
         <div className="section" id="timeline">
           <p className="label" style={{ marginTop: 0 }}>Timeline</p>
-          <ol className="timeline">{tl.map((r, i) => <li key={i} className={r.at < Date.now() ? "past" : ""}><time dateTime={new Date(r.at).toISOString()}>{when(r.at)}</time><b>{r.label}</b></li>)}</ol>
+          <ol className="timeline">{tl.map((r, i) => <li key={i} className={r.at < Date.now() ? "past" : ""}><time dateTime={new Date(r.at).toISOString()}>{when(r.at)}{r.end ? ` to ${new Date(r.end).toLocaleTimeString(undefined, { hour: "2-digit", minute: "2-digit" })}` : ""}</time><b>{r.label}</b></li>)}</ol>
+          {(c.agenda?.length ?? 0) > 0 && <div className="actions"><Link className="btn ghost" to={`/o/${c.org.slug}/c/${c.slug}/live`}>Open the live page</Link></div>}
         </div>
       )}
       {c.prizes && <div className="section" id="prizes"><p className="label" style={{ marginTop: 0 }}>Prizes</p><Markdown text={c.prizes} /></div>}
@@ -353,6 +356,7 @@ export function ChallengePublic() {
       )}
       {c.criteria && c.criteria.length > 0 && <Rubric criteria={c.criteria} />}
       {c.status !== "draft" && <WhosComing orgSlug={c.org.slug} cslug={c.slug} open={isOpen} teamMax={c.team_max} team={team} />}
+      {team && c.checkin_enabled && team.status !== "rejected" && <CheckinPass orgSlug={c.org.slug} cslug={c.slug} />}
       {c.status !== "draft" && <div id="apply"><TeamPanel orgSlug={c.org.slug} cslug={c.slug} challenge={c} team={team} reload={reload} /></div>}
       {team && ["finalist", "winner"].includes(team.status) && <ShowProject team={team} onChange={reload} />}
     </>

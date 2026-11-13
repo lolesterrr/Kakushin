@@ -19,6 +19,7 @@ import { AdminOverview } from "./pages/Overview";
 import { AdminApplications } from "./pages/Applications";
 import { AdminChallenge, AdminHome, AdminOrg } from "./pages/Admin";
 import { Credits } from "./pages/Credits";
+import { AdminLive, LivePage } from "./pages/Live";
 import { Privacy, Terms } from "./pages/Legal";
 import "./styles.css";
 
@@ -56,6 +57,8 @@ function App() {
         <Route path="/profile" element={<SignedInOnly><Profile /></SignedInOnly>} />
         <Route path="/o/:slug" element={<OrgPublic />} />
         <Route path="/o/:slug/c/:cslug" element={<ChallengePublic />} />
+        <Route path="/o/:slug/c/:cslug/live" element={<LivePage />} />
+        <Route path="/admin/o/:slug/c/:cslug/live" element={<SignedInOnly><AdminLive /></SignedInOnly>} />
         <Route path="/join/:code" element={<Join />} />
         <Route path="/admin/o/:slug/c/:cslug/applications" element={<SignedInOnly><AdminApplications /></SignedInOnly>} />
         <Route path="/admin" element={<SignedInOnly><AdminHome /></SignedInOnly>} />

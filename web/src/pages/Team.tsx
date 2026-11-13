@@ -233,17 +233,17 @@ export function Join() {
   );
 }
 
-interface PitchData { has_deck: boolean; deck_name: string | null; video_url: string; demo_url: string; notes: string }
+interface PitchData { has_deck: boolean; deck_name: string | null; video_url: string; demo_url: string; repo_url?: string; notes: string }
 
 export function PitchSection({ team, dueAt }: { team: TeamData; dueAt: number | null | undefined }) {
   const [pitch, setPitch] = useState<PitchData | null>(null);
-  const [form, setForm] = useState({ video_url: "", demo_url: "", notes: "" });
+  const [form, setForm] = useState({ video_url: "", demo_url: "", repo_url: "", notes: "" });
   const [msg, setMsg] = useState<Msg>(null);
   const [busy, setBusy] = useState(false);
   const late = !!dueAt && Date.now() > dueAt;
   async function load() {
     const r = await api<{ pitch: PitchData | null }>(`/teams/${team.id}/pitch`);
-    setPitch(r.pitch); if (r.pitch) setForm({ video_url: r.pitch.video_url, demo_url: r.pitch.demo_url, notes: r.pitch.notes });
+    setPitch(r.pitch); if (r.pitch) setForm({ video_url: r.pitch.video_url, demo_url: r.pitch.demo_url, repo_url: r.pitch.repo_url ?? "", notes: r.pitch.notes });
   }
   useEffect(() => { void load().catch(() => {}); }, [team.id]);
   async function save(e: React.FormEvent) {
@@ -270,6 +270,8 @@ export function PitchSection({ team, dueAt }: { team: TeamData; dueAt: number | 
         {pitch?.has_deck && <p style={{ margin: "8px 0 0", fontSize: 14 }}>Uploaded: <a href={`/api/decks/${team.id}`} target="_blank" rel="noopener noreferrer">{pitch.deck_name ?? "deck.pdf"}</a></p>}
         <label htmlFor="pv">Video link</label><input id="pv" type="url" placeholder="https://" disabled={late} value={form.video_url} onChange={set("video_url")} />
         <label htmlFor="pm">Demo link</label><input id="pm" type="url" placeholder="https://" disabled={late} value={form.demo_url} onChange={set("demo_url")} />
+        <label htmlFor="pr">GitHub repo (public)</label><input id="pr" type="url" placeholder="https://github.com/your-team/project" disabled={late} value={form.repo_url} onChange={set("repo_url")} />
+        <p className="muted" style={{ fontSize: 13, margin: "4px 0 0" }}>Judges see who pushed code, matched by the GitHub link on each member's profile. The link itself shows your GitHub name, even in blind review.</p>
         <label htmlFor="pn">Notes for the judges</label><textarea id="pn" rows={4} maxLength={2000} disabled={late} value={form.notes} onChange={set("notes")} />
         {!late && <div className="actions"><button type="submit">Save pitch</button></div>}
         {msg && <Notice kind={msg.kind}>{msg.text}</Notice>}
