@@ -1,6 +1,7 @@
 import { Hono } from "hono";
 import { z } from "zod";
 import type { AppEnv } from "../types";
+import { clearSessionCookie } from "../lib/session";
 
 export const me = new Hono<AppEnv>();
 
@@ -44,5 +45,76 @@ me.put("/", async (c) => {
     p.gender !== undefined ? 1 : 0, p.gender ?? null,
     u.id,
   ).run();
+  return c.json({ ok: true });
+});
+
+/**
+ * Deletes the signed-in account and everything that is only theirs: profile, sessions, team places, scores they gave,
+ * certificates, inbox, follows, devices and invites to their email. Teams they lead pass to the teammate who joined
+ * first; a team with nobody else in it goes. An organisation they own passes to another admin; one with no other admin
+ * goes too if it has only drafts, and otherwise blocks the delete so live challenges are not left without anyone.
+ */
+me.delete("/", async (c) => {
+  const u = c.get("user");
+  if (!u) return c.json({ error: "Not signed in" }, 401);
+  const parsed = z.object({ confirm: z.string().trim().toLowerCase() }).safeParse(await c.req.json().catch(() => null));
+  if (!parsed.success || parsed.data.confirm !== u.email.toLowerCase()) return c.json({ error: "Type your email address to confirm" }, 400);
+  if (u.is_platform_admin) return c.json({ error: "Platform admins cannot delete their account here. Ask the Kakushin team to remove your admin role first." }, 409);
+  const db = c.env.DB;
+
+  // Organisations they own.
+  const { results: owned } = await db.prepare(
+    `SELECT o.id, o.name, o.logo_key, o.logo_print_key,
+       (SELECT m2.user_id FROM memberships m2 JOIN users u2 ON u2.id = m2.user_id WHERE m2.org_id = o.id AND m2.user_id != ?1 AND u2.suspended = 0 ORDER BY u2.email LIMIT 1) AS heir,
+       (SELECT COUNT(*) FROM challenges ch WHERE ch.org_id = o.id AND ch.status != 'draft') AS live
+     FROM memberships m JOIN organizations o ON o.id = m.org_id WHERE m.user_id = ?1 AND m.role = 'owner'`,
+  ).bind(u.id).all<{ id: string; name: string; logo_key: string | null; logo_print_key: string | null; heir: string | null; live: number }>();
+  const stuck = owned.filter((o) => !o.heir && o.live > 0);
+  if (stuck.length) {
+    return c.json({ error: `You are the only admin of ${stuck.map((o) => o.name).join(", ")}, which has public challenges. Add another admin in the organiser area first, so someone can still run them, then delete your account.` }, 409);
+  }
+  const orgsToDelete = owned.filter((o) => !o.heir);
+  const { results: covers } = orgsToDelete.length
+    ? await db.prepare(`SELECT cover_key FROM challenges WHERE cover_key IS NOT NULL AND org_id IN (${orgsToDelete.map(() => "?").join(",")})`).bind(...orgsToDelete.map((o) => o.id)).all<{ cover_key: string }>()
+    : { results: [] as { cover_key: string }[] };
+
+  // Teams they lead.
+  const { results: led } = await db.prepare(
+    `SELECT t.id, (SELECT m.user_id FROM team_members m WHERE m.team_id = t.id AND m.user_id != ?1 ORDER BY m.joined_at LIMIT 1) AS heir,
+       (SELECT s.deck_key FROM submissions s WHERE s.team_id = t.id) AS deck_key
+     FROM teams t WHERE t.lead_user_id = ?1`,
+  ).bind(u.id).all<{ id: string; heir: string | null; deck_key: string | null }>();
+  const solo = led.filter((t) => !t.heir);
+
+  const files = [
+    (await db.prepare("SELECT avatar_key FROM users WHERE id = ?").bind(u.id).first<{ avatar_key: string | null }>())?.avatar_key,
+    ...(await db.prepare("SELECT pdf_key FROM certificates WHERE user_id = ? AND pdf_key IS NOT NULL").bind(u.id).all<{ pdf_key: string }>()).results.map((r) => r.pdf_key),
+    ...solo.map((t) => t.deck_key), ...orgsToDelete.flatMap((o) => [o.logo_key, o.logo_print_key]), ...covers.map((r) => r.cover_key),
+  ].filter((k): k is string => !!k);
+
+  const email = u.email.toLowerCase();
+  const byTeam = (table: string, t: string) => db.prepare(`DELETE FROM ${table} WHERE team_id = ?`).bind(t);
+  await db.batch([
+    ...owned.filter((o) => o.heir).map((o) => db.prepare("UPDATE memberships SET role = 'owner' WHERE org_id = ? AND user_id = ?").bind(o.id, o.heir)),
+    ...orgsToDelete.flatMap((o) => [
+      ...["criteria", "judges"].map((table) => db.prepare(`DELETE FROM ${table} WHERE challenge_id IN (SELECT id FROM challenges WHERE org_id = ?)`).bind(o.id)),
+      ...["challenges", "memberships", "follows", "announcements", "org_invites"].map((table) => db.prepare(`DELETE FROM ${table} WHERE org_id = ?`).bind(o.id)),
+      db.prepare("DELETE FROM organizations WHERE id = ?").bind(o.id),
+    ]),
+    ...led.filter((t) => t.heir).map((t) => db.prepare("UPDATE teams SET lead_user_id = ? WHERE id = ?").bind(t.heir, t.id)),
+    ...solo.flatMap((t) => [byTeam("scores", t.id), byTeam("certificates", t.id), byTeam("submissions", t.id), byTeam("applications", t.id), byTeam("team_members", t.id),
+      db.prepare("DELETE FROM teams WHERE id = ?").bind(t.id)]),
+    // Children first, so this works whether or not the database enforces ON DELETE CASCADE.
+    ...["sessions", "memberships", "team_members", "certificates", "notifications", "follows", "interests", "push_tokens", "notification_settings"]
+      .map((table) => db.prepare(`DELETE FROM ${table} WHERE user_id = ?`).bind(u.id)),
+    db.prepare("DELETE FROM scores WHERE judge_user_id = ?").bind(u.id),
+    db.prepare("DELETE FROM judges WHERE lower(email) = ?").bind(email),
+    db.prepare("DELETE FROM org_invites WHERE lower(email) = ?").bind(email),
+    db.prepare("DELETE FROM login_tokens WHERE lower(email) = ?").bind(email),
+    db.prepare("DELETE FROM code_failures WHERE lower(email) = ?").bind(email),
+    db.prepare("DELETE FROM users WHERE id = ?").bind(u.id),
+  ]);
+  if (files.length) c.executionCtx.waitUntil(c.env.FILES.delete(files).catch((e) => console.error(`account file clean-up failed: ${e instanceof Error ? e.message : e}`)));
+  clearSessionCookie(c);
   return c.json({ ok: true });
 });

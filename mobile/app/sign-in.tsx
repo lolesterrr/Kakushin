@@ -1,5 +1,7 @@
 import React, { useEffect, useState } from "react";
 import { Text, View } from "react-native";
+import * as WebBrowser from "expo-web-browser";
+import { API_URL } from "../lib/config";
 import { Redirect } from "expo-router";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useAuth } from "../lib/auth";
@@ -65,6 +67,11 @@ export default function SignIn() {
             {needsCheck ? <Turnstile key={check} onToken={setToken} /> : null}
             {err ? <Notice kind="err">{err}</Notice> : null}
             <Button title="Email me a code" onPress={send} busy={busy} disabled={!email.includes("@") || (needsCheck && !token)} />
+            <Text style={{ color: t.muted, fontSize: 13, lineHeight: 19 }}>
+              By continuing you agree to the{" "}
+              <Text accessibilityRole="link" style={{ textDecorationLine: "underline" }} onPress={() => void WebBrowser.openBrowserAsync(`${API_URL}/terms`)}>terms of use</Text> and the{" "}
+              <Text accessibilityRole="link" style={{ textDecorationLine: "underline" }} onPress={() => void WebBrowser.openBrowserAsync(`${API_URL}/privacy`)}>privacy policy</Text>.
+            </Text>
           </>
         ) : (
           <>

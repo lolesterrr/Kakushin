@@ -83,6 +83,7 @@ export function Login() {
             <button type="button" className="ghost" disabled={state === "sending" || !email || (!!siteKey && !captcha)} onClick={() => void send("code")}>Email me a code instead</button>
           </div>
           {state === "error" && <Notice kind="err">{msg}</Notice>}
+          <p className="muted" style={{ fontSize: 13 }}>By continuing you agree to the <Link to="/terms">terms of use</Link> and the <Link to="/privacy">privacy policy</Link>.</p>
         </form>
       )}
     </div>
