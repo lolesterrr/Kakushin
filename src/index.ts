@@ -15,6 +15,7 @@ import { people, teamFinder } from "./routes/people";
 import { readToken, userFromToken } from "./lib/session";
 import { withMeta } from "./lib/meta";
 import { runHourly } from "./lib/jobs";
+import { LIVE_CRON, runLive } from "./lib/live";
 import { handleOutbox, type OutboxMessage } from "./lib/outbox";
 import type { Env } from "./types";
 
@@ -62,7 +63,8 @@ app.onError((err, c) => {
 export default {
   fetch: app.fetch,
   // Hourly: close applications, reminders, clean-up and push retries (src/lib/jobs.ts).
-  scheduled(_event, env, ctx) { ctx.waitUntil(runHourly(env)); },
+  // Every 5 minutes: agenda and pitch cutoff pushes for live events (src/lib/live.ts).
+  scheduled(event, env, ctx) { ctx.waitUntil(event.cron === LIVE_CRON ? runLive(env) : runHourly(env)); },
   // Results emails and pushes, a few at a time (src/lib/outbox.ts).
   queue: (batch, env) => handleOutbox(batch, env),
 } satisfies ExportedHandler<Env, OutboxMessage>;

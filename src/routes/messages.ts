@@ -18,7 +18,7 @@ export const AUDIENCES = ["applied", "shortlisted", "finalists", "not_selected",
 export type Audience = (typeof AUDIENCES)[number];
 
 /** Team statuses in each audience. "applied" is everyone who sent an application, whatever happened to it since. */
-const STATUSES: Record<Exclude<Audience, "team">, string[]> = {
+export const STATUSES: Record<Exclude<Audience, "team">, string[]> = {
   applied: ["applied", "shortlisted", "rejected", "finalist", "winner"],
   shortlisted: ["shortlisted"],
   finalists: ["finalist", "winner"],

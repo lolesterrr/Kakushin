@@ -27,7 +27,9 @@
     { "name": "AUTH_VERIFY_LIMIT", "namespace_id": "2002", "simple": { "limit": 30, "period": 60 } }
   ],
   // Hourly job: close applications past their deadline, reminders, clean-up, push retries (src/lib/jobs.ts).
-  "triggers": { "crons": ["0 * * * *"] },
+  // Every 5 minutes: live-mode pushes when an agenda block starts or a pitch cutoff is near (src/lib/live.ts).
+  // It only does work in those minutes. The second entry must match LIVE_CRON in src/lib/live.ts.
+  "triggers": { "crons": ["0 * * * *", "*/5 * * * *"] },
   // Results emails and pushes go through this queue so they reach everyone (src/lib/outbox.ts).
   // Create it once per account: npx wrangler queues create kakushin-outbox
   "queues": {

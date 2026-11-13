@@ -7,6 +7,7 @@ import { sendEmail } from "../lib/email";
 import { calibration, leaderboard, type Criterion, type ScoreRow } from "../lib/scoring";
 import { autoAssign, judgeSees } from "../lib/assign";
 import { pushLater } from "../lib/push";
+import { loginFromProfile, matchContributors, parseRepo, repoStats } from "../lib/github";
 
 /** Organiser side: criteria, judges, leaderboard. Mounted under /api/orgs. */
 export const orgJudging = new Hono<AppEnv>();
@@ -349,7 +350,7 @@ judge.get("/:slug/:cslug/teams/:teamId", async (c) => {
   const x = await judgeLoad(c); if ("err" in x) return x.err;
   const t = await judgeTeam(c, x);
   if (!t) return c.json({ error: "Not found" }, 404);
-  const p = await c.env.DB.prepare("SELECT deck_key, deck_name, video_url, demo_url, notes FROM submissions WHERE team_id = ?").bind(t.id).first<any>();
+  const p = await c.env.DB.prepare("SELECT deck_key, deck_name, video_url, demo_url, repo_url, notes FROM submissions WHERE team_id = ?").bind(t.id).first<any>();
   const blind = !!x.ch.blind_judging;
   // Blind review: the query is not even run, so names and institutions never leave the server.
   const members = blind ? [] : (await c.env.DB.prepare("SELECT u.name, u.email, u.institution FROM team_members m JOIN users u ON u.id = m.user_id WHERE m.team_id = ? ORDER BY m.joined_at").bind(t.id).all<{ name: string | null; email: string; institution: string | null }>()).results;
@@ -358,8 +359,34 @@ judge.get("/:slug/:cslug/teams/:teamId", async (c) => {
   return c.json({
     team: { id: t.id, name: t.name, members: members.map((m) => ({ name: m.name || m.email.split("@")[0], institution: m.institution })) },
     blind,
-    pitch: p ? { has_deck: !!p.deck_key, deck_name: p.deck_name, video_url: p.video_url, demo_url: p.demo_url, notes: p.notes } : null,
+    pitch: p ? { has_deck: !!p.deck_key, deck_name: p.deck_name, video_url: p.video_url, demo_url: p.demo_url, repo_url: p.repo_url ?? "", notes: p.notes } : null,
     scores: mine, own_team: own, scoring_open: x.ch.status === "judging", criteria: await criteriaOf(c, x.ch.id),
+  });
+});
+
+/**
+ * Who pushed code to the team's GitHub repo: contributors and commit counts, matched to members by the GitHub link on
+ * their profile. Fetched on its own so a slow GitHub never holds up the pitch. In blind review no names or logins go out.
+ */
+judge.get("/:slug/:cslug/teams/:teamId/repo", async (c) => {
+  const x = await judgeLoad(c); if ("err" in x) return x.err;
+  const t = await judgeTeam(c, x);
+  if (!t) return c.json({ error: "Not found" }, 404);
+  const row = await c.env.DB.prepare("SELECT repo_url FROM submissions WHERE team_id = ?").bind(t.id).first<{ repo_url: string }>();
+  const repo = row?.repo_url ? parseRepo(row.repo_url) : null;
+  if (!repo) return c.json({ repo_url: null, status: "none" });
+  const stats = await repoStats(c.env, repo);
+  if (!stats.ok) return c.json({ repo_url: row!.repo_url, status: stats.reason, fetched_at: stats.fetched_at });
+  const { results: members } = await c.env.DB.prepare("SELECT u.name, u.email, u.links FROM team_members m JOIN users u ON u.id = m.user_id WHERE m.team_id = ? ORDER BY m.joined_at")
+    .bind(t.id).all<{ name: string | null; email: string; links: string | null }>();
+  const links = (raw: string | null) => { try { return JSON.parse(raw ?? "{}") as Record<string, string>; } catch { return {}; } };
+  const m = matchContributors(stats.contributors, members.map((u) => ({ name: u.name || u.email.split("@")[0]!, login: loginFromProfile(links(u.links).github) })));
+  const blind = !!x.ch.blind_judging;
+  return c.json({
+    repo_url: row!.repo_url, status: "ok", fetched_at: stats.fetched_at, blind,
+    contributors: m.contributors.map((r) => (blind ? { login: null, member: null, on_team: !!r.member, commits: r.commits } : { ...r, on_team: !!r.member })),
+    not_on_team: m.not_on_team,
+    no_commits: blind ? m.no_commits.length : m.no_commits,
   });
 });
 
