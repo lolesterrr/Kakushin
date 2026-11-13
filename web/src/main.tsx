@@ -8,6 +8,7 @@ import { Profile } from "./pages/Profile";
 import { ChallengePublic, Explore, Home, OrgPublic } from "./pages/Public";
 import { Join } from "./pages/Team";
 import { AdminJudging } from "./pages/Judging";
+import { AdminMessages } from "./pages/Messages";
 import { AdminResults } from "./pages/Results";
 import { Verify as VerifyCert } from "./pages/Certificates";
 import { Inbox } from "./pages/Inbox";
@@ -58,6 +59,7 @@ function App() {
         <Route path="/admin/o/:slug" element={<SignedInOnly><AdminOrg /></SignedInOnly>} />
         <Route path="/admin/o/:slug/c/:cslug" element={<SignedInOnly><AdminOverview /></SignedInOnly>} />
         <Route path="/admin/o/:slug/c/:cslug/judging" element={<SignedInOnly><AdminJudging /></SignedInOnly>} />
+        <Route path="/admin/o/:slug/c/:cslug/messages" element={<SignedInOnly><AdminMessages /></SignedInOnly>} />
         <Route path="/admin/o/:slug/c/:cslug/results" element={<SignedInOnly><AdminResults /></SignedInOnly>} />
         <Route path="/verify/:code" element={<VerifyCert />} />
         <Route path="/credits" element={<Credits />} />

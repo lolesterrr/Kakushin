@@ -38,3 +38,32 @@ describe("scoring", () => {
     expect(lb[1]!.total).toBeNull();
   });
 });
+
+import { calibration, normalisedTotals } from "./scoring";
+
+describe("normalised scores", () => {
+  const row = (team: string, a: number | null, b: number | null) => ({ team_id: team, judges: [{ judge: "a", total: a }, { judge: "b", total: b }] });
+  it("removes the advantage of drawing a generous judge", () => {
+    // Judge a gives everything 30 more than judge b. Team x drew only a, team y only b, at the same relative standing.
+    const rows = [row("x", 90, null), row("y", null, 60), row("p", 80, 50), row("q", 70, 40)];
+    const n = normalisedTotals(rows);
+    expect(n.get("x")).toBeCloseTo(n.get("y")!, 5);
+    expect(n.get("p")! > n.get("q")!).toBe(true);
+  });
+  it("uses the raw total for a judge with one team", () => {
+    expect(normalisedTotals([row("x", 70, null)]).get("x")).toBe(70);
+  });
+});
+
+describe("calibration", () => {
+  it("flags a judge far from the panel", () => {
+    const rows = [
+      { judges: [{ judge: "a", total: 90 }, { judge: "b", total: 60 }, { judge: "c", total: 62 }] },
+      { judges: [{ judge: "a", total: 85 }, { judge: "b", total: 55 }, { judge: "c", total: 57 }] },
+    ];
+    const cal = calibration(rows, ["a", "b", "c"]);
+    expect(cal.find((x) => x.judge === "a")!.flagged).toBe(true);
+    expect(cal.find((x) => x.judge === "c")!.flagged).toBe(false);
+    expect(cal.find((x) => x.judge === "a")!.teams).toBe(2);
+  });
+});
