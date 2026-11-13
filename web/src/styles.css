@@ -24,6 +24,8 @@ a { color: inherit; }
 .bar { max-width: 1120px; margin: 0 auto; padding: 0 16px; height: 56px; display: flex; align-items: center; justify-content: space-between; border-left: 1px solid var(--line); border-right: 1px solid var(--line); }
 .brand { font-family: var(--font); font-weight: 700; font-size: 20px; letter-spacing: -0.01em; text-decoration: none; display: flex; align-items: center; gap: 8px; }
 .sun { width: 12px; height: 12px; border-radius: 50%; background: var(--red); display: inline-block; }
+/* The logo dot blinks like a red light. Steady for people who ask for less motion. */
+@media (prefers-reduced-motion: no-preference) { .sun { animation: redlight 1.2s ease-in-out infinite; } @keyframes redlight { 0%, 45% { opacity: 1; box-shadow: 0 0 8px 2px var(--red); } 55%, 95% { opacity: .2; box-shadow: none; } 100% { opacity: 1; box-shadow: 0 0 8px 2px var(--red); } } }
 .bar nav { display: flex; gap: 20px; align-items: center; font-size: 14px; }
 .bar nav a { text-decoration: none; color: var(--muted); padding: 6px 0; border-bottom: 2px solid transparent; }
 .bar nav a.active { color: var(--text); border-bottom-color: var(--red); }
