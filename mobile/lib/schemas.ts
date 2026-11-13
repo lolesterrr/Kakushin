@@ -29,7 +29,7 @@ export const challengeDetail = z.object({
 export type ChallengeDetail = z.infer<typeof challengeDetail>["challenge"];
 
 export const team = z.object({
-  id: z.string(), name: z.string(), status: z.string(), invite_code: z.string(), is_lead: z.boolean(),
+  id: z.string(), name: z.string(), status: z.string(), placement: z.number().nullable().optional(), invite_code: z.string(), is_lead: z.boolean(),
   members: z.array(z.object({ id: z.string(), name: z.string(), is_lead: z.boolean() })),
   application: z.object({ answers: z.record(z.string()), submitted_at: z.number() }).nullable(),
 });
@@ -37,7 +37,11 @@ export type Team = z.infer<typeof team>;
 export const teamResponse = z.object({ team: team.nullable() });
 
 export const myTeams = z.object({
-  teams: z.array(z.object({ id: z.string(), name: z.string(), status: z.string(), title: z.string(), cslug: z.string(), oslug: z.string(), oname: z.string() })),
+  teams: z.array(z.object({
+    id: z.string(), name: z.string(), status: z.string(), title: z.string(), cslug: z.string(), oslug: z.string(), oname: z.string(),
+    placement: z.number().nullable().optional(), cstatus: z.string().optional(), logo_url: z.string().nullable().optional(),
+    applications_close_at: z.number().nullable().optional(), pitch_due_at: z.number().nullable().optional(), has_pitch: z.boolean().optional(),
+  })),
 });
 
 export const me = z.object({
@@ -49,13 +53,15 @@ export const me = z.object({
 export type Me = NonNullable<z.infer<typeof me>["user"]>;
 
 export const certificates = z.object({
-  certificates: z.array(z.object({ code: z.string(), kind: z.string(), title: z.string(), challenge: z.string(), org: z.string(), issued_at: z.number() })),
+  certificates: z.array(z.object({ code: z.string(), kind: z.string(), title: z.string(), challenge: z.string(), org: z.string(), issued_at: z.number(), link: z.string().optional() })),
 });
 
 export const inbox = z.object({
   items: z.array(z.object({ id: z.string(), kind: z.string(), title: z.string(), body: z.string(), link: z.string(), read_at: z.number().nullable(), created_at: z.number() })),
   unread: z.number(),
+  next: z.string().nullable().optional(),
 });
+export type InboxItem = z.infer<typeof inbox>["items"][number];
 
 export const follows = z.object({ orgs: z.array(z.object({ slug: z.string(), name: z.string() })), topics: z.array(z.string()) });
 export const topics = z.object({ topics: z.array(z.string()) });
@@ -68,3 +74,18 @@ export const pitch = z.object({
   open: z.boolean(),
 });
 export type Pitch = z.infer<typeof pitch>;
+
+export const orgDetail = z.object({
+  org: z.object({ slug: z.string(), name: z.string(), type: z.string().nullable().optional(), website: z.string().nullable().optional(), logo_url: z.string().nullable().optional(), verified: z.union([z.boolean(), z.number()]).optional() }).passthrough(),
+  challenges: z.array(challengeCard.extend({ results_published: z.number().optional() })),
+});
+
+export const publicResults = z.object({
+  published: z.boolean(),
+  winners: z.array(z.object({ placement: z.number().nullable(), team: z.string(), members: z.string() })),
+  finalists: z.array(z.string()),
+});
+
+export const invitePreview = z.object({
+  team: z.object({ name: z.string(), status: z.string(), title: z.string(), cslug: z.string(), oslug: z.string(), oname: z.string(), team_max: z.number(), size: z.number(), logo_url: z.string().nullable().optional() }),
+});

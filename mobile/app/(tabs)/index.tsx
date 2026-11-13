@@ -1,16 +1,19 @@
-import React, { useState } from "react";
-import { Pressable, Text, TextInput, View } from "react-native";
+import React, { useEffect, useState } from "react";
+import { Pressable, ScrollView, Text, TextInput, View } from "react-native";
 import Svg, { Circle, Path } from "react-native-svg";
 import { useRouter } from "expo-router";
 import { api } from "../../lib/api";
 import { useAuth } from "../../lib/auth";
-import { challengeList, topics as topicsSchema, type ChallengeCard } from "../../lib/schemas";
+import { challengeList, follows as followsSchema, topics as topicsSchema, type ChallengeCard } from "../../lib/schemas";
+import { loadPrefs, markOnboarded, onboarded } from "../../lib/prefs";
+import { forYou } from "../../lib/rank";
+import { toSignIn } from "../../lib/nav";
 import { daysLeft, fmtDate, teamSize } from "../../lib/format";
 import { F } from "../../lib/fonts";
 import { useLoad } from "../../lib/useLoad";
 import { shadow, useTheme } from "../../lib/theme";
 import { Banner, Scrim } from "../../components/Banner";
-import { Body, DaysStamp, Hand, Loading, Notice, Pill, Screen } from "../../components/ui";
+import { Body, DaysStamp, H2, Hand, Loading, Notice, Offline, Pill, Screen } from "../../components/ui";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { RedLight } from "../../components/RedLight";
 
@@ -39,14 +42,48 @@ function ChallengeTile({ c, i, onOpen }: { c: ChallengeCard; i: number; onOpen: 
   );
 }
 
+/** A smaller card for the "For you" row. */
+function ForYouCard({ c, onOpen }: { c: ChallengeCard; onOpen: () => void }) {
+  const t = useTheme();
+  const d = daysLeft(c.applications_close_at);
+  return (
+    <Pressable onPress={onOpen} accessibilityRole="button" accessibilityLabel={`${c.title} by ${c.org.name}`} style={({ pressed }) => [{ width: 230, gap: 6 }, pressed && { opacity: 0.9 }]}>
+      <View style={[{ borderRadius: 16 }, shadow(0.2)]}>
+        <Banner url={c.cover_url} seed={c.slug} label={c.title} style={{ height: 130, borderRadius: 16 }}>
+          <Scrim height={80} />
+          <Text numberOfLines={2} style={{ position: "absolute", left: 12, right: 12, bottom: 10, color: "#fff", fontFamily: F.display, fontSize: 17, lineHeight: 20 }}>{c.title}</Text>
+        </Banner>
+      </View>
+      <Text numberOfLines={1} style={{ color: t.muted, fontSize: 13, fontWeight: "600" }}>{c.org.name}{d !== null && d > 0 ? `  ·  ${d} ${d === 1 ? "day" : "days"} left` : ""}</Text>
+    </Pressable>
+  );
+}
+
 export default function Explore() {
   const router = useRouter();
   const t = useTheme();
   const { me } = useAuth();
   const [topic, setTopic] = useState<string | null>(null);
   const [q, setQ] = useState("");
-  const topics = useLoad(() => api("/challenges/topics", { schema: topicsSchema }), []);
-  const list = useLoad(() => api(`/challenges${topic ? `?topic=${encodeURIComponent(topic)}` : ""}`, { schema: challengeList }), [topic]);
+  const topics = useLoad(() => api("/challenges/topics", { schema: topicsSchema }), [], { cache: "topics" });
+  const list = useLoad(() => api(`/challenges${topic ? `?topic=${encodeURIComponent(topic)}` : ""}`, { schema: challengeList }), [topic], { cache: `explore.${topic ?? "all"}` });
+  // The topics behind "For you": the account's when signed in, otherwise the ones picked during onboarding.
+  const mine = useLoad(async () => (me ? (await api("/follows", { schema: followsSchema })).topics : (await loadPrefs()).topics), [me?.id]);
+  const suggested = !topic && !q.trim() ? forYou(list.data?.challenges ?? [], mine.data ?? []) : [];
+
+  // First run goes through onboarding, unless a signed-in person already follows topics.
+  useEffect(() => {
+    let alive = true;
+    void (async () => {
+      if (await onboarded()) return;
+      if (me) {
+        const f = await api("/follows", { schema: followsSchema }).catch(() => null);
+        if (f && (f.topics.length || f.orgs.length)) { await markOnboarded(); return; }
+      }
+      if (alive) router.push("/welcome");
+    })();
+    return () => { alive = false; };
+  }, [me?.id]); // eslint-disable-line react-hooks/exhaustive-deps
   const first = (me?.name ?? me?.email ?? "").split(/[ @]/)[0] ?? "";
   const initials = (me?.name ?? me?.email ?? "?").split(/[ @.]/).filter(Boolean).slice(0, 2).map((x) => x[0]!.toUpperCase()).join("");
   const shown = (list.data?.challenges ?? []).filter((c) => !q.trim() || `${c.title} ${c.org.name} ${c.topics.join(" ")}`.toLowerCase().includes(q.trim().toLowerCase()));
@@ -59,11 +96,17 @@ export default function Explore() {
             <RedLight size={12} />
             <Text style={{ color: t.ink, fontSize: 18, fontWeight: "700" }}>Kakushin</Text>
           </View>
-          <Pressable onPress={() => router.push("/profile")} accessibilityRole="button" accessibilityLabel="Your profile" style={{ width: 44, height: 44, borderRadius: 22, backgroundColor: t.ink, alignItems: "center", justifyContent: "center" }}>
-            <Text style={{ color: t.bg, fontSize: 15, fontWeight: "700" }}>{initials}</Text>
-          </Pressable>
+          {me ? (
+            <Pressable onPress={() => router.push("/profile")} accessibilityRole="button" accessibilityLabel="Your profile" style={{ width: 44, height: 44, borderRadius: 22, backgroundColor: t.ink, alignItems: "center", justifyContent: "center" }}>
+              <Text style={{ color: t.bg, fontSize: 15, fontWeight: "700" }}>{initials}</Text>
+            </Pressable>
+          ) : (
+            <Pressable onPress={() => toSignIn(router)} accessibilityRole="button" style={{ minHeight: 44, paddingHorizontal: 16, borderRadius: 22, borderWidth: 1.5, borderColor: t.ink, alignItems: "center", justifyContent: "center" }}>
+              <Text style={{ color: t.ink, fontSize: 15, fontWeight: "700" }}>Sign in</Text>
+            </Pressable>
+          )}
         </View>
-        <View style={{ marginTop: 10 }}><Hand>{first ? `Hi ${first},` : "Hi,"}</Hand></View>
+        <View style={{ marginTop: 10 }}><Hand>{first ? `Hi ${first},` : me ? "Hi," : "Welcome,"}</Hand></View>
         <Text accessibilityRole="header" style={{ color: t.ink, fontFamily: F.display, fontSize: 36, lineHeight: 37, letterSpacing: -0.8 }}>Find your next{"\n"}hackathon.</Text>
       </SafeAreaView>
 
@@ -76,7 +119,17 @@ export default function Explore() {
         {topics.data?.topics.map((x) => <Pill key={x} text={x} on={topic === x} onPress={() => setTopic(topic === x ? null : x)} />)}
       </View>
 
-      {list.err ? <Notice kind="err">{list.err}</Notice> : null}
+      {list.err && !list.data ? <Notice kind="err">{list.err}</Notice> : null}
+      {list.stale ? <Offline /> : null}
+      {suggested.length ? (
+        <View style={{ gap: 10 }}>
+          <H2>For you</H2>
+          <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 12, paddingRight: 16 }} style={{ marginHorizontal: -16, paddingHorizontal: 16 }}>
+            {suggested.map((c) => <ForYouCard key={`${c.org.slug}/${c.slug}`} c={c} onOpen={() => router.push(`/challenge/${c.org.slug}/${c.slug}`)} />)}
+          </ScrollView>
+          <H2>All challenges</H2>
+        </View>
+      ) : null}
       {!list.data && !list.err ? <Loading /> : null}
       {list.data && shown.length === 0 ? <Body muted>{q ? "Nothing matches that search." : `No open challenges${topic ? ` in ${topic}` : ""} right now.`}</Body> : null}
       <View style={{ gap: 26 }}>
