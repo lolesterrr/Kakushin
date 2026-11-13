@@ -34,7 +34,7 @@ export function Layout({ children }: { children: React.ReactNode }) {
         </div>
       </header>
       <main className={admin ? "page admin" : "page"}>{children}</main>
-      <footer className="foot"><span><b>Kakushin</b> <span className="muted">Innovation challenges, end to end</span></span><span className="muted"><Link to="/challenges">Challenges</Link> · <Link to="/admin">For organisers</Link> · <Link to="/credits">Photo credits</Link></span></footer>
+      <footer className="foot"><span><b>Kakushin</b> <span className="muted">Innovation challenges, end to end</span></span><span className="muted"><Link to="/challenges">Challenges</Link> · <Link to="/admin">For organisers</Link> · <Link to="/credits">Photo credits</Link> · <Link to="/privacy">Privacy</Link> · <Link to="/terms">Terms</Link></span></footer>
     </>
   );
 }

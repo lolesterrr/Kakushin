@@ -23,6 +23,7 @@ export const challengeDetail = z.object({
     description: z.string(), prizes: z.string(), status: z.string(),
     applications_open_at: z.number().nullable(), pitch_due_at: z.number().nullable(),
     questions: z.array(question), results_published: z.number().optional(),
+    criteria: z.array(z.object({ name: z.string(), description: z.string(), weight: z.number(), max_score: z.number() })).default([]),
   }),
 });
 export type ChallengeDetail = z.infer<typeof challengeDetail>["challenge"];

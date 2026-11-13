@@ -246,3 +246,5 @@ table tbody tr:hover { background: var(--paper-2); }
   .hero-ban { aspect-ratio: 16 / 9; }
   .actions .btn, .actions button { border-radius: 12px; }
 }
+.sr-only { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; border: 0; }
+.legal { max-width: 760px; } .legal h2 { margin-top: 28px; font-size: 20px; } .legal ul { padding-left: 20px; } .legal li { margin: 6px 0; line-height: 1.5; } .legal p { line-height: 1.6; }

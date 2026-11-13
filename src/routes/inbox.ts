@@ -7,18 +7,40 @@ import { loadOrg } from "../lib/access";
 /** Notification inbox. Mounted at /api/inbox. */
 export const inbox = new Hono<AppEnv>();
 
+const PAGE = 50;
+
+/** Newest first, 50 at a time. `next` is the cursor for the page after this one ("<created_at>:<id>"), or null. */
 inbox.get("/", async (c) => {
   const user = c.get("user");
-  if (!user) return c.json({ items: [], unread: 0 });
-  const { results } = await c.env.DB.prepare("SELECT id, kind, title, body, link, read_at, created_at FROM notifications WHERE user_id = ? ORDER BY created_at DESC LIMIT 50").bind(user.id).all();
+  if (!user) return c.json({ items: [], unread: 0, next: null });
+  const m = /^(\d{1,15}):([0-9a-zA-Z-]{1,64})$/.exec(c.req.query("before") ?? "");
+  const stmt = m
+    ? c.env.DB.prepare(
+      `SELECT id, kind, title, body, link, read_at, created_at FROM notifications
+       WHERE user_id = ? AND (created_at < ? OR (created_at = ? AND id < ?)) ORDER BY created_at DESC, id DESC LIMIT ?`,
+    ).bind(user.id, Number(m[1]), Number(m[1]), m[2], PAGE + 1)
+    : c.env.DB.prepare("SELECT id, kind, title, body, link, read_at, created_at FROM notifications WHERE user_id = ? ORDER BY created_at DESC, id DESC LIMIT ?").bind(user.id, PAGE + 1);
+  const { results } = await stmt.all<{ id: string; created_at: number }>();
+  const items = results.slice(0, PAGE);
+  const last = items[items.length - 1];
   const n = await c.env.DB.prepare("SELECT COUNT(*) AS n FROM notifications WHERE user_id = ? AND read_at IS NULL").bind(user.id).first<{ n: number }>();
-  return c.json({ items: results, unread: n?.n ?? 0 });
+  return c.json({ items, unread: n?.n ?? 0, next: results.length > PAGE && last ? `${last.created_at}:${last.id}` : null });
 });
 
+/** Marks everything read. */
 inbox.post("/read", async (c) => {
   const user = c.get("user");
   if (!user) return c.json({ error: "Not signed in" }, 401);
   await c.env.DB.prepare("UPDATE notifications SET read_at = ? WHERE user_id = ? AND read_at IS NULL").bind(Date.now(), user.id).run();
+  return c.json({ ok: true });
+});
+
+/** Marks one item read, when it is opened. */
+inbox.post("/:id{[0-9a-zA-Z-]{1,64}}/read", async (c) => {
+  const user = c.get("user");
+  if (!user) return c.json({ error: "Not signed in" }, 401);
+  const r = await c.env.DB.prepare("UPDATE notifications SET read_at = COALESCE(read_at, ?) WHERE id = ? AND user_id = ?").bind(Date.now(), c.req.param("id"), user.id).run();
+  if (!r.meta.changes) return c.json({ error: "Not found" }, 404);
   return c.json({ ok: true });
 });
 

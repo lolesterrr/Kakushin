@@ -4,6 +4,7 @@ import type { AppEnv } from "../types";
 import { loadOrg } from "../lib/access";
 import { sendEmail } from "../lib/email";
 import { pushLater } from "../lib/push";
+import { queueEmails } from "../lib/outbox";
 
 /** Organiser side: winners, publishing, certificates. Mounted under /api/orgs. */
 export const orgResults = new Hono<AppEnv>();
@@ -84,15 +85,20 @@ orgResults.post("/:slug/challenges/:cslug/results/publish", async (c) => {
   ]);
 
   pushLater(c);
-  // Email the first 40 people; the rest still see it in their inbox (the free plan allows 50 outgoing calls per request).
-  const { results: people } = await db.prepare(
-    "SELECT DISTINCT u.email FROM certificates ce JOIN users u ON u.id = ce.user_id WHERE ce.challenge_id = ? LIMIT 40",
-  ).bind(x.ch.id).all<{ email: string }>();
   const url = `${c.env.APP_URL}/o/${x.org.slug}/c/${x.ch.slug}`;
+  const subject = `Results are out: ${x.ch.title}`;
   const text = `The results for "${x.ch.title}" by ${x.org.name} are out.\n\nSee them and download your certificate:\n${url}`;
   const html = `<p>The results for <b>${x.ch.title.replace(/</g, "&lt;")}</b> by ${x.org.name.replace(/</g, "&lt;")} are out.</p><p><a href="${url}">See the results and download your certificate</a></p>`;
-  c.executionCtx.waitUntil(Promise.all(people.map((p) =>
-    sendEmail(c.env, p.email, `Results are out: ${x.ch.title}`, html, text).catch((e) => console.error(`results email failed: ${e instanceof Error ? e.message : e}`)))));
+  // Everyone gets the email through the queue, which sends a few at a time. Publishing twice does not email twice.
+  const { results: people } = await db.prepare(
+    "SELECT DISTINCT u.email FROM certificates ce JOIN users u ON u.id = ce.user_id WHERE ce.challenge_id = ? AND ce.issued_at = ? AND u.suspended = 0",
+  ).bind(x.ch.id, now).all<{ email: string }>();
+  const queued = await queueEmails(c.env, people.map((p) => ({ to: p.email, subject, html, text }))).catch((e) => { console.error(`results email queue failed: ${e instanceof Error ? e.message : e}`); return false; });
+  if (!queued) {
+    // No queue binding (a local setup): email the first 40 inline, inside the free plan's 50 outgoing calls per request.
+    c.executionCtx.waitUntil(Promise.all(people.slice(0, 40).map((p) =>
+      sendEmail(c.env, p.email, subject, html, text).catch((e) => console.error(`results email failed: ${e instanceof Error ? e.message : e}`)))));
+  }
 
   const n = await db.prepare("SELECT COUNT(*) AS n FROM certificates WHERE challenge_id = ?").bind(x.ch.id).first<{ n: number }>();
   return c.json({ ok: true, certificates: n?.n ?? 0 });
