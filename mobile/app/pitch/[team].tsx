@@ -39,7 +39,7 @@ export default function PitchScreen() {
   const { team, name } = useLocalSearchParams<{ team: string; name?: string }>();
   const t = useTheme();
   const p = useLoad(() => api(`/teams/${team}/pitch`, { schema: pitchSchema }), [team]);
-  const [form, setForm] = useState<{ video_url: string; demo_url: string; notes: string } | null>(null);
+  const [form, setForm] = useState<{ video_url: string; demo_url: string; repo_url: string; notes: string } | null>(null);
   const [busy, setBusy] = useState<"deck" | "links" | null>(null);
   const [deckMsg, setDeckMsg] = useState<Msg>(null);
   const [msg, setMsg] = useState<Msg>(null);
@@ -47,7 +47,7 @@ export default function PitchScreen() {
   if (!p.data) return <Screen>{p.err ? <Notice kind="err">{p.err === "Not found" ? "We could not find that team." : p.err}</Notice> : <Loading />}</Screen>;
 
   const cur = p.data.pitch;
-  const f = form ?? { video_url: cur?.video_url ?? "", demo_url: cur?.demo_url ?? "", notes: cur?.notes ?? "" };
+  const f = form ?? { video_url: cur?.video_url ?? "", demo_url: cur?.demo_url ?? "", repo_url: cur?.repo_url ?? "", notes: cur?.notes ?? "" };
   const set = (k: keyof typeof f) => (v: string) => setForm({ ...f, [k]: v });
   const late = !!p.data.due && Date.now() > p.data.due;
   const canEdit = p.data.open && !late;
@@ -94,7 +94,9 @@ export default function PitchScreen() {
       <H2>Links and notes</H2>
       <View style={{ gap: 12 }}>
         <Field label="Video link" value={f.video_url} onChangeText={set("video_url")} editable={canEdit} placeholder="https://" autoCapitalize="none" autoCorrect={false} keyboardType="url" />
-        <Field label="Demo or repo link" value={f.demo_url} onChangeText={set("demo_url")} editable={canEdit} placeholder="https://" autoCapitalize="none" autoCorrect={false} keyboardType="url" />
+        <Field label="GitHub repo (public)" value={f.repo_url} onChangeText={set("repo_url")} editable={canEdit} placeholder="https://github.com/your-team/project" autoCapitalize="none" autoCorrect={false} keyboardType="url" />
+        <Body muted style={{ fontSize: 13 }}>Judges see who pushed code, matched by the GitHub link on each member's profile.</Body>
+        <Field label="Demo link" value={f.demo_url} onChangeText={set("demo_url")} editable={canEdit} placeholder="https://" autoCapitalize="none" autoCorrect={false} keyboardType="url" />
         <Field label="Notes for the judges" value={f.notes} onChangeText={set("notes")} editable={canEdit} multiline maxLength={2000} />
       </View>
       {msg ? <Notice kind={msg.kind}>{msg.text}</Notice> : null}
