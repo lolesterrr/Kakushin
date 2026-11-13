@@ -1,7 +1,8 @@
 import React, { useEffect, useState } from "react";
-import { Switch, Text, View } from "react-native";
+import { Alert, Switch, Text, View } from "react-native";
 import * as WebBrowser from "expo-web-browser";
 import { api, pdfUrl } from "../lib/api";
+import { API_URL } from "../lib/config";
 import { useAuth } from "../lib/auth";
 import { registerForPush, type PushState } from "../lib/push";
 import { certificates as certSchema, follows as followsSchema, topics as topicsSchema } from "../lib/schemas";
@@ -97,6 +98,46 @@ export default function Profile() {
       {msg ? <Notice kind={msg.kind}>{msg.text}</Notice> : null}
       <Button title="Save profile" onPress={save} busy={busy} disabled={!form.name.trim()} />
       <View style={{ marginTop: 16 }}><Button title="Sign out" kind="ghost" onPress={() => void signOut()} /></View>
+
+      <View style={{ flexDirection: "row", gap: 16, marginTop: 8 }}>
+        <Text accessibilityRole="link" style={{ color: t.muted, textDecorationLine: "underline" }} onPress={() => void WebBrowser.openBrowserAsync(`${API_URL}/privacy`)}>Privacy policy</Text>
+        <Text accessibilityRole="link" style={{ color: t.muted, textDecorationLine: "underline" }} onPress={() => void WebBrowser.openBrowserAsync(`${API_URL}/terms`)}>Terms of use</Text>
+      </View>
+      {me ? <DeleteAccount email={me.email} onDeleted={signOut} /> : null}
     </Screen>
+  );
+}
+
+/** Deleting is final, so it needs the email typed back and one more tap on a warning. */
+function DeleteAccount({ email, onDeleted }: { email: string; onDeleted: () => Promise<void> }) {
+  const [open, setOpen] = useState(false);
+  const [typed, setTyped] = useState("");
+  const [busy, setBusy] = useState(false);
+  const [err, setErr] = useState("");
+  const matches = typed.trim().toLowerCase() === email.toLowerCase();
+  async function remove() {
+    setBusy(true); setErr("");
+    try {
+      await api("/me", { method: "DELETE", json: { confirm: typed } });
+      try { await onDeleted(); } catch { /* the session is already gone */ }
+    } catch (e) { setErr((e as Error).message); setBusy(false); }
+  }
+  function ask() {
+    Alert.alert("Delete your account?", "This removes your profile, team places, certificates and inbox for good. It cannot be undone.", [
+      { text: "Cancel", style: "cancel" },
+      { text: "Delete", style: "destructive", onPress: () => void remove() },
+    ]);
+  }
+  if (!open) return <View style={{ marginTop: 24 }}><Button title="Delete my account" kind="ghost" onPress={() => setOpen(true)} /></View>;
+  return (
+    <>
+      <H2>Delete your account</H2>
+      <Body>This removes your profile, sign-in, devices, your place in every team, your certificates (they stop verifying), your inbox and follows, and any scores you gave as a judge.</Body>
+      <Body muted>A team you lead passes to the teammate who joined first. A team with only you in it is removed. If you own an organisation, another admin takes it over.</Body>
+      <Field label="Type your email address to confirm" value={typed} onChangeText={setTyped} autoCapitalize="none" autoCorrect={false} keyboardType="email-address" placeholder={email} />
+      {err ? <Notice kind="err">{err}</Notice> : null}
+      <Button title="Delete my account for good" onPress={ask} busy={busy} disabled={!matches} />
+      <Button title="Cancel" kind="ghost" onPress={() => { setOpen(false); setTyped(""); setErr(""); }} />
+    </>
   );
 }

@@ -260,10 +260,12 @@ explore.get("/", async (c) => {
   const sql = `SELECT c.slug, c.title, c.summary, c.cover_key, c.topics, c.team_min, c.team_max, c.prizes, c.status,
         c.applications_close_at, o.slug AS org_slug, o.name AS org_name, o.logo_key
       FROM challenges c JOIN organizations o ON o.id = c.org_id
-      WHERE c.status = 'open' AND o.suspended = 0 ${useTopic ? "AND c.topics LIKE ?" : ""}
+      WHERE c.status = 'open' AND o.suspended = 0 AND (c.applications_close_at IS NULL OR c.applications_close_at > ?)
+        ${useTopic ? "AND c.topics LIKE ?" : ""}
       ORDER BY (c.applications_close_at IS NULL), c.applications_close_at ASC, c.created_at DESC LIMIT 60`;
+  // Past the deadline means closed, even in the hour before the cron job moves it to reviewing.
   const stmt = c.env.DB.prepare(sql);
-  const { results } = await (useTopic ? stmt.bind(`%"${topic}"%`) : stmt).all<Record<string, unknown>>();
+  const { results } = await (useTopic ? stmt.bind(Date.now(), `%"${topic}"%`) : stmt.bind(Date.now())).all<Record<string, unknown>>();
   return c.json({
     challenges: results.map((r) => ({
       slug: r.slug, title: r.title, summary: r.summary, cover_url: fileUrl(r.cover_key as string | null),

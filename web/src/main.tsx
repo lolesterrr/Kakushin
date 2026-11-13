@@ -17,6 +17,7 @@ import { AdminOverview } from "./pages/Overview";
 import { AdminApplications } from "./pages/Applications";
 import { AdminChallenge, AdminHome, AdminOrg } from "./pages/Admin";
 import { Credits } from "./pages/Credits";
+import { Privacy, Terms } from "./pages/Legal";
 import "./styles.css";
 
 function App() {
@@ -39,6 +40,8 @@ function App() {
         <Route path="/admin/o/:slug/c/:cslug/results" element={<SignedInOnly><AdminResults /></SignedInOnly>} />
         <Route path="/verify/:code" element={<VerifyCert />} />
         <Route path="/credits" element={<Credits />} />
+        <Route path="/privacy" element={<Privacy />} />
+        <Route path="/terms" element={<Terms />} />
         <Route path="/inbox" element={<SignedInOnly><Inbox /></SignedInOnly>} />
         <Route path="/platform" element={<SignedInOnly><PlatformOverview /></SignedInOnly>} />
         <Route path="/platform/review" element={<SignedInOnly><PlatformReview /></SignedInOnly>} />
