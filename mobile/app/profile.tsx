@@ -1,15 +1,20 @@
 import React, { useEffect, useState } from "react";
 import { Alert, Switch, Text, View } from "react-native";
 import * as WebBrowser from "expo-web-browser";
+import { Redirect } from "expo-router";
 import { api, pdfUrl } from "../lib/api";
+import { addToLinkedIn, shareCertificate } from "../lib/share";
+import { FILL } from "../lib/theme";
+import { F } from "../lib/fonts";
 import { API_URL } from "../lib/config";
 import { useAuth } from "../lib/auth";
 import { registerForPush, type PushState } from "../lib/push";
-import { certificates as certSchema, follows as followsSchema, topics as topicsSchema } from "../lib/schemas";
+import { setServerPushes, syncReminders } from "../lib/reminders";
+import { certificates as certSchema, follows as followsSchema, myTeams, topics as topicsSchema } from "../lib/schemas";
 import { fmtDate } from "../lib/format";
 import { useLoad } from "../lib/useLoad";
 import { useTheme } from "../lib/theme";
-import { Body, Button, Card, Field, H2, Notice, Pill, Screen } from "../components/ui";
+import { Body, Button, Field, H2, Notice, Offline, Pill, Screen } from "../components/ui";
 
 export default function Profile() {
   const { me, reload, signOut } = useAuth();
@@ -21,7 +26,7 @@ export default function Profile() {
     if (me) setForm({ name: me.name ?? "", institution: me.institution ?? "", location: me.location ?? "", skills: me.skills.join(", "), bio: me.bio ?? "" });
   }, [me?.id]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  const certs = useLoad(() => api("/certificates/mine", { schema: certSchema }), []);
+  const certs = useLoad(() => api("/certificates/mine", { schema: certSchema }), [me?.id], { cache: me ? `certs.${me.id}` : null });
   const all = useLoad(() => api("/challenges/topics", { schema: topicsSchema }), []);
   const fol = useLoad(() => api("/follows", { schema: followsSchema }), []);
   const [mine, setMine] = useState<string[] | null>(null);
@@ -48,10 +53,15 @@ export default function Profile() {
     setPushOn(on); setMsg(null);
     try {
       await api("/inbox/settings", { method: "PUT", json: { push: on } });
-      if (on) setPushState(await registerForPush());
+      const state = on ? await registerForPush() : null;
+      if (state) setPushState(state);
+      // With server pushes off (or unavailable here), the phone keeps its own deadline reminders instead.
+      setServerPushes(on && state === "ready");
+      void api("/teams/mine", { schema: myTeams }).then((r) => syncReminders(r.teams)).catch(() => {});
     } catch (e) { setPushOn(!on); setMsg({ kind: "err", text: (e as Error).message }); }
   }
   const set = (k: keyof typeof form) => (v: string) => setForm({ ...form, [k]: v });
+  if (!me) return <Redirect href={{ pathname: "/sign-in", params: { next: "/profile" } } as never} />;
 
   return (
     <Screen onRefresh={() => { void certs.refresh(); void fol.refresh(); void settings.refresh(); }} refreshing={certs.refreshing}>
@@ -60,13 +70,8 @@ export default function Profile() {
       {certs.data && certs.data.certificates.length > 0 ? (
         <>
           <H2>Your certificates</H2>
-          {certs.data.certificates.map((c) => (
-            <Card key={c.code}>
-              <Text style={{ color: t.ink, fontSize: 17, fontWeight: "800" }}>{c.challenge}</Text>
-              <Body muted>{c.org} · {c.title} · {fmtDate(c.issued_at)}</Body>
-              <View style={{ marginTop: 8 }}><Button title="Open certificate" kind="ghost" onPress={() => void WebBrowser.openBrowserAsync(pdfUrl(c.code))} /></View>
-            </Card>
-          ))}
+          {certs.stale ? <Offline /> : null}
+          {certs.data.certificates.map((c) => <CertificateCard key={c.code} c={c} />)}
           <Body muted style={{ fontSize: 13 }}>The name on a certificate is the one on your profile when you first open it, so set your name first.</Body>
         </>
       ) : null}
@@ -105,6 +110,31 @@ export default function Profile() {
       </View>
       {me ? <DeleteAccount email={me.email} onDeleted={signOut} /> : null}
     </Screen>
+  );
+}
+
+type Cert = { code: string; kind: string; title: string; challenge: string; org: string; issued_at: number };
+
+/** A certificate as a card: the award, the challenge and organiser, and the code that proves it. */
+function CertificateCard({ c }: { c: Cert }) {
+  const t = useTheme();
+  const won = c.kind === "winner";
+  return (
+    <View style={{ backgroundColor: t.card, borderWidth: 1, borderColor: t.line, borderRadius: 20, overflow: "hidden" }}>
+      <View style={{ backgroundColor: won ? FILL.red : FILL.ink, paddingHorizontal: 18, paddingVertical: 16, gap: 4 }}>
+        <Text style={{ color: "#ffffffcc", fontSize: 11, fontWeight: "700", letterSpacing: 1.4, textTransform: "uppercase" }}>Certificate · {c.org}</Text>
+        <Text style={{ color: "#fff", fontFamily: F.display, fontSize: 22, lineHeight: 26 }}>{c.title}</Text>
+      </View>
+      <View style={{ padding: 16, gap: 8 }}>
+        <Text style={{ color: t.ink, fontSize: 17, fontWeight: "800" }}>{c.challenge}</Text>
+        <Body muted style={{ fontSize: 14 }}>Issued {fmtDate(c.issued_at)} · Code {c.code}</Body>
+        <View style={{ flexDirection: "row", gap: 8, marginTop: 4 }}>
+          <View style={{ flex: 1 }}><Button title="Share" onPress={() => void shareCertificate(c)} /></View>
+          <View style={{ flex: 1 }}><Button title="Open PDF" kind="ghost" onPress={() => void WebBrowser.openBrowserAsync(pdfUrl(c.code))} /></View>
+        </View>
+        <Button title="Add to LinkedIn" kind="ghost" onPress={() => addToLinkedIn(c)} />
+      </View>
+    </View>
   );
 }
 

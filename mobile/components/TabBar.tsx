@@ -5,6 +5,7 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { api } from "../lib/api";
 import { inbox } from "../lib/schemas";
 import { shadow } from "../lib/theme";
+import { useAuth } from "../lib/auth";
 
 type Props = { state: { index: number; routes: { key: string; name: string }[] }; emitter: { emit: (e: { type: "tabPress"; target: string; canPreventDefault: true }) => { defaultPrevented: boolean } }; navigateToTab: (routeKey: string) => void };
 
@@ -24,12 +25,14 @@ function Glyph({ name, color }: { name: string; color: string }) {
 export function TabBar({ state, emitter, navigateToTab }: Props) {
   const insets = useSafeAreaInsets();
   const [unread, setUnread] = React.useState(0);
+  const { me } = useAuth();
   const current = state.routes[state.index]?.name;
   React.useEffect(() => {
+    if (!me) { setUnread(0); return; }
     let alive = true;
-    api("/inbox", { schema: inbox }).then((r) => { if (alive) setUnread(current === "inbox" ? 0 : r.unread); }).catch(() => {});
+    api("/inbox", { schema: inbox }).then((r) => { if (alive) setUnread(r.unread); }).catch(() => {});
     return () => { alive = false; };
-  }, [current]);
+  }, [current, me?.id]); // eslint-disable-line react-hooks/exhaustive-deps
   return (
     <View pointerEvents="box-none" style={{ position: "absolute", left: 20, right: 20, bottom: Math.max(insets.bottom, 12) + 4 }}>
       <View style={[{ height: 68, borderRadius: 24, backgroundColor: "#111111", flexDirection: "row", alignItems: "center", paddingHorizontal: 10, gap: 6 }, shadow(0.4)]}>

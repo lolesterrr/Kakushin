@@ -223,6 +223,8 @@ export function Join() {
           <p className="muted">{info.size} of {info.team_max} places taken.</p>
           <div className="actions">
             {me ? <button onClick={join}>Join this team</button> : <Link className="btn" to={`/login?next=/join/${code}`}>Sign in to join</Link>}
+            {/* On a phone with the Kakushin app, the same invite opens there. */}
+            {/Android|iPhone|iPad/i.test(navigator.userAgent) ? <a className="btn ghost" href={`kakushin://join/${encodeURIComponent(code ?? "")}`}>Open in the app</a> : null}
           </div>
         </>
       ) : !err ? null : <h1>Invite not found</h1>}
