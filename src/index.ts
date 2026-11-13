@@ -13,6 +13,9 @@ import { inbox, follows } from "./routes/inbox";
 import { platform } from "./routes/platform";
 import { readToken, userFromToken } from "./lib/session";
 import { withMeta } from "./lib/meta";
+import { runHourly } from "./lib/jobs";
+import { handleOutbox, type OutboxMessage } from "./lib/outbox";
+import type { Env } from "./types";
 
 const app = new Hono<AppEnv>();
 
@@ -53,4 +56,10 @@ app.onError((err, c) => {
   return c.json({ error: "Something went wrong" }, 500);
 });
 
-export default app;
+export default {
+  fetch: app.fetch,
+  // Hourly: close applications, reminders, clean-up and push retries (src/lib/jobs.ts).
+  scheduled(_event, env, ctx) { ctx.waitUntil(runHourly(env)); },
+  // Results emails and pushes, a few at a time (src/lib/outbox.ts).
+  queue: (batch, env) => handleOutbox(batch, env),
+} satisfies ExportedHandler<Env, OutboxMessage>;

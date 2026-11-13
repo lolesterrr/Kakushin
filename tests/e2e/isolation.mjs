@@ -45,7 +45,7 @@ await makeOrg(aOwner, A, `${P} A`); await makeOrg(bOwner, B, `${P} B`);
 // ---- anonymous visitors ----
 for (const path of ["/orgs/mine", "/teams/mine", "/inbox/settings"]) ok(`anon blocked: ${path}`, (await anon(path)).s === 401, path);
 // These answer signed-out callers with an empty list so the web app can render; they must never carry data.
-for (const path of ["/inbox", "/judge/challenges", "/certificates/mine"]) { const r = await anon(path); ok(`anon gets nothing: ${path}`, r.s === 401 || Object.values(r.d).every((v) => Array.isArray(v) ? v.length === 0 : v === 0), r); }
+for (const path of ["/inbox", "/judge/challenges", "/certificates/mine"]) { const r = await anon(path); ok(`anon gets nothing: ${path}`, r.s === 401 || Object.values(r.d).every((v) => Array.isArray(v) ? v.length === 0 : v === 0 || v === null), r); }
 for (const path of ["/platform/stats", "/platform/users", "/platform/audit"]) ok(`anon blocked: ${path}`, denied(await anon(path)), path);
 ok("anon cannot announce", denied(await anon(`/orgs/${A}/announcements`, "POST")));
 

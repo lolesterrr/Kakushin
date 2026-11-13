@@ -63,6 +63,21 @@ export default function ChallengeScreen() {
 
       {c.description ? <><H2>About</H2><Body>{c.description}</Body></> : null}
       {c.prizes ? <><H2>Prizes</H2><Body>{c.prizes}</Body></> : null}
+      {c.criteria.length ? (
+        <>
+          <H2>How you will be scored</H2>
+          <Body muted>Judges score each pitch on these. The weight is how much each counts.</Body>
+          {c.criteria.map((r) => (
+            <View key={r.name} style={{ flexDirection: "row", alignItems: "flex-start", justifyContent: "space-between", gap: 12, borderBottomWidth: 1, borderBottomColor: t.line, paddingVertical: 10 }}>
+              <View style={{ flex: 1 }}>
+                <Text style={{ color: t.ink, fontSize: 16, fontWeight: "700" }}>{r.name}</Text>
+                {r.description ? <Body muted>{r.description}</Body> : null}
+              </View>
+              <Text accessibilityLabel={`${r.weight} percent of the score`} style={{ color: t.ink, fontFamily: F.display, fontSize: 20 }}>{r.weight}%</Text>
+            </View>
+          ))}
+        </>
+      ) : null}
 
       {msg ? <Notice kind={msg.kind}>{msg.text}</Notice> : null}
       <TeamPanel org={org} slug={slug} c={c} team={tm.data} loaded={teamLoaded} onChange={refresh} />

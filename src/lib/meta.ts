@@ -36,6 +36,8 @@ export async function pageMeta(c: Context<AppEnv>, path: string): Promise<Partia
     if (!row) return {};
     return { title: `${row.name} on Kakushin`, description: `Open and past innovation challenges from ${row.name}.`, ...(row.logo_key ? { image: `/api/files/${row.logo_key}` } : {}) };
   }
+  if (path === "/privacy") return { title: "Privacy policy · Kakushin", description: "What Kakushin keeps about you, who can see it, and how to delete it." };
+  if (path === "/terms") return { title: "Terms of use · Kakushin", description: "The rules for using Kakushin as a participant, judge or organiser." };
   if (path === "/challenges" || path === "/challenges/") return { title: "Challenges · Kakushin", description: "Open innovation challenges and hackathons you can apply to now." };
   return {};
 }

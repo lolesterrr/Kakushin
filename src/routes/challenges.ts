@@ -136,7 +136,11 @@ orgChallenges.get("/:slug/challenges/:cslug", async (c) => {
     .bind(access.org.id, c.req.param("cslug")).first<ChallengeRow>();
   // Drafts are only visible to the organisation's own admins.
   if (!row || (row.status === "draft" && !access.role)) return c.json({ error: "Not found" }, 404);
-  return c.json({ challenge: challengeOut(row, access.org), role: access.role });
+  // The rubric is public so people know how they will be scored before they apply. Weights go out as percentages.
+  const { results: rubric } = await c.env.DB.prepare("SELECT name, description, weight, max_score FROM criteria WHERE challenge_id = ? ORDER BY position, rowid")
+    .bind(row.id).all<{ name: string; description: string; weight: number; max_score: number }>();
+  const criteria = rubric.map((r) => ({ name: r.name, description: r.description, weight: Math.round(r.weight * 10000) / 100, max_score: r.max_score }));
+  return c.json({ challenge: { ...challengeOut(row, access.org), criteria }, role: access.role });
 });
 
 orgChallenges.put("/:slug/challenges/:cslug", async (c) => {
@@ -256,10 +260,12 @@ explore.get("/", async (c) => {
   const sql = `SELECT c.slug, c.title, c.summary, c.cover_key, c.topics, c.team_min, c.team_max, c.prizes, c.status,
         c.applications_close_at, o.slug AS org_slug, o.name AS org_name, o.logo_key
       FROM challenges c JOIN organizations o ON o.id = c.org_id
-      WHERE c.status = 'open' AND o.suspended = 0 ${useTopic ? "AND c.topics LIKE ?" : ""}
+      WHERE c.status = 'open' AND o.suspended = 0 AND (c.applications_close_at IS NULL OR c.applications_close_at > ?)
+        ${useTopic ? "AND c.topics LIKE ?" : ""}
       ORDER BY (c.applications_close_at IS NULL), c.applications_close_at ASC, c.created_at DESC LIMIT 60`;
+  // Past the deadline means closed, even in the hour before the cron job moves it to reviewing.
   const stmt = c.env.DB.prepare(sql);
-  const { results } = await (useTopic ? stmt.bind(`%"${topic}"%`) : stmt).all<Record<string, unknown>>();
+  const { results } = await (useTopic ? stmt.bind(Date.now(), `%"${topic}"%`) : stmt.bind(Date.now())).all<Record<string, unknown>>();
   return c.json({
     challenges: results.map((r) => ({
       slug: r.slug, title: r.title, summary: r.summary, cover_url: fileUrl(r.cover_key as string | null),

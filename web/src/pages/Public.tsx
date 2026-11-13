@@ -9,6 +9,7 @@ import { Banner, ChallengeCard, type ChallengeCardData, DeadlineStamp, Logo, Not
 
 /**
  * Banner bulb: grows in once per page load, then loops a gentle turn. Reduced motion gets the still.
+ * Both videos carry the still as their poster, so a phone shows the bulb (not a black box) until playback starts.
  * A reload plays the intro again; moving around inside the app and back to the homepage does not.
  * The intro waits until the banner is on screen and the tab is in front, so it is not used up
  * while someone is scrolled away (the banner sits below the text on phones).
@@ -22,7 +23,8 @@ function HeroBulb() {
     const v = ref.current;
     if (!intro || !v) return;
     let onScreen = false;
-    const sync = () => { if (onScreen && document.visibilityState === "visible") v.play().catch(() => {}); else v.pause(); };
+    // If the phone refuses to play (Low Power Mode, data saver), skip to the loop, which shows the still as its poster.
+    const sync = () => { if (onScreen && document.visibilityState === "visible") v.play().catch(() => { bulbIntroPlayed = true; setIntro(false); }); else v.pause(); };
     const io = new IntersectionObserver((es) => { const e = es[es.length - 1]; onScreen = !!e && e.isIntersecting && e.intersectionRatio >= 0.5; sync(); }, { threshold: [0, 0.5, 1] });
     io.observe(v);
     document.addEventListener("visibilitychange", sync);
@@ -31,7 +33,7 @@ function HeroBulb() {
   function done() { bulbIntroPlayed = true; setIntro(false); }
   if (still) return <img className="glyph" src="/hero/bulb-poster.jpg" width={640} height={800} alt="" />;
   return intro
-    ? <video key="intro" ref={ref} className="glyph" src="/hero/bulb-intro.mp4" muted playsInline preload="auto" onEnded={done} onError={() => setIntro(false)} />
+    ? <video key="intro" ref={ref} className="glyph" src="/hero/bulb-intro.mp4" poster="/hero/bulb-poster.jpg" muted playsInline preload="auto" onEnded={done} onError={() => setIntro(false)} />
     : <video key="loop" className="glyph" src="/hero/bulb-loop.mp4" poster="/hero/bulb-poster.jpg" autoPlay muted loop playsInline preload="auto" />;
 }
 
@@ -45,8 +47,10 @@ export function Home() {
     ["03", "Pitch", "Shortlisted teams pitch to judges, who score against the organiser's criteria."],
     ["04", "Certificate", "Everyone who takes part gets a certificate that anyone can verify online."],
   ];
+  const [deleted] = useState(() => typeof window !== "undefined" && new URLSearchParams(window.location.search).has("deleted"));
   return (
     <>
+      {deleted && <div className="section" style={{ paddingTop: 16, paddingBottom: 16 }}><Notice kind="ok">Your account has been deleted.</Notice></div>}
       <section className="home-hero">
         <div className="copy">
           <p className="hand" style={{ margin: 0 }}>Hackathons, without the spreadsheets</p>
@@ -145,6 +149,25 @@ export function OrgPublic() {
 
 interface ChallengeFull extends ChallengeCardData {
   cover_credit?: { author: string; license: string; source: string; license_url?: string } | null; description: string; prizes: string; status: string; results_published?: number; applications_open_at: number | null; pitch_due_at: number | null; questions: Question[];
+  criteria?: { name: string; description: string; weight: number; max_score: number }[];
+}
+
+/** The judging rubric, so people know how they will be scored before they apply. */
+function Rubric({ criteria }: { criteria: NonNullable<ChallengeFull["criteria"]> }) {
+  return (
+    <div className="section">
+      <p className="label" style={{ marginTop: 0 }}>How you will be scored</p>
+      <p className="muted" style={{ marginTop: 0, maxWidth: 720 }}>Judges score each pitch on these criteria. The weights show how much each one counts towards the final score.</p>
+      <ul className="todo" style={{ maxWidth: 720 }}>
+        {criteria.map((r) => (
+          <li key={r.name}>
+            <span><b>{r.name}</b>{r.description && <span className="muted"> · {r.description}</span>}</span>
+            <span className="pill" aria-label={`${r.weight} percent of the score`}>{r.weight}%</span>
+          </li>
+        ))}
+      </ul>
+    </div>
+  );
 }
 
 export function ChallengePublic() {
@@ -196,6 +219,7 @@ export function ChallengePublic() {
       {c.results_published ? <PublicResults orgSlug={c.org.slug} cslug={c.slug} /> : null}
       {c.description && <div className="section"><p className="label" style={{ marginTop: 0 }}>About</p><div className="prose">{c.description}</div></div>}
       {c.prizes && <div className="section"><p className="label" style={{ marginTop: 0 }}>Prizes</p><div className="prose">{c.prizes}</div></div>}
+      {c.criteria && c.criteria.length > 0 && <Rubric criteria={c.criteria} />}
       {c.status !== "draft" && <div id="apply"><TeamPanel orgSlug={c.org.slug} cslug={c.slug} challenge={c} team={team} reload={reload} /></div>}
     </>
   );
