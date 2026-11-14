@@ -22,6 +22,7 @@ export default function JudgeTeams() {
       <Stack.Screen options={{ title: x.challenge.title }} />
       {d.stale ? <Offline /> : null}
       <Text style={{ color: t.ink, fontSize: 28, fontWeight: "900" }}>{done}/{x.teams.length} <Text style={{ fontSize: 16, fontWeight: "600" }}>teams scored</Text></Text>
+      {x.challenge.round ? <Body muted>{x.challenge.round}</Body> : null}
       {!x.challenge.scoring_open ? <Body muted>Scoring opens when the organiser starts judging. You can look at the pitches now.</Body> : null}
       {x.challenge.blind ? <Body muted>Blind review: member names are hidden.</Body> : null}
       {x.teams.length === 0 ? <Body muted>No teams to judge yet.</Body> : null}

@@ -29,8 +29,13 @@ async function adminLoad(c: Context<AppEnv>) {
 
 export type Stage = "application" | "pitch";
 
+/** SQL: a pitch criterion (by table alias) belongs to its challenge's current round. */
+export const CURRENT_ROUND = (a: string) => `${a}.round_no = (SELECT cr0.current_round FROM challenges cr0 WHERE cr0.id = ${a}.challenge_id)`;
+/** SQL: a team (by table alias) is a finalist still in the current round. */
+export const FINALIST_NOW = (a: string) => `${a}.status IN ('finalist','winner') AND ${a}.round_reached >= (SELECT ch0.current_round FROM challenges ch0 WHERE ch0.id = ${a}.challenge_id)`;
+
 export const criteriaOf = async (c: Context<AppEnv>, challengeId: string, stage: Stage = "pitch") =>
-  (await c.env.DB.prepare("SELECT id, name, description, weight, max_score, position FROM criteria WHERE challenge_id = ? AND stage = ? ORDER BY position, rowid").bind(challengeId, stage).all<Criterion & { description: string }>()).results;
+  (await c.env.DB.prepare(`SELECT id, name, description, weight, max_score, position FROM criteria WHERE challenge_id = ?1 AND stage = ?2 AND (stage <> 'pitch' OR ${CURRENT_ROUND("criteria")}) ORDER BY position, rowid`).bind(challengeId, stage).all<Criterion & { description: string }>()).results;
 
 export const criteriaBody = z.object({
   criteria: z.array(z.object({
@@ -64,7 +69,7 @@ export async function saveCriteria(c: Context<AppEnv>, ch: { id: string; status:
       stmts.push(c.env.DB.prepare("UPDATE criteria SET name = ?, description = ?, weight = ?, max_score = ?, position = ? WHERE id = ? AND challenge_id = ? AND stage = ?")
         .bind(r.name, r.description, r.weight / 100, r.max_score, i, r.id, ch.id, stage));
     } else {
-      stmts.push(c.env.DB.prepare("INSERT INTO criteria (id, challenge_id, name, description, weight, max_score, position, stage) VALUES (?, ?, ?, ?, ?, ?, ?, ?)")
+      stmts.push(c.env.DB.prepare("INSERT INTO criteria (id, challenge_id, name, description, weight, max_score, position, stage, round_no) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, (SELECT current_round FROM challenges WHERE id = ?2))")
         .bind(newId(), ch.id, r.name, r.description, r.weight / 100, r.max_score, i, stage));
     }
   });
@@ -134,21 +139,20 @@ orgJudging.put("/:slug/challenges/:cslug/judging/settings", async (c) => {
   return c.json({ ok: true });
 });
 
-const FINALIST = "('finalist','winner')";
 
 /** Finalists with their assigned judges, conflict flags and progress, for the organiser. */
 async function assignmentView(c: Context<AppEnv>, ch: Ch) {
   const db = c.env.DB;
   const [teams, judges, asg, conf, done, own] = await db.batch([
-    db.prepare(`SELECT id, name FROM teams WHERE challenge_id = ? AND status IN ${FINALIST} ORDER BY name`).bind(ch.id),
+    db.prepare(`SELECT t.id, t.name FROM teams t WHERE t.challenge_id = ? AND ${FINALIST_NOW("t")} ORDER BY t.name`).bind(ch.id),
     db.prepare("SELECT email FROM judges WHERE challenge_id = ? ORDER BY invited_at").bind(ch.id),
     db.prepare("SELECT email, team_id FROM judge_assignments WHERE challenge_id = ?").bind(ch.id),
     db.prepare("SELECT email, team_id, created_at FROM judge_conflicts WHERE challenge_id = ?").bind(ch.id),
     // A judge finished a team when they scored every pitch criterion.
     db.prepare(
       `SELECT u.email, s.team_id FROM scores s JOIN users u ON u.id = s.judge_user_id JOIN criteria cr ON cr.id = s.criterion_id
-       WHERE cr.challenge_id = ?1 AND cr.stage = 'pitch' GROUP BY u.email, s.team_id
-       HAVING COUNT(*) >= (SELECT COUNT(*) FROM criteria WHERE challenge_id = ?1 AND stage = 'pitch')`,
+       WHERE cr.challenge_id = ?1 AND cr.stage = 'pitch' AND ${CURRENT_ROUND("cr")} GROUP BY u.email, s.team_id
+       HAVING COUNT(*) >= (SELECT COUNT(*) FROM criteria k WHERE k.challenge_id = ?1 AND k.stage = 'pitch' AND ${CURRENT_ROUND("k")})`,
     ).bind(ch.id),
     // A judge who is on a team cannot judge it.
     db.prepare(
@@ -245,12 +249,12 @@ orgJudging.delete("/:slug/challenges/:cslug/conflicts", async (c) => {
 // ---- leaderboard and calibration ----
 async function board(c: Context<AppEnv>, ch: Ch) {
   const criteria = await criteriaOf(c, ch.id);
-  const { results: teams } = await c.env.DB.prepare(`SELECT id, name FROM teams WHERE challenge_id = ? AND status IN ${FINALIST}`).bind(ch.id).all<{ id: string; name: string }>();
+  const { results: teams } = await c.env.DB.prepare(`SELECT t.id, t.name FROM teams t WHERE t.challenge_id = ? AND ${FINALIST_NOW("t")}`).bind(ch.id).all<{ id: string; name: string }>();
   const { results: js } = await c.env.DB.prepare(
     `SELECT j.email, u.id AS user_id FROM judges j LEFT JOIN users u ON u.email = j.email WHERE j.challenge_id = ? ORDER BY j.invited_at`,
   ).bind(ch.id).all<{ email: string; user_id: string | null }>();
   const { results: raw } = await c.env.DB.prepare(
-    `SELECT s.judge_user_id, s.team_id, s.criterion_id, s.score FROM scores s JOIN criteria cr ON cr.id = s.criterion_id WHERE cr.challenge_id = ? AND cr.stage = 'pitch'`,
+    `SELECT s.judge_user_id, s.team_id, s.criterion_id, s.score FROM scores s JOIN criteria cr ON cr.id = s.criterion_id WHERE cr.challenge_id = ? AND cr.stage = 'pitch' AND ${CURRENT_ROUND("cr")}`,
   ).bind(ch.id).all<{ judge_user_id: string; team_id: string; criterion_id: string; score: number }>();
   const emailOf = new Map(js.filter((j) => j.user_id).map((j) => [j.user_id as string, j.email]));
   const rows: ScoreRow[] = raw.filter((r) => emailOf.has(r.judge_user_id)).map((r) => ({ judge: emailOf.get(r.judge_user_id)!, team: r.team_id, criterion: r.criterion_id, score: r.score }));
@@ -284,15 +288,23 @@ orgJudging.get("/:slug/challenges/:cslug/leaderboard.csv", async (c) => {
   return new Response("﻿" + lines.join("\r\n") + "\r\n", { headers: { "Content-Type": "text/csv; charset=utf-8", "Content-Disposition": `attachment; filename="${x.ch.slug}-scores.csv"` } });
 });
 
+/** "Round 2 of 3: Build round", or null for a one-round challenge. */
+export function roundLabel(namesJson: string, current: number): string | null {
+  let names: string[] = [];
+  try { const v = JSON.parse(namesJson); if (Array.isArray(v)) names = v.map(String); } catch { /* bad JSON reads as one round */ }
+  if (names.length < 2) return null;
+  return `Round ${current} of ${names.length}: ${names[current - 1] ?? ""}`.replace(/: $/, "");
+}
+
 // ---- judge side ----
 async function judgeLoad(c: Context<AppEnv>) {
   const user = c.get("user");
   if (!user) return { err: c.json({ error: "Not signed in" }, 401) };
   const row = await c.env.DB.prepare(
-    `SELECT ch.id, ch.slug, ch.title, ch.status, ch.org_id, ch.blind_judging, ch.judges_per_team, o.slug AS oslug, o.name AS oname
+    `SELECT ch.id, ch.slug, ch.title, ch.status, ch.org_id, ch.blind_judging, ch.judges_per_team, ch.round_names, ch.current_round, o.slug AS oslug, o.name AS oname
      FROM challenges ch JOIN organizations o ON o.id = ch.org_id JOIN judges j ON j.challenge_id = ch.id
      WHERE o.slug = ? AND ch.slug = ? AND j.email = ?`,
-  ).bind(c.req.param("slug")!, c.req.param("cslug")!, user.email.toLowerCase()).first<Ch & { oslug: string; oname: string }>();
+  ).bind(c.req.param("slug")!, c.req.param("cslug")!, user.email.toLowerCase()).first<Ch & { oslug: string; oname: string; round_names: string; current_round: number }>();
   if (!row) return { err: c.json({ error: "Not found" }, 404) };
   return { user, email: user.email.toLowerCase(), ch: row };
 }
@@ -302,7 +314,7 @@ judge.get("/challenges", async (c) => {
   if (!user) return c.json({ challenges: [] });
   const { results } = await c.env.DB.prepare(
     `SELECT ch.slug, ch.title, ch.status, o.slug AS oslug, o.name AS oname,
-       (SELECT COUNT(*) FROM teams t WHERE t.challenge_id = ch.id AND t.status IN ${FINALIST} AND ${judgeSees("ch.id", "j.email", "t.id")}) AS teams
+       (SELECT COUNT(*) FROM teams t WHERE t.challenge_id = ch.id AND ${FINALIST_NOW("t")} AND ${judgeSees("ch.id", "j.email", "t.id")}) AS teams
      FROM judges j JOIN challenges ch ON ch.id = j.challenge_id JOIN organizations o ON o.id = ch.org_id WHERE j.email = ? ORDER BY ch.created_at DESC`,
   ).bind(user.email.toLowerCase()).all();
   return c.json({ challenges: results });
@@ -314,11 +326,11 @@ judge.get("/:slug/:cslug", async (c) => {
   const { results: teams } = await c.env.DB.prepare(
     `SELECT t.id, t.name, (SELECT COUNT(*) FROM submissions s WHERE s.team_id = t.id AND (s.deck_key IS NOT NULL OR s.video_url != '' OR s.demo_url != '')) AS has_pitch,
        (SELECT COUNT(*) FROM team_members m WHERE m.team_id = t.id AND m.user_id = ?1) AS mine,
-       (SELECT COUNT(*) FROM scores sc JOIN criteria cr ON cr.id = sc.criterion_id WHERE sc.judge_user_id = ?1 AND sc.team_id = t.id AND cr.stage = 'pitch') AS scored
-     FROM teams t WHERE t.challenge_id = ?2 AND t.status IN ${FINALIST} AND ${judgeSees("?2", "?3", "t.id")} ORDER BY t.name`,
+       (SELECT COUNT(*) FROM scores sc JOIN criteria cr ON cr.id = sc.criterion_id WHERE sc.judge_user_id = ?1 AND sc.team_id = t.id AND cr.stage = 'pitch' AND ${CURRENT_ROUND("cr")}) AS scored
+     FROM teams t WHERE t.challenge_id = ?2 AND ${FINALIST_NOW("t")} AND ${judgeSees("?2", "?3", "t.id")} ORDER BY t.name`,
   ).bind(x.user.id, x.ch.id, x.email).all<{ id: string; name: string; has_pitch: number; mine: number; scored: number }>();
   return c.json({
-    challenge: { title: x.ch.title, status: x.ch.status, org: x.ch.oname, scoring_open: x.ch.status === "judging", blind: !!x.ch.blind_judging }, criteria,
+    challenge: { title: x.ch.title, status: x.ch.status, org: x.ch.oname, scoring_open: x.ch.status === "judging", blind: !!x.ch.blind_judging, round: roundLabel(x.ch.round_names, x.ch.current_round) }, criteria,
     teams: teams.map((t) => ({ id: t.id, name: t.name, has_pitch: !!t.has_pitch, own_team: !!t.mine, done: t.scored >= criteria.length && criteria.length > 0, partial: t.scored > 0 && t.scored < criteria.length })),
   });
 });
@@ -342,7 +354,7 @@ judge.put("/:slug/:cslug/profile", async (c) => {
 
 /** A finalist this judge may see: assigned to them (once the challenge uses assignments) and not flagged as a conflict. */
 async function judgeTeam(c: Context<AppEnv>, x: { email: string; ch: Ch }) {
-  return c.env.DB.prepare(`SELECT id, name FROM teams t WHERE t.id = ?1 AND t.challenge_id = ?2 AND t.status IN ${FINALIST} AND ${judgeSees("?2", "?3", "t.id")}`)
+  return c.env.DB.prepare(`SELECT id, name FROM teams t WHERE t.id = ?1 AND t.challenge_id = ?2 AND ${FINALIST_NOW("t")} AND ${judgeSees("?2", "?3", "t.id")}`)
     .bind(c.req.param("teamId")!, x.ch.id, x.email).first<{ id: string; name: string }>();
 }
 
