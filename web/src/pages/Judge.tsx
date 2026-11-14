@@ -55,7 +55,7 @@ interface Crit { id: string; name: string; description: string; weight: number; 
 export function JudgeChallenge() {
   const { slug, cslug } = useParams();
   const { me } = useAuth();
-  const [data, setData] = useState<{ challenge: { title: string; status: string; org: string; scoring_open: boolean }; criteria: Crit[]; teams: { id: string; name: string; has_pitch: boolean; own_team: boolean; done: boolean; partial: boolean }[] } | null>(null);
+  const [data, setData] = useState<{ challenge: { title: string; status: string; org: string; scoring_open: boolean; round?: string | null }; criteria: Crit[]; teams: { id: string; name: string; has_pitch: boolean; own_team: boolean; done: boolean; partial: boolean }[] } | null>(null);
   const [err, setErr] = useState("");
   useEffect(() => { if (me) api<typeof data>(`/judge/${slug}/${cslug}`).then(setData).catch((e: Error) => setErr(e.message)); }, [slug, cslug, me?.id]);
   if (!me) return <Navigate to={`/login?next=/judge/${slug}/${cslug}`} replace />;
@@ -64,7 +64,7 @@ export function JudgeChallenge() {
   const done = data.teams.filter((t) => t.done).length;
   return (
     <>
-      <Band crumb="All judging" to="/judge" title={data.challenge.title} tags={<><Tag status={data.challenge.status} /><span>{data.challenge.org}</span></>} />
+      <Band crumb="All judging" to="/judge" title={data.challenge.title} tags={<><Tag status={data.challenge.status} /><span>{data.challenge.org}</span>{data.challenge.round && <span>{data.challenge.round}</span>}</>} />
       <NumSection n="01" title="Your progress">
         <div className="pipeline" style={{ maxWidth: 420 }}><a style={{ cursor: "default" }} className={done < data.teams.length ? "hot" : ""}><b>{done}/{data.teams.length}</b><span>Teams scored</span></a></div>
         {!data.challenge.scoring_open && <p className="muted">Scoring opens when the organiser starts judging. You can look at the pitches now.</p>}
