@@ -12,11 +12,11 @@ me.get("/", async (c) => {
   const u = c.get("user");
   if (!u) return c.json({ user: null });
   const full = await c.env.DB.prepare(
-    "SELECT id, email, name, bio, institution, location, skills, links, gender, is_platform_admin, is_super_admin, handle, public_profile, avatar_key FROM users WHERE id = ?",
+    "SELECT id, email, name, bio, institution, location, skills, links, gender, is_platform_admin, is_super_admin, handle, public_profile, avatar_key, banner_key FROM users WHERE id = ?",
   ).bind(u.id).first<Record<string, unknown>>();
-  const { avatar_key, ...rest } = full ?? {};
+  const { avatar_key, banner_key, ...rest } = full ?? {};
   return c.json({
-    user: { ...rest, avatar_url: avatar_key ? fileUrl(String(avatar_key)) : null, public_profile: !!full?.public_profile, skills: JSON.parse(String(full?.skills ?? "[]")), links: JSON.parse(String(full?.links ?? "{}")) },
+    user: { ...rest, avatar_url: avatar_key ? fileUrl(String(avatar_key)) : null, banner_url: banner_key ? fileUrl(String(banner_key)) : null, public_profile: !!full?.public_profile, skills: JSON.parse(String(full?.skills ?? "[]")), links: JSON.parse(String(full?.links ?? "{}")) },
   });
 });
 
@@ -73,26 +73,30 @@ me.put("/", async (c) => {
   return c.json({ ok: true });
 });
 
-/** Sets the profile picture. The old file is removed once the new one is saved. */
-me.post("/avatar", async (c) => {
-  const u = c.get("user");
-  if (!u) return c.json({ error: "Not signed in" }, 401);
-  const saved = await saveImage(c, "avatars", 2 * 1024 * 1024);
-  if (!saved.ok) return c.json({ error: saved.error }, 400);
-  const old = await c.env.DB.prepare("SELECT avatar_key FROM users WHERE id = ?").bind(u.id).first<{ avatar_key: string | null }>();
-  await c.env.DB.prepare("UPDATE users SET avatar_key = ? WHERE id = ?").bind(saved.key, u.id).run();
-  if (old?.avatar_key) c.executionCtx.waitUntil(c.env.FILES.delete(old.avatar_key).catch(() => {}));
-  return c.json({ ok: true, avatar_url: fileUrl(saved.key) });
-});
-
-me.delete("/avatar", async (c) => {
-  const u = c.get("user");
-  if (!u) return c.json({ error: "Not signed in" }, 401);
-  const old = await c.env.DB.prepare("SELECT avatar_key FROM users WHERE id = ?").bind(u.id).first<{ avatar_key: string | null }>();
-  await c.env.DB.prepare("UPDATE users SET avatar_key = NULL WHERE id = ?").bind(u.id).run();
-  if (old?.avatar_key) c.executionCtx.waitUntil(c.env.FILES.delete(old.avatar_key).catch(() => {}));
-  return c.json({ ok: true });
-});
+/**
+ * The profile picture and the profile banner: upload one to set or replace it, delete to go back to none.
+ * The old file is removed once the new one is saved.
+ */
+for (const [path, col, folder, max] of [["/avatar", "avatar_key", "avatars", 2], ["/banner", "banner_key", "banners", 4]] as const) {
+  me.post(path, async (c) => {
+    const u = c.get("user");
+    if (!u) return c.json({ error: "Not signed in" }, 401);
+    const saved = await saveImage(c, folder, max * 1024 * 1024);
+    if (!saved.ok) return c.json({ error: saved.error }, 400);
+    const old = await c.env.DB.prepare(`SELECT ${col} AS k FROM users WHERE id = ?`).bind(u.id).first<{ k: string | null }>();
+    await c.env.DB.prepare(`UPDATE users SET ${col} = ? WHERE id = ?`).bind(saved.key, u.id).run();
+    if (old?.k) c.executionCtx.waitUntil(c.env.FILES.delete(old.k).catch(() => {}));
+    return c.json({ ok: true, url: fileUrl(saved.key), [`${path.slice(1)}_url`]: fileUrl(saved.key) });
+  });
+  me.delete(path, async (c) => {
+    const u = c.get("user");
+    if (!u) return c.json({ error: "Not signed in" }, 401);
+    const old = await c.env.DB.prepare(`SELECT ${col} AS k FROM users WHERE id = ?`).bind(u.id).first<{ k: string | null }>();
+    await c.env.DB.prepare(`UPDATE users SET ${col} = NULL WHERE id = ?`).bind(u.id).run();
+    if (old?.k) c.executionCtx.waitUntil(c.env.FILES.delete(old.k).catch(() => {}));
+    return c.json({ ok: true });
+  });
+}
 
 /**
  * Deletes the signed-in account and everything that is only theirs: profile, sessions, team places, scores they gave,
@@ -133,7 +137,7 @@ me.delete("/", async (c) => {
   const solo = led.filter((t) => !t.heir);
 
   const files = [
-    (await db.prepare("SELECT avatar_key FROM users WHERE id = ?").bind(u.id).first<{ avatar_key: string | null }>())?.avatar_key,
+    ...Object.values((await db.prepare("SELECT avatar_key, banner_key FROM users WHERE id = ?").bind(u.id).first<{ avatar_key: string | null; banner_key: string | null }>()) ?? {}),
     ...(await db.prepare("SELECT pdf_key FROM certificates WHERE user_id = ? AND pdf_key IS NOT NULL").bind(u.id).all<{ pdf_key: string }>()).results.map((r) => r.pdf_key),
     ...solo.map((t) => t.deck_key), ...orgsToDelete.flatMap((o) => [o.logo_key, o.logo_print_key]), ...covers.map((r) => r.cover_key),
   ].filter((k): k is string => !!k);

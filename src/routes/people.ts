@@ -28,8 +28,8 @@ people.get("/:handle", async (c) => {
   const handle = c.req.param("handle").toLowerCase();
   if (!HANDLE_RE.test(handle)) return c.json({ error: "Not found" }, 404);
   const u = await c.env.DB.prepare(
-    "SELECT id, name, bio, institution, location, skills, links, handle, avatar_key FROM users WHERE handle = ? AND public_profile = 1 AND suspended = 0",
-  ).bind(handle).first<{ id: string; name: string | null; bio: string | null; institution: string | null; location: string | null; skills: string; links: string; handle: string; avatar_key: string | null }>();
+    "SELECT id, name, bio, institution, location, skills, links, handle, avatar_key, banner_key FROM users WHERE handle = ? AND public_profile = 1 AND suspended = 0",
+  ).bind(handle).first<{ id: string; name: string | null; bio: string | null; institution: string | null; location: string | null; skills: string; links: string; handle: string; avatar_key: string | null; banner_key: string | null }>();
   if (!u) return c.json({ error: "Not found" }, 404);
   const db = c.env.DB;
   const [certs, teams] = await db.batch([
@@ -48,7 +48,7 @@ people.get("/:handle", async (c) => {
   type T = { team: string; status: string; placement: number | null; challenge: string; cslug: string; results_published: number; oslug: string; org: string };
   return c.json({
     profile: {
-      handle: u.handle, name: displayName(u.name), avatar_url: u.avatar_key ? fileUrl(u.avatar_key) : null, bio: u.bio ?? "", institution: u.institution ?? "", location: u.location ?? "",
+      handle: u.handle, name: displayName(u.name), avatar_url: u.avatar_key ? fileUrl(u.avatar_key) : null, banner_url: u.banner_key ? fileUrl(u.banner_key) : null, bio: u.bio ?? "", institution: u.institution ?? "", location: u.location ?? "",
       skills: parseJson<string[]>(u.skills, []), links: parseJson<Record<string, string>>(u.links, {}),
       certificates: certs!.results,
       teams: (teams!.results as T[]).map((t) => ({

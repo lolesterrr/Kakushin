@@ -39,8 +39,9 @@ export function Profile() {
   const TABS = ["About you", "Teams and certificates", "Notifications", "Account"];
   return (
     <>
-    <div className="me-hero">
-      <span className="me-sun" aria-hidden="true" /><span className="me-ring" aria-hidden="true" />
+    <div className={`me-hero${me.banner_url ? " has-banner" : ""}`}>
+      {me.banner_url ? <img className="me-banner" src={me.banner_url} alt="" /> : <><span className="me-sun" aria-hidden="true" /><span className="me-ring" aria-hidden="true" /></>}
+      <BannerPicker url={me.banner_url} onChange={reload} />
       <div className="me-card">
         <div style={{ display: "flex", flexDirection: "column", gap: 18 }}>
           <p className="label">{me.public_profile && me.handle ? "Public profile" : "Private profile"}</p>
@@ -179,6 +180,27 @@ function AvatarPicker({ name, url, onChange }: { name: string; url?: string | nu
         {url && <button type="button" className="link" disabled={busy} onClick={() => void act(() => api("/me/avatar", { method: "DELETE" }))}>Remove</button>}
         {err && <p className="avatar-err" role="alert">{err}</p>}
       </div>
+    </div>
+  );
+}
+
+/** The wide picture across the top of the profile. Without one, the profile keeps its red sun. */
+function BannerPicker({ url, onChange }: { url?: string | null; onChange: () => Promise<void> }) {
+  const [busy, setBusy] = useState(false);
+  const [err, setErr] = useState("");
+  async function act(fn: () => Promise<unknown>) {
+    setBusy(true); setErr("");
+    try { await fn(); await onChange(); } catch (e) { setErr((e as Error).message); } finally { setBusy(false); }
+  }
+  return (
+    <div className="banner-pick">
+      <label className={`btn small ghost${busy ? " disabled" : ""}`}>
+        {busy ? "Saving" : url ? "Change banner" : "Add a banner"}
+        <input type="file" accept="image/png,image/jpeg,image/webp" hidden disabled={busy}
+          onChange={(e) => { const f = e.target.files?.[0]; e.target.value = ""; if (f) void act(() => postImage("/me/banner", f)); }} />
+      </label>
+      {url && <button type="button" className="btn small ghost" disabled={busy} onClick={() => void act(() => api("/me/banner", { method: "DELETE" }))}>Remove</button>}
+      {err && <p className="avatar-err" role="alert">{err}</p>}
     </div>
   );
 }

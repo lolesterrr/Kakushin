@@ -424,3 +424,17 @@ button.ghost, .btn.ghost { border: 1.5px solid var(--ink); }
 .me-card .avatar-pick .btn { white-space: nowrap; color: #f6f4ee; border-color: #f6f4ee; cursor: pointer; }
 .me-card .avatar-pick .link { color: #dcd8cf; }
 .avatar-err { margin: 0; color: #ffb4a8; font-size: 13px; max-width: 220px; }
+
+/* Profile banners: a wide picture across the top. The card sits over its lower edge. */
+.me-hero.has-banner { padding-top: 0; }
+.me-banner { position: absolute; left: 0; right: 0; top: 0; width: 100%; height: 240px; object-fit: cover; border-bottom: 1.5px solid var(--ink); }
+.me-hero.has-banner .me-card { margin-top: 170px; }
+.banner-pick { position: absolute; top: 14px; right: 16px; z-index: 2; display: flex; gap: 8px; flex-wrap: wrap; justify-content: flex-end; align-items: flex-start; max-width: 60%; }
+.banner-pick .btn { background: var(--paper); cursor: pointer; white-space: nowrap; }
+.banner-pick .avatar-err { flex-basis: 100%; text-align: right; color: var(--red-text, #b3261e); background: var(--paper); padding: 4px 8px; }
+.person-banner { aspect-ratio: 16 / 4; min-height: 140px; overflow: hidden; border-bottom: 1.5px solid var(--ink); background: var(--paper-2); }
+.person-banner img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.hero.under-banner { padding-top: 0; overflow: visible; }
+.hero.under-banner .avatar { position: relative; z-index: 1; margin-top: -48px; border-width: 3px; border-color: var(--paper); box-shadow: 0 0 0 1.5px var(--ink); }
+.hero.under-banner .person-head { align-items: flex-end; }
+@media (max-width: 640px) { .me-banner { height: 160px; } .banner-pick { top: 10px; right: 10px; } .banner-pick .btn { font-size: 12px; padding: 6px 12px; } .me-hero.has-banner .me-card { margin-top: 120px; margin-left: 0; } }

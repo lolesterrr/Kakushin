@@ -152,6 +152,15 @@ ok("gallery cards carry a cover when there is one", gal.find((g) => g.id === T)?
   await new Promise((r) => setTimeout(r, 500));
   ok("a new picture replaces the old file", up2.s === 200 && (await fetch(`${U}${up.d.avatar_url}`)).status === 404);
   ok("removing the picture", (await lead("/me/avatar", "DELETE")).s === 200 && (await lead("/me")).d.user.avatar_url === null);
+  {
+    const b = await lead.post("/me/banner", PHOTO, "image/jpeg");
+    ok("someone adds a profile banner", b.s === 200 && /^\/api\/files\/banners\//.test(b.d.url) && (await lead("/me")).d.user.banner_url === b.d.url, b);
+    ok("the banner is served", (await fetch(`${U}${b.d.url}`)).status === 200);
+    ok("a public profile shows the banner", (await anon(`/people/${h}`)).d.profile.banner_url === b.d.url);
+    ok("removing the banner", (await lead("/me/banner", "DELETE")).s === 200 && (await anon(`/people/${h}`)).d.profile.banner_url === null);
+    await new Promise((r) => setTimeout(r, 500));
+    ok("a removed banner's file is deleted", (await fetch(`${U}${b.d.url}`)).status === 404);
+  }
   ok("signed out cannot upload", (await fetch(`${U}/api/me/avatar`, { method: "POST", headers: { "content-type": "image/png" }, body: fs.readFileSync(IMG) })).status === 401);
 }
 
