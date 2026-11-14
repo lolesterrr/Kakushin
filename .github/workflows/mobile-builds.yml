@@ -1,0 +1,162 @@
+# Builds the phone app on GitHub's servers and smoke-tests it.
+#
+#  - Android: a release APK (signed with the debug key, so it installs on any phone
+#    with "install unknown apps" allowed), then a run on an Android emulator.
+#  - iOS: a simulator build that is smoke-tested on an iPhone simulator, plus an
+#    UNSIGNED .ipa. An unsigned .ipa only installs on a real iPhone after it is
+#    re-signed (for example with Sideloadly and a free Apple ID, valid 7 days).
+#
+# Everything (APK, IPA, screenshots) lands under the run's "Artifacts".
+name: Mobile builds
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths:
+      - "mobile/**"
+      - ".github/workflows/mobile-builds.yml"
+  pull_request:
+    paths:
+      - "mobile/**"
+      - ".github/workflows/mobile-builds.yml"
+
+concurrency:
+  group: mobile-builds-${{ github.ref }}
+  cancel-in-progress: true
+
+defaults:
+  run:
+    working-directory: mobile
+
+jobs:
+  android:
+    name: Android APK
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: mobile/package-lock.json
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 17
+      - uses: gradle/actions/setup-gradle@v4
+      - run: npm ci
+      - run: npx expo prebuild --platform android --no-install
+      - name: Build release APK
+        working-directory: mobile/android
+        run: ./gradlew assembleRelease --no-daemon -PreactNativeArchitectures=arm64-v8a,x86_64
+      - run: cp android/app/build/outputs/apk/release/app-release.apk ../kakushin.apk
+      - uses: actions/upload-artifact@v4
+        with:
+          name: kakushin-android-apk
+          path: kakushin.apk
+
+  android-test:
+    name: Android emulator smoke test
+    needs: android
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with:
+          name: kakushin-android-apk
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 17
+      - name: Enable KVM
+        working-directory: .
+        run: |
+          echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | sudo tee /etc/udev/rules.d/99-kvm4all.rules
+          sudo udevadm control --reload-rules
+          sudo udevadm trigger --name-match=kvm
+      - name: Install Maestro
+        working-directory: .
+        run: |
+          curl -fsSL "https://get.maestro.mobile.dev" | bash
+          echo "$HOME/.maestro/bin" >> "$GITHUB_PATH"
+      - name: Run on emulator
+        uses: reactivecircus/android-emulator-runner@v2
+        with:
+          api-level: 34
+          arch: x86_64
+          target: google_apis
+          profile: pixel_6
+          disable-animations: true
+          working-directory: mobile
+          script: |
+            adb install -r ../kakushin.apk
+            mkdir -p ../shots/android && maestro test .maestro/smoke.yaml --test-output-dir ../shots/android/report; s=$?; cp *.png ../shots/android/ 2>/dev/null; adb exec-out screencap -p > ../shots/android/zz-last-screen.png; exit $s
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: android-screenshots
+          path: shots/android
+
+  ios:
+    name: iOS build and simulator smoke test
+    runs-on: macos-26
+    timeout-minutes: 90
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: mobile/package-lock.json
+      - run: xcodebuild -version
+      - run: npm ci
+      - run: npx expo prebuild --platform ios
+      - name: Build for the simulator
+        run: |
+          set -o pipefail
+          xcodebuild -workspace ios/Kakushin.xcworkspace -scheme Kakushin -configuration Release \
+            -sdk iphonesimulator -destination 'generic/platform=iOS Simulator' \
+            -derivedDataPath build/sim CODE_SIGNING_ALLOWED=NO build | tail -n 60
+      - name: Build unsigned IPA for devices
+        run: |
+          set -o pipefail
+          xcodebuild -workspace ios/Kakushin.xcworkspace -scheme Kakushin -configuration Release \
+            -sdk iphoneos -destination 'generic/platform=iOS' \
+            -derivedDataPath build/dev CODE_SIGNING_ALLOWED=NO CODE_SIGNING_REQUIRED=NO CODE_SIGN_IDENTITY="" build | tail -n 60
+          mkdir -p Payload
+          cp -R build/dev/Build/Products/Release-iphoneos/Kakushin.app Payload/
+          zip -qry ../kakushin-unsigned.ipa Payload
+          cd build/sim/Build/Products/Release-iphonesimulator && zip -qry "$GITHUB_WORKSPACE/kakushin-simulator.app.zip" Kakushin.app
+      - uses: actions/upload-artifact@v4
+        with:
+          name: kakushin-ios-unsigned-ipa
+          path: kakushin-unsigned.ipa
+      - uses: actions/upload-artifact@v4
+        with:
+          name: kakushin-ios-simulator-app
+          path: kakushin-simulator.app.zip
+      - name: Install Maestro
+        run: |
+          curl -fsSL "https://get.maestro.mobile.dev" | bash
+          echo "$HOME/.maestro/bin" >> "$GITHUB_PATH"
+      - name: Run on iPhone simulator
+        run: |
+          set +e
+          UDID=$(xcrun simctl list devices available -j | python3 -c 'import json,sys; d=json.load(sys.stdin)["devices"]; print(next(x["udid"] for r in sorted(d, reverse=True) if "iOS" in r for x in d[r] if x["name"].startswith("iPhone")))')
+          echo "Using simulator $UDID"
+          xcrun simctl boot "$UDID"
+          xcrun simctl bootstatus "$UDID" -b
+          xcrun simctl install "$UDID" build/sim/Build/Products/Release-iphonesimulator/Kakushin.app
+          mkdir -p ../shots/ios
+          maestro --device "$UDID" test .maestro/smoke.yaml --test-output-dir ../shots/ios/report; s=$?
+          cp *.png ../shots/ios/ 2>/dev/null
+          xcrun simctl io "$UDID" screenshot ../shots/ios/zz-last-screen.png
+          exit $s
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: ios-screenshots
+          path: shots/ios

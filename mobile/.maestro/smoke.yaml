@@ -1,0 +1,32 @@
+# Smoke test: opens the app fresh, walks through first-run onboarding and the main tabs,
+# and saves a screenshot of each screen. Runs against the live site (read-only).
+appId: app.kakushin.mobile
+---
+- launchApp:
+    clearState: true
+- extendedWaitUntil:
+    visible: "What do you like building?"
+    timeout: 60000
+- takeScreenshot: 01-welcome
+- tapOn: "Skip"
+- extendedWaitUntil:
+    visible: "Explore"
+    timeout: 30000
+- waitForAnimationToEnd:
+    timeout: 8000
+- takeScreenshot: 02-explore
+- tapOn: "Global"
+- waitForAnimationToEnd:
+    timeout: 8000
+- takeScreenshot: 03-global-events
+- tapOn: "My teams"
+- waitForAnimationToEnd:
+    timeout: 5000
+- takeScreenshot: 04-my-teams
+- tapOn:
+    text: "Inbox.*"
+- waitForAnimationToEnd:
+    timeout: 5000
+- takeScreenshot: 05-inbox
+- tapOn: "Explore"
+- assertVisible: "Explore"
