@@ -7,6 +7,7 @@ import { StatusStamp } from "./Team";
 import { CertificatesList } from "./Certificates";
 import { TopicPicker } from "./Inbox";
 import { PushSetting } from "./OrgTeam";
+import { Avatar, postImage } from "../media";
 
 export function Profile() {
   const { me, reload } = useAuth();
@@ -43,7 +44,10 @@ export function Profile() {
       <div className="me-card">
         <div style={{ display: "flex", flexDirection: "column", gap: 18 }}>
           <p className="label">{me.public_profile && me.handle ? "Public profile" : "Private profile"}</p>
-          <h1 className="boxed">{me.name || "Your name"}</h1>
+          <div className="me-id">
+            <AvatarPicker name={me.name || me.email} url={me.avatar_url} onChange={reload} />
+            <h1 className="boxed">{me.name || "Your name"}</h1>
+          </div>
           {(me.institution || me.location) && <div className="facts">{me.institution && <span>{me.institution}</span>}{me.location && <span>{me.location}</span>}</div>}
           {me.skills.length > 0 && <div className="pills">{me.skills.slice(0, 8).map((k) => <span className="pill" key={k}>{k}</span>)}</div>}
           {me.public_profile && me.handle ? <Link to={`/u/${me.handle}`} style={{ fontFamily: "var(--mono)", fontSize: 14, color: "#f6f4ee" }}>{window.location.host}/u/{me.handle}</Link>
@@ -151,6 +155,30 @@ function DeleteAccount({ email }: { email: string }) {
           {err && <Notice kind="err">{err}</Notice>}
         </form>
       )}
+    </div>
+  );
+}
+
+/** The profile picture with a way to change or remove it. Square crops look best; the circle trims the rest. */
+function AvatarPicker({ name, url, onChange }: { name: string; url?: string | null; onChange: () => Promise<void> }) {
+  const [busy, setBusy] = useState(false);
+  const [err, setErr] = useState("");
+  async function act(fn: () => Promise<unknown>) {
+    setBusy(true); setErr("");
+    try { await fn(); await onChange(); } catch (e) { setErr((e as Error).message); } finally { setBusy(false); }
+  }
+  return (
+    <div className="avatar-pick">
+      <Avatar name={name} url={url} size={88} />
+      <div>
+        <label className={`btn small ghost${busy ? " disabled" : ""}`}>
+          {busy ? "Saving" : url ? "Change photo" : "Add a photo"}
+          <input type="file" accept="image/png,image/jpeg,image/webp" hidden disabled={busy}
+            onChange={(e) => { const f = e.target.files?.[0]; e.target.value = ""; if (f) void act(() => postImage("/me/avatar", f)); }} />
+        </label>
+        {url && <button type="button" className="link" disabled={busy} onClick={() => void act(() => api("/me/avatar", { method: "DELETE" }))}>Remove</button>}
+        {err && <p className="avatar-err" role="alert">{err}</p>}
+      </div>
     </div>
   );
 }

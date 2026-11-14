@@ -3,6 +3,8 @@ import { z } from "zod";
 import type { AppEnv } from "../types";
 import { clearSessionCookie } from "../lib/session";
 import { HANDLE_RE, RESERVED_HANDLES } from "./people";
+import { saveImage } from "../lib/upload";
+import { fileUrl } from "../lib/media";
 
 export const me = new Hono<AppEnv>();
 
@@ -10,10 +12,11 @@ me.get("/", async (c) => {
   const u = c.get("user");
   if (!u) return c.json({ user: null });
   const full = await c.env.DB.prepare(
-    "SELECT id, email, name, bio, institution, location, skills, links, gender, is_platform_admin, is_super_admin, handle, public_profile FROM users WHERE id = ?",
+    "SELECT id, email, name, bio, institution, location, skills, links, gender, is_platform_admin, is_super_admin, handle, public_profile, avatar_key FROM users WHERE id = ?",
   ).bind(u.id).first<Record<string, unknown>>();
+  const { avatar_key, ...rest } = full ?? {};
   return c.json({
-    user: { ...full, public_profile: !!full?.public_profile, skills: JSON.parse(String(full?.skills ?? "[]")), links: JSON.parse(String(full?.links ?? "{}")) },
+    user: { ...rest, avatar_url: avatar_key ? fileUrl(String(avatar_key)) : null, public_profile: !!full?.public_profile, skills: JSON.parse(String(full?.skills ?? "[]")), links: JSON.parse(String(full?.links ?? "{}")) },
   });
 });
 
@@ -67,6 +70,27 @@ me.put("/", async (c) => {
     u.id,
   ).run().catch((e) => { if (String(e).includes("UNIQUE")) return null; throw e; });
   if (!res) return c.json({ error: "That profile address is taken" }, 409);
+  return c.json({ ok: true });
+});
+
+/** Sets the profile picture. The old file is removed once the new one is saved. */
+me.post("/avatar", async (c) => {
+  const u = c.get("user");
+  if (!u) return c.json({ error: "Not signed in" }, 401);
+  const saved = await saveImage(c, "avatars", 2 * 1024 * 1024);
+  if (!saved.ok) return c.json({ error: saved.error }, 400);
+  const old = await c.env.DB.prepare("SELECT avatar_key FROM users WHERE id = ?").bind(u.id).first<{ avatar_key: string | null }>();
+  await c.env.DB.prepare("UPDATE users SET avatar_key = ? WHERE id = ?").bind(saved.key, u.id).run();
+  if (old?.avatar_key) c.executionCtx.waitUntil(c.env.FILES.delete(old.avatar_key).catch(() => {}));
+  return c.json({ ok: true, avatar_url: fileUrl(saved.key) });
+});
+
+me.delete("/avatar", async (c) => {
+  const u = c.get("user");
+  if (!u) return c.json({ error: "Not signed in" }, 401);
+  const old = await c.env.DB.prepare("SELECT avatar_key FROM users WHERE id = ?").bind(u.id).first<{ avatar_key: string | null }>();
+  await c.env.DB.prepare("UPDATE users SET avatar_key = NULL WHERE id = ?").bind(u.id).run();
+  if (old?.avatar_key) c.executionCtx.waitUntil(c.env.FILES.delete(old.avatar_key).catch(() => {}));
   return c.json({ ok: true });
 });
 

@@ -28,8 +28,8 @@ people.get("/:handle", async (c) => {
   const handle = c.req.param("handle").toLowerCase();
   if (!HANDLE_RE.test(handle)) return c.json({ error: "Not found" }, 404);
   const u = await c.env.DB.prepare(
-    "SELECT id, name, bio, institution, location, skills, links, handle FROM users WHERE handle = ? AND public_profile = 1 AND suspended = 0",
-  ).bind(handle).first<{ id: string; name: string | null; bio: string | null; institution: string | null; location: string | null; skills: string; links: string; handle: string }>();
+    "SELECT id, name, bio, institution, location, skills, links, handle, avatar_key FROM users WHERE handle = ? AND public_profile = 1 AND suspended = 0",
+  ).bind(handle).first<{ id: string; name: string | null; bio: string | null; institution: string | null; location: string | null; skills: string; links: string; handle: string; avatar_key: string | null }>();
   if (!u) return c.json({ error: "Not found" }, 404);
   const db = c.env.DB;
   const [certs, teams] = await db.batch([
@@ -48,7 +48,7 @@ people.get("/:handle", async (c) => {
   type T = { team: string; status: string; placement: number | null; challenge: string; cslug: string; results_published: number; oslug: string; org: string };
   return c.json({
     profile: {
-      handle: u.handle, name: displayName(u.name), bio: u.bio ?? "", institution: u.institution ?? "", location: u.location ?? "",
+      handle: u.handle, name: displayName(u.name), avatar_url: u.avatar_key ? fileUrl(u.avatar_key) : null, bio: u.bio ?? "", institution: u.institution ?? "", location: u.location ?? "",
       skills: parseJson<string[]>(u.skills, []), links: parseJson<Record<string, string>>(u.links, {}),
       certificates: certs!.results,
       teams: (teams!.results as T[]).map((t) => ({
@@ -168,12 +168,12 @@ orgPeople.get("/:slug/challenges/:cslug/projects/:teamId", async (c) => {
   if (!g) return c.json({ error: "Not found" }, 404);
   // Members link to their profile only when they made it public.
   const { results: members } = await c.env.DB.prepare(
-    `SELECT COALESCE(NULLIF(u.name, ''), 'Participant') AS name, CASE WHEN u.public_profile = 1 THEN u.handle END AS handle, (t.lead_user_id = u.id) AS lead
+    `SELECT COALESCE(NULLIF(u.name, ''), 'Participant') AS name, CASE WHEN u.public_profile = 1 THEN u.handle END AS handle, CASE WHEN u.public_profile = 1 THEN u.avatar_key END AS avatar_key, (t.lead_user_id = u.id) AS lead
      FROM team_members m JOIN users u ON u.id = m.user_id JOIN teams t ON t.id = m.team_id WHERE m.team_id = ? ORDER BY lead DESC, m.joined_at`,
-  ).bind(g.id).all<{ name: string; handle: string | null; lead: number }>();
+  ).bind(g.id).all<{ name: string; handle: string | null; avatar_key: string | null; lead: number }>();
   const { results: others } = await c.env.DB.prepare(`${GALLERY} AND ch.id = ? AND t.id != ? ORDER BY t.placement IS NULL, t.placement, t.name LIMIT 6`).bind(x.ch.id, g.id).all<G>();
   return c.json({
-    project: { ...galleryOut(g), members: members.map((m) => ({ name: m.name, handle: m.handle, lead: !!m.lead })), images: await pitchImages(c, g.id) },
+    project: { ...galleryOut(g), members: members.map((m) => ({ name: m.name, handle: m.handle, avatar_url: m.avatar_key ? fileUrl(m.avatar_key) : null, lead: !!m.lead })), images: await pitchImages(c, g.id) },
     org: { slug: x.org.slug, name: x.org.name }, more: others.map(galleryOut),
   });
 });
