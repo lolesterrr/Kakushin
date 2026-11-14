@@ -8,6 +8,7 @@ import { NETWORK_ERROR, enqueue, flush, queued } from "../../../../lib/judgeQueu
 import { useLoad } from "../../../../lib/useLoad";
 import { useTheme } from "../../../../lib/theme";
 import { Body, Button, Card, Field, H2, Label, Loading, Notice, Offline, Screen } from "../../../../components/ui";
+import { ImageStrip, Video } from "../../../../components/media";
 
 type Vals = Record<string, { score: number | null; comment: string }>;
 type Msg = { kind: "ok" | "err"; text: string } | null;
@@ -74,7 +75,10 @@ export default function JudgeTeamScreen() {
       {d.stale ? <Offline /> : null}
       <Body muted>{x.blind ? "Blind review: member names are hidden." : x.team.members.map((m) => (m.institution ? `${m.name} (${m.institution})` : m.name)).join(", ")}</Body>
       <H2>Pitch</H2>
-      {!p ? <Body muted>This team has not added a pitch yet.</Body> : (
+      {/* Video and screenshots first, when the team added them. Either can be missing. */}
+      {p?.video_embed ? <Video embed={p.video_embed} title={x.team.name} /> : null}
+      <ImageStrip images={x.images} title={x.team.name} />
+      {!p && !x.images.length ? <Body muted>This team has not added a pitch yet.</Body> : !p ? null : (
         <Card>
           {p.has_deck ? <Button title="Open the deck" onPress={() => router.push({ pathname: "/deck/[team]", params: { team, name: x.team.name } } as never)} /> : <Body muted>No deck.</Body>}
           {[["Video", p.video_url], ["Demo", p.demo_url], ["Code", p.repo_url]].filter(([, u]) => u).map(([l, u]) => (
