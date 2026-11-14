@@ -30,6 +30,7 @@ export interface User {
   email: string;
   name: string | null;
   is_platform_admin: number;
+  is_super_admin?: number;
 }
 
 export type AppEnv = { Bindings: Env; Variables: { user: User | null } };

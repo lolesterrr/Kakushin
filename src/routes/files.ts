@@ -5,8 +5,9 @@ export const files = new Hono<AppEnv>();
 
 // Only public image folders are served. Keys are random, so they can be cached for a long time.
 files.get("/:folder{logos|covers}/:name", (c) => serve(c, `${c.req.param("folder")}/${c.req.param("name")}`));
-// Sponsor logos and images in challenge pages sit in a folder per challenge.
-files.get("/:folder{sponsors|pages}/:sub{[a-f0-9]{8,40}}/:name", (c) => serve(c, `${c.req.param("folder")}/${c.req.param("sub")}/${c.req.param("name")}`));
+// Sponsor logos, page images and recap photos sit in a folder per challenge; pitch screenshots in a folder per team.
+// Keys are random and unlisted, so a screenshot is only reachable by someone who was shown its address.
+files.get("/:folder{sponsors|pages|shots|photos}/:sub{[a-f0-9]{8,40}}/:name", (c) => serve(c, `${c.req.param("folder")}/${c.req.param("sub")}/${c.req.param("name")}`));
 
 async function serve(c: Context<AppEnv>, key: string) {
   const obj = await c.env.FILES.get(key);

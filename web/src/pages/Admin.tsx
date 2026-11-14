@@ -162,6 +162,8 @@ interface Form {
   rules: string; faq: { q: string; a: string }[]; sponsors: Sponsor[]; timeline: { label: string; at: string }[]; show_judges: boolean;
 }
 
+const SECTIONS = ["Basics", "Rules and FAQ", "Sponsors", "Timeline and teams", "Questions", "Status and publish"];
+
 export function AdminChallenge() {
   const { slug, cslug } = useParams();
   const guard = useGuard(`/admin/o/${slug}/c/${cslug}/edit`);
@@ -169,6 +171,7 @@ export function AdminChallenge() {
   const [f, setF] = useState<Form | null>(null);
   const [allTopics, setAllTopics] = useState<string[]>([]);
   const [msg, setMsg] = useState<Msg>(null);
+  const [sec, setSec] = useState(0);
   const [saving, setSaving] = useState(false);
   const [copied, setCopied] = useState(false);
   const [wasDraft, setWasDraft] = useState(true);
@@ -262,7 +265,13 @@ export function AdminChallenge() {
         <div className="section"><div className="actions" style={{ marginTop: 0 }}><input readOnly value={publicUrl} aria-label="Public link" style={{ maxWidth: 420 }} onFocus={(e) => e.target.select()} /><button className="ghost" onClick={copy}>{copied ? "Copied" : "Copy link"}</button><Link className="btn ghost" to={`/o/${slug}/c/${cslug}`}>View page</Link></div></div>
       )}
 
-      <div className="section form">
+      <nav className="folders" role="tablist" aria-label="Challenge editor sections">
+        {SECTIONS.map((label, i) => (
+          <button key={label} type="button" role="tab" id={`tab-${i}`} aria-controls={`sec-${i}`} aria-selected={sec === i} onClick={() => setSec(i)}>{label}</button>
+        ))}
+      </nav>
+
+      <div className="section form" role="tabpanel" id="sec-0" aria-labelledby="tab-0" hidden={sec !== 0}>
         <h2>Basics</h2>
         <label htmlFor="t">Title</label><input id="t" value={f.title} onChange={(e) => set("title", e.target.value)} />
         <label htmlFor="su">One-line summary (shown on cards)</label><input id="su" maxLength={200} value={f.summary} onChange={(e) => set("summary", e.target.value)} />
@@ -280,7 +289,7 @@ export function AdminChallenge() {
         })}</div>
       </div>
 
-      <div className="section form">
+      <div className="section form" role="tabpanel" id="sec-1" aria-labelledby="tab-1" hidden={sec !== 1}>
         <h2>Rules and FAQ</h2>
         <MarkdownField id="ru" label="Rules" rows={8} value={f.rules} onChange={(v) => set("rules", v)} uploadPath={`/orgs/${slug}/challenges/${cslug}/images`} hint="Who can take part, what to build, what is not allowed. Same formatting as the description." />
         <label>Frequently asked questions</label>
@@ -294,7 +303,7 @@ export function AdminChallenge() {
         <button type="button" className="ghost" disabled={f.faq.length >= 30} onClick={() => set("faq", [...f.faq, { q: "", a: "" }])}>Add a question</button>
       </div>
 
-      <div className="section form">
+      <div className="section form" role="tabpanel" id="sec-2" aria-labelledby="tab-2" hidden={sec !== 2}>
         <h2>Sponsors</h2>
         <p className="muted">Shown with their logo on the challenge page. Logos are PNG, JPEG or WebP, up to 1 MB.</p>
         {f.sponsors.map((x, i) => (
@@ -314,7 +323,7 @@ export function AdminChallenge() {
         <button type="button" className="ghost" disabled={f.sponsors.length >= 20} onClick={() => set("sponsors", [...f.sponsors, { name: "", url: "", logo_key: null, logo_url: null }])}>Add a sponsor</button>
       </div>
 
-      <div className="section form">
+      <div className="section form" role="tabpanel" id="sec-3" aria-labelledby="tab-3" hidden={sec !== 3}>
         <h2>Timeline and teams</h2>
         <div className="row">
           <div><label htmlFor="o">Applications open</label><input id="o" type="datetime-local" value={f.opens} onChange={(e) => set("opens", e.target.value)} /></div>
@@ -339,7 +348,7 @@ export function AdminChallenge() {
         <p className="muted" style={{ marginTop: 4 }}>Only judges who add a display name on their judging page appear, with their title. Their email is never shown.</p>
       </div>
 
-      <div className="section form">
+      <div className="section form" role="tabpanel" id="sec-4" aria-labelledby="tab-4" hidden={sec !== 4}>
         <h2>Application questions</h2>
         <p className="muted">Applicants answer these when they apply. Name and email come from their profile.</p>
         {f.questions.map((q, i) => (
@@ -363,7 +372,7 @@ export function AdminChallenge() {
         <button type="button" className="ghost" onClick={() => set("questions", [...f.questions, { label: "", type: "short_text", required: false, options: [] }])} disabled={f.questions.length >= 20}>Add a question</button>
       </div>
 
-      <div className="section form">
+      <div className="section form" role="tabpanel" id="sec-5" aria-labelledby="tab-5" hidden={sec !== 5}>
         <h2>Status</h2>
         <label htmlFor="st">Stage</label>
         <select id="st" value={f.status} onChange={(e) => set("status", e.target.value)}>{STATUSES.map((s) => <option key={s}>{s}</option>)}</select>
@@ -380,6 +389,14 @@ export function AdminChallenge() {
         </div>
         {msg && <Notice kind={msg.kind}>{msg.text}</Notice>}
       </div>
+      {sec !== SECTIONS.length - 1 && (
+        <div className="savebar">
+          {sec > 0 && <button type="button" className="ghost" onClick={() => setSec(sec - 1)}>← {SECTIONS[sec - 1]}</button>}
+          <button type="button" onClick={() => save()} disabled={saving}>{saving ? "Saving..." : "Save"}</button>
+          <button type="button" className="ghost" onClick={() => setSec(sec + 1)}>Next: {SECTIONS[sec + 1]} →</button>
+          {msg && <Notice kind={msg.kind}>{msg.text}</Notice>}
+        </div>
+      )}
     </>
   );
 }

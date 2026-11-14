@@ -4,6 +4,8 @@ import type { AppEnv } from "../types";
 import { judgeSees } from "../lib/assign";
 import { newId } from "../lib/crypto";
 import { parseRepo, repoUrl } from "../lib/github";
+import { MAX_PITCH_IMAGES, MEDIA_BYTES, fileUrl, headerCaption, youtubeEmbed } from "../lib/media";
+import { saveImage } from "../lib/upload";
 
 /** Participant pitch routes, mounted under /api/teams. */
 export const pitch = new Hono<AppEnv>();
@@ -26,14 +28,22 @@ async function memberTeam(c: Context<AppEnv>, teamId: string): Promise<TeamCtx |
 }
 
 const pitchOut = (r: { deck_name: string | null; deck_key: string | null; video_url: string; demo_url: string; repo_url?: string; notes: string; updated_at: number } | null) =>
-  r ? { has_deck: !!r.deck_key, deck_name: r.deck_name, video_url: r.video_url, demo_url: r.demo_url, repo_url: r.repo_url ?? "", notes: r.notes, updated_at: r.updated_at } : null;
+  r ? { has_deck: !!r.deck_key, deck_name: r.deck_name, video_url: r.video_url, video_embed: youtubeEmbed(r.video_url), demo_url: r.demo_url, repo_url: r.repo_url ?? "", notes: r.notes, updated_at: r.updated_at } : null;
+
+export interface PitchImage { id: string; url: string; caption: string }
+
+/** A team's screenshots in order. An empty list when there are none. */
+export async function pitchImages(c: Context<AppEnv>, teamId: string): Promise<PitchImage[]> {
+  const { results } = await c.env.DB.prepare("SELECT id, key, caption FROM pitch_images WHERE team_id = ? ORDER BY position, created_at").bind(teamId).all<{ id: string; key: string; caption: string }>();
+  return results.map((r) => ({ id: r.id, url: fileUrl(r.key), caption: r.caption }));
+}
 
 pitch.get("/:id/pitch", async (c) => {
   if (!c.get("user")) return c.json({ error: "Not signed in" }, 401);
   const x = await memberTeam(c, c.req.param("id"));
   if (!x) return c.json({ error: "Not found" }, 404);
   const row = await c.env.DB.prepare("SELECT * FROM submissions WHERE team_id = ?").bind(x.team.id).first<any>();
-  return c.json({ pitch: pitchOut(row), due: x.due, open: PITCH_STATUSES.includes(x.team.status) });
+  return c.json({ pitch: pitchOut(row), images: await pitchImages(c, x.team.id), max_images: MAX_PITCH_IMAGES, due: x.due, open: PITCH_STATUSES.includes(x.team.status) });
 });
 
 function guard(x: TeamCtx): string | null {
@@ -88,6 +98,56 @@ pitch.put("/:id/pitch/deck", async (c) => {
   ).bind(newId(), x.team.id, key, name, Date.now()).run();
   if (old?.deck_key) await c.env.FILES.delete(old.deck_key);
   return c.json({ ok: true, deck_name: name });
+});
+
+// ---- screenshots: up to MAX_PITCH_IMAGES per team, each with an optional caption ----
+pitch.post("/:id/pitch/images", async (c) => {
+  if (!c.get("user")) return c.json({ error: "Not signed in" }, 401);
+  const x = await memberTeam(c, c.req.param("id"));
+  if (!x) return c.json({ error: "Not found" }, 404);
+  const why = guard(x);
+  if (why) return c.json({ error: why }, 409);
+  const n = (await c.env.DB.prepare("SELECT COUNT(*) AS n FROM pitch_images WHERE team_id = ?").bind(x.team.id).first<{ n: number }>())?.n ?? 0;
+  if (n >= MAX_PITCH_IMAGES) return c.json({ error: `A pitch can have up to ${MAX_PITCH_IMAGES} images. Remove one first.` }, 409);
+  const saved = await saveImage(c, `shots/${x.team.id}`, MEDIA_BYTES);
+  if (!saved.ok) return c.json({ error: saved.error }, 400);
+  const caption = headerCaption(c.req.header("X-Caption"));
+  const id = newId();
+  await c.env.DB.prepare("INSERT INTO pitch_images (id, team_id, key, caption, position, created_at) VALUES (?, ?, ?, ?, ?, ?)")
+    .bind(id, x.team.id, saved.key, caption, n, Date.now()).run();
+  return c.json({ ok: true, image: { id, url: fileUrl(saved.key), caption } });
+});
+
+/** Captions and order in one call: the list is the new order, and every image the team has must be in it. */
+pitch.put("/:id/pitch/images", async (c) => {
+  if (!c.get("user")) return c.json({ error: "Not signed in" }, 401);
+  const x = await memberTeam(c, c.req.param("id"));
+  if (!x) return c.json({ error: "Not found" }, 404);
+  const why = guard(x);
+  if (why) return c.json({ error: why }, 409);
+  const parsed = z.object({ images: z.array(z.object({ id: z.string().min(1).max(64), caption: z.string().trim().max(120) })).max(MAX_PITCH_IMAGES) })
+    .safeParse(await c.req.json().catch(() => null));
+  if (!parsed.success) return c.json({ error: "Captions can be up to 120 characters" }, 400);
+  const have = new Set((await pitchImages(c, x.team.id)).map((i) => i.id));
+  const list = parsed.data.images;
+  if (list.length !== have.size || !list.every((i) => have.has(i.id)) || new Set(list.map((i) => i.id)).size !== list.length) {
+    return c.json({ error: "The images changed. Reload and try again." }, 409);
+  }
+  await c.env.DB.batch(list.map((i, pos) => c.env.DB.prepare("UPDATE pitch_images SET caption = ?, position = ? WHERE id = ? AND team_id = ?").bind(i.caption, pos, i.id, x.team.id)));
+  return c.json({ ok: true });
+});
+
+pitch.delete("/:id/pitch/images/:imageId", async (c) => {
+  if (!c.get("user")) return c.json({ error: "Not signed in" }, 401);
+  const x = await memberTeam(c, c.req.param("id"));
+  if (!x) return c.json({ error: "Not found" }, 404);
+  const why = guard(x);
+  if (why) return c.json({ error: why }, 409);
+  const row = await c.env.DB.prepare("SELECT key FROM pitch_images WHERE id = ? AND team_id = ?").bind(c.req.param("imageId"), x.team.id).first<{ key: string }>();
+  if (!row) return c.json({ error: "Not found" }, 404);
+  await c.env.DB.prepare("DELETE FROM pitch_images WHERE id = ?").bind(c.req.param("imageId")).run();
+  c.executionCtx.waitUntil(c.env.FILES.delete(row.key).catch(() => {}));
+  return c.json({ ok: true });
 });
 
 /** A deck can be opened by the team, the organisation's admins, and the challenge's judges. */

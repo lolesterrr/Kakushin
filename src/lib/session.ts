@@ -37,7 +37,7 @@ export function readToken(c: Context<AppEnv>): string | null {
 
 export async function userFromToken(c: Context<AppEnv>, token: string): Promise<User | null> {
   const row = await c.env.DB.prepare(
-    `SELECT u.id, u.email, u.name, u.is_platform_admin
+    `SELECT u.id, u.email, u.name, u.is_platform_admin, u.is_super_admin
      FROM sessions s JOIN users u ON u.id = s.user_id
      WHERE s.id_hash = ? AND s.expires_at > ? AND u.suspended = 0`,
   )
