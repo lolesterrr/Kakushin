@@ -14,9 +14,10 @@ import { useTheme } from "../../../lib/theme";
 import { Banner, Scrim } from "../../../components/Banner";
 import { Markdown } from "../../../components/Markdown";
 import { API_URL } from "../../../lib/config";
-import { F } from "../../../lib/fonts";
+import { F, topicLabel } from "../../../lib/fonts";
 import { shadow } from "../../../lib/theme";
 import { Body, Button, Card, DaysStamp, H2, Label, Loading, Notice, Offline, Pill, Screen, StatusStamp } from "../../../components/ui";
+import { Recap } from "../../../components/projects";
 
 export default function ChallengeScreen() {
   const { org, slug } = useLocalSearchParams<{ org: string; slug: string }>();
@@ -63,10 +64,10 @@ export default function ChallengeScreen() {
           {ch.stale ? <Offline /> : null}
           <Text accessibilityRole="header" style={{ color: t.ink, fontFamily: F.display, fontSize: 32, lineHeight: 34, letterSpacing: -0.6 }}>{c.title}</Text>
           {c.summary ? <Body muted>{c.summary}</Body> : null}
-          {c.topics.length ? <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 8 }}>{c.topics.map((x) => <Pill key={x} text={x} />)}</View> : null}
+          {c.topics.length ? <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 8 }}>{c.topics.map((x) => <Pill key={x} text={topicLabel(x)} />)}</View> : null}
           <View style={{ flexDirection: "row", gap: 8 }}>
-            {c.applications_close_at ? <View style={[{ flex: 1, backgroundColor: t.card, borderWidth: 1, borderColor: t.line, borderRadius: 14, padding: 12 }, shadow(0.06)]}><Label>Closes</Label><Text style={{ color: t.ink, fontFamily: F.display, fontSize: 19 }}>{fmtDate(c.applications_close_at)}</Text></View> : null}
-            <View style={[{ flex: 1, backgroundColor: t.card, borderWidth: 1, borderColor: t.line, borderRadius: 14, padding: 12 }, shadow(0.06)]}><Label>Team</Label><Text style={{ color: t.ink, fontFamily: F.display, fontSize: 19 }}>{teamSize(c.team_min, c.team_max)}</Text></View>
+            {c.applications_close_at ? <View style={{ flex: 1, backgroundColor: t.card, borderWidth: 1.5, borderColor: t.ink, borderRadius: 14, padding: 12 }}><Label>Closes</Label><Text style={{ color: t.ink, fontFamily: F.display, fontSize: 19 }}>{fmtDate(c.applications_close_at)}</Text></View> : null}
+            <View style={{ flex: 1, backgroundColor: t.card, borderWidth: 1.5, borderColor: t.ink, borderRadius: 14, padding: 12 }}><Label>Team</Label><Text style={{ color: t.ink, fontFamily: F.display, fontSize: 19 }}>{teamSize(c.team_min, c.team_max)}</Text></View>
             {c.pitch_due_at ? <View style={{ flex: 1, backgroundColor: "#111111", borderRadius: 14, padding: 12 }}><Label>Pitch</Label><Text style={{ color: "#F6F4EE", fontFamily: F.display, fontSize: 19 }}>{fmtDate(c.pitch_due_at)}</Text></View> : null}
           </View>
           {d !== null && d > 0 ? <View style={{ flexDirection: "row" }}><DaysStamp days={d} tilt={-2} /></View> : null}
@@ -116,7 +117,8 @@ export default function ChallengeScreen() {
       ) : null}
 
       {msg ? <Notice kind={msg.kind}>{msg.text}</Notice> : null}
-      {c.results_published ? <Button title="See the results" onPress={() => router.push(`/results/${org}/${slug}`)} /> : null}
+      {c.results_published ? <Button title="See the results and projects" onPress={() => router.push(`/results/${org}/${slug}`)} /> : null}
+      {(c.status === "judging" || c.status === "completed") && !c.results_published ? <Recap base={`/orgs/${org}/challenges/${slug}`} /> : null}
       {c.status !== "draft" && c.status !== "completed" && (c.agenda.length > 0 || c.checkin_enabled || c.role) ? (
         <>
           <H2>Event day</H2>

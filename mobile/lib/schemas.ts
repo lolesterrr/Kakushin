@@ -40,7 +40,7 @@ export type ChallengeDetail = z.infer<typeof challengeDetail>["challenge"];
 
 export const team = z.object({
   id: z.string(), name: z.string(), status: z.string(), placement: z.number().nullable().optional(), invite_code: z.string(), is_lead: z.boolean(),
-  members: z.array(z.object({ id: z.string(), name: z.string(), is_lead: z.boolean() })),
+  members: z.array(z.object({ id: z.string(), name: z.string(), is_lead: z.boolean(), avatar_url: z.string().nullable().optional() })),
   application: z.object({ answers: z.record(z.string()), submitted_at: z.number() }).nullable(),
 });
 export type Team = z.infer<typeof team>;
@@ -58,6 +58,9 @@ export const me = z.object({
   user: z.object({
     id: z.string(), email: z.string(), name: z.string().nullable(), bio: z.string().nullable(), institution: z.string().nullable(),
     location: z.string().nullable(), skills: z.array(z.string()),
+    // Day 8: pictures and the public profile. Optional so the app still reads an older server.
+    avatar_url: z.string().nullable().optional(), banner_url: z.string().nullable().optional(),
+    handle: z.string().nullable().optional(), public_profile: z.boolean().optional(),
   }).nullable(),
 });
 export type Me = NonNullable<z.infer<typeof me>["user"]>;
@@ -79,7 +82,10 @@ export const topics = z.object({ topics: z.array(z.string()) });
 export const pitch = z.object({
   pitch: z.object({
     has_deck: z.boolean(), deck_name: z.string().nullable(), video_url: z.string(), demo_url: z.string(), repo_url: z.string().default(""), notes: z.string(), updated_at: z.number(),
+    video_embed: z.string().nullable().optional(),
   }).nullable(),
+  images: z.array(z.object({ id: z.string(), url: z.string(), caption: z.string() })).default([]),
+  max_images: z.number().default(6),
   due: z.number().nullable(),
   open: z.boolean(),
 });
@@ -128,7 +134,8 @@ export const judgeChallenge = z.object({
 export const judgeTeam = z.object({
   team: z.object({ id: z.string(), name: z.string(), members: z.array(z.object({ name: z.string(), institution: z.string().nullable() })) }),
   blind: z.boolean(),
-  pitch: z.object({ has_deck: z.boolean(), deck_name: z.string().nullable(), video_url: z.string(), demo_url: z.string(), repo_url: z.string().default(""), notes: z.string() }).nullable(),
+  pitch: z.object({ has_deck: z.boolean(), deck_name: z.string().nullable(), video_url: z.string(), video_embed: z.string().nullable().optional(), demo_url: z.string(), repo_url: z.string().default(""), notes: z.string() }).nullable(),
+  images: z.array(z.object({ id: z.string(), url: z.string(), caption: z.string() })).default([]),
   scores: z.array(z.object({ criterion_id: z.string(), score: z.number(), comment: z.string().nullable() })),
   own_team: z.boolean(), scoring_open: z.boolean(), criteria: z.array(criterion),
 });
@@ -136,4 +143,25 @@ export const repoStats = z.object({
   status: z.string(), blind: z.boolean().optional(), not_on_team: z.number().optional(),
   contributors: z.array(z.object({ login: z.string().nullable(), member: z.string().nullable(), on_team: z.boolean(), commits: z.number() })).optional(),
   no_commits: z.union([z.number(), z.array(z.object({ name: z.string(), linked: z.boolean() }))]).optional(),
+});
+
+// ---- Day 8: project pages and the event recap ----
+export const projectCard = z.object({
+  id: z.string(), team: z.string(), status: z.string(), placement: z.number().nullable(), challenge: z.string(), cslug: z.string(), oslug: z.string(),
+  video_url: z.string().default(""), video_embed: z.string().nullable().optional(), demo_url: z.string().default(""), repo_url: z.string().default(""),
+  notes: z.string().default(""), cover_url: z.string().nullable().optional(), members: z.string().default(""),
+});
+export type ProjectCard = z.infer<typeof projectCard>;
+export const gallery = z.object({ projects: z.array(projectCard) });
+export const project = z.object({
+  project: projectCard.omit({ members: true }).extend({
+    members: z.array(z.object({ name: z.string(), handle: z.string().nullable(), avatar_url: z.string().nullable().optional(), lead: z.boolean() })),
+    images: z.array(z.object({ id: z.string(), url: z.string(), caption: z.string() })),
+  }),
+  org: z.object({ slug: z.string(), name: z.string() }),
+  more: z.array(projectCard),
+});
+export const photos = z.object({
+  photos: z.array(z.object({ id: z.string(), url: z.string(), caption: z.string(), approved: z.boolean(), by: z.string(), created_at: z.number() })),
+  can_add: z.boolean(), can_manage: z.boolean(), open: z.boolean(), per_person: z.number(),
 });

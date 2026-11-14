@@ -60,6 +60,7 @@ export default function Root() {
         <Stack.Screen name="judge/[org]/[slug]/index" options={{ title: "Judging" }} />
         <Stack.Screen name="judge/[org]/[slug]/[team]" options={{ title: "Score" }} />
         <Stack.Screen name="deck/[team]" options={{ title: "Deck" }} />
+        <Stack.Screen name="project/[org]/[slug]/[team]" options={{ title: "Project" }} />
         <Stack.Screen name="welcome" options={{ headerShown: false, gestureEnabled: false }} />
       </Stack>
     </AuthProvider>
