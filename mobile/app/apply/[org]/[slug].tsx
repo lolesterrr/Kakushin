@@ -12,6 +12,7 @@ import { F } from "../../../lib/fonts";
 import { useLoad } from "../../../lib/useLoad";
 import { shadow, useTheme } from "../../../lib/theme";
 import { Body, Button, Card, Field, Hand, Label, Loading, Notice, Pill, Screen } from "../../../components/ui";
+import { Avatar } from "../../../components/media";
 
 type Msg = { kind: "ok" | "err"; text: string } | null;
 const STEPS = ["Team", "Answers", "Check and send"] as const;
@@ -205,7 +206,7 @@ function TeamStep({ base, c, team, sizeOk, onChange, onNext }: { base: string; c
         <View style={{ gap: 6, marginTop: 4 }}>
           {team.members.map((m) => (
             <View key={m.id} style={{ flexDirection: "row", alignItems: "center", gap: 10 }}>
-              <View style={{ width: 34, height: 34, borderRadius: 17, backgroundColor: t.ink, alignItems: "center", justifyContent: "center" }}><Text style={{ color: t.bg, fontSize: 12, fontWeight: "700" }}>{m.name.split(" ").map((x) => x[0]).join("").slice(0, 2).toUpperCase()}</Text></View>
+              <Avatar name={m.name} url={m.avatar_url} size={34} />
               <Text style={{ flex: 1, color: t.ink, fontSize: 16, fontWeight: "600" }}>{m.name}</Text>
               {m.is_lead ? <Pill text="Lead" /> : null}
             </View>

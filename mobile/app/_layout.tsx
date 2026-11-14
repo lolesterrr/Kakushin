@@ -10,7 +10,7 @@ import { AuthProvider } from "../lib/auth";
 import { useTheme } from "../lib/theme";
 import { appRoute } from "../lib/links";
 
-// Keep the bulb splash up until the fonts are in, so the first screen never flashes in the system font.
+// Keep the red-dot splash up until the fonts are in, so the first screen never flashes in the system font.
 void SplashScreen.preventAutoHideAsync().catch(() => {});
 
 /** Opens the right screen when someone taps a push, whether the app was open, in the background or closed. */
@@ -60,6 +60,7 @@ export default function Root() {
         <Stack.Screen name="judge/[org]/[slug]/index" options={{ title: "Judging" }} />
         <Stack.Screen name="judge/[org]/[slug]/[team]" options={{ title: "Score" }} />
         <Stack.Screen name="deck/[team]" options={{ title: "Deck" }} />
+        <Stack.Screen name="project/[org]/[slug]/[team]" options={{ title: "Project" }} />
         <Stack.Screen name="welcome" options={{ headerShown: false, gestureEnabled: false }} />
       </Stack>
     </AuthProvider>
