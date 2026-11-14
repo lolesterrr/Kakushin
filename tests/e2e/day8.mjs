@@ -135,5 +135,34 @@ ok("a project with no media still has a page", pb.s === 200 && pb.d.project.imag
 const gal = (await anon(`${B}/gallery`)).d.projects;
 ok("gallery cards carry a cover when there is one", gal.find((g) => g.id === T)?.cover_url && gal.find((g) => g.id === T2)?.cover_url === null, gal);
 
+// ---- profile pictures ----
+{
+  const up = await lead.post("/me/avatar", PHOTO, "image/jpeg");
+  ok("someone adds a profile picture", up.s === 200 && /^\/api\/files\/avatars\//.test(up.d.avatar_url), up);
+  ok("/me returns the picture", (await lead("/me")).d.user.avatar_url === up.d.avatar_url);
+  ok("the picture is served", (await fetch(`${U}${up.d.avatar_url}`)).status === 200);
+  ok("a file that is not an image is refused", (await lead.post("/me/avatar", "package.json", "image/png")).s === 400);
+  ok("teammates see the picture", (await lead(`${B}/team`)).d.team.members.some((m) => m.avatar_url === up.d.avatar_url));
+  ok("a private profile's picture stays off the public project page", !(await anon(`${B}/projects/${T}`)).d.project.members.some((m) => m.avatar_url));
+  const h = `${P}-lead`.slice(0, 30);
+  await lead("/me", "PUT", { name: "Lead", skills: [], handle: h, public_profile: true });
+  ok("a public profile shows the picture", (await anon(`/people/${h}`)).d.profile.avatar_url === up.d.avatar_url);
+  ok("and so does the project page", (await anon(`${B}/projects/${T}`)).d.project.members.some((m) => m.avatar_url === up.d.avatar_url));
+  const up2 = await lead.post("/me/avatar", IMG, "image/png");
+  await new Promise((r) => setTimeout(r, 500));
+  ok("a new picture replaces the old file", up2.s === 200 && (await fetch(`${U}${up.d.avatar_url}`)).status === 404);
+  ok("removing the picture", (await lead("/me/avatar", "DELETE")).s === 200 && (await lead("/me")).d.user.avatar_url === null);
+  {
+    const b = await lead.post("/me/banner", PHOTO, "image/jpeg");
+    ok("someone adds a profile banner", b.s === 200 && /^\/api\/files\/banners\//.test(b.d.url) && (await lead("/me")).d.user.banner_url === b.d.url, b);
+    ok("the banner is served", (await fetch(`${U}${b.d.url}`)).status === 200);
+    ok("a public profile shows the banner", (await anon(`/people/${h}`)).d.profile.banner_url === b.d.url);
+    ok("removing the banner", (await lead("/me/banner", "DELETE")).s === 200 && (await anon(`/people/${h}`)).d.profile.banner_url === null);
+    await new Promise((r) => setTimeout(r, 500));
+    ok("a removed banner's file is deleted", (await fetch(`${U}${b.d.url}`)).status === 404);
+  }
+  ok("signed out cannot upload", (await fetch(`${U}/api/me/avatar`, { method: "POST", headers: { "content-type": "image/png" }, body: fs.readFileSync(IMG) })).status === 401);
+}
+
 console.log(`\n${passed} passed, ${failed} failed`);
 process.exit(failed ? 1 : 0);

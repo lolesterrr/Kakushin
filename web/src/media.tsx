@@ -19,6 +19,14 @@ export async function postImage<T = unknown>(path: string, file: File, caption =
   return data as T;
 }
 
+/** A person's picture, or their first letter on a plain circle when they have none. */
+export function Avatar({ name, url, size = 40 }: { name: string; url?: string | null; size?: number }) {
+  const [broken, setBroken] = useState(false);
+  const style = { width: size, height: size, fontSize: Math.round(size * 0.42) };
+  if (url && !broken) return <img className="avatar" src={url} alt="" style={style} onError={() => setBroken(true)} />;
+  return <span className="avatar ph" aria-hidden="true" style={style}>{(name.trim()[0] ?? "?").toUpperCase()}</span>;
+}
+
 /** A YouTube embed when the link is one, otherwise a plain link. Nothing when there is no link. */
 export function Video({ url, embed, title }: { url?: string | null; embed?: string | null; title: string }) {
   if (embed) {
@@ -168,7 +176,7 @@ export function Recap({ orgSlug, cslug }: { orgSlug: string; cslug: string }) {
 }
 
 export interface ProjectCard { id: string; team: string; status: string; placement: number | null; challenge: string; cslug: string; oslug: string; video_url: string; video_embed: string | null; demo_url: string; repo_url: string; notes: string; cover_url: string | null; members: string }
-type ProjectFull = Omit<ProjectCard, "members"> & { members: { name: string; handle: string | null; lead: boolean }[]; images: MediaImage[] };
+type ProjectFull = Omit<ProjectCard, "members"> & { members: { name: string; handle: string | null; avatar_url?: string | null; lead: boolean }[]; images: MediaImage[] };
 
 export const placeLabel = (p: { status: string; placement: number | null }) =>
   p.status === "winner" && p.placement ? (p.placement === 1 ? "1st place" : p.placement === 2 ? "2nd place" : p.placement === 3 ? "3rd place" : `${p.placement}th place`) : p.status === "winner" ? "Winner" : "Finalist";
@@ -215,7 +223,7 @@ export function ProjectPage() {
           <p className="label" style={{ marginTop: 0 }}>The team</p>
           <ul className="who-list">
             {p.members.map((m, n) => (
-              <li key={n}><span className="logo ph" aria-hidden="true" style={{ width: 40, height: 40, borderRadius: "50%" }}>{m.name.slice(0, 1).toUpperCase()}</span>
+              <li key={n}><Avatar name={m.name} url={m.avatar_url} />
                 <span>{m.handle ? <Link to={`/u/${m.handle}`}><b>{m.name}</b></Link> : <b>{m.name}</b>}{m.lead && <span className="muted"> · lead</span>}</span></li>
             ))}
           </ul>
