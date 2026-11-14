@@ -10,7 +10,7 @@ import { AuthProvider } from "../lib/auth";
 import { useTheme } from "../lib/theme";
 import { appRoute } from "../lib/links";
 
-// Keep the bulb splash up until the fonts are in, so the first screen never flashes in the system font.
+// Keep the red-dot splash up until the fonts are in, so the first screen never flashes in the system font.
 void SplashScreen.preventAutoHideAsync().catch(() => {});
 
 /** Opens the right screen when someone taps a push, whether the app was open, in the background or closed. */
