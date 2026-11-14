@@ -2,8 +2,8 @@ import { Hono, type Context } from "hono";
 import { z } from "zod";
 import type { AppEnv } from "../types";
 import { audit } from "../lib/audit";
-import { sendEmail } from "../lib/email";
-import { notifyFollowersOfChallenge } from "../lib/notify";
+import { notifyFollowersOfChallenge, tellOrgAdmins } from "../lib/notify";
+import { addModeration } from "./moderation";
 import { pushLater } from "../lib/push";
 import { postNews } from "./announcements";
 
@@ -29,6 +29,9 @@ platform.get("/stats", async (c) => {
     suspended_orgs: await count(c, "SELECT COUNT(*) AS n FROM organizations WHERE suspended = 1"),
     challenges_live: await count(c, "SELECT COUNT(*) AS n FROM challenges WHERE status != 'draft'"),
     awaiting_review: await count(c, "SELECT COUNT(*) AS n FROM challenges WHERE review_state = 'pending'"),
+    pending_events: await count(c, "SELECT COUNT(*) AS n FROM external_events WHERE state = 'pending'"),
+    global_events: await count(c, "SELECT COUNT(*) AS n FROM external_events WHERE state = 'published'"),
+    open_reports: await count(c, "SELECT COUNT(*) AS n FROM (SELECT 1 FROM reports WHERE state = 'open' GROUP BY kind, item_id)"),
     teams: await count(c, "SELECT COUNT(*) AS n FROM teams"),
     applications: await count(c, "SELECT COUNT(*) AS n FROM applications"),
     certificates: await count(c, "SELECT COUNT(*) AS n FROM certificates"),
@@ -51,20 +54,6 @@ async function reviewTarget(c: Context<AppEnv>) {
     `SELECT ch.id, ch.slug, ch.title, ch.org_id, ch.review_state, o.slug AS oslug, o.name AS oname
      FROM challenges ch JOIN organizations o ON o.id = ch.org_id WHERE ch.id = ?`,
   ).bind(c.req.param("id")!).first<{ id: string; slug: string; title: string; org_id: string; review_state: string; oslug: string; oname: string }>();
-}
-
-/** Tells every admin of the organisation, in the inbox and by email. */
-async function tellOrgAdmins(c: Context<AppEnv>, orgId: string, title: string, body: string, link: string, subject: string) {
-  const now = Date.now();
-  await c.env.DB.prepare(
-    `INSERT INTO notifications (id, user_id, kind, title, body, link, created_at)
-     SELECT lower(hex(randomblob(12))), m.user_id, 'review.result', ?, ?, ?, ? FROM memberships m WHERE m.org_id = ?`,
-  ).bind(title, body, link, now, orgId).run();
-  pushLater(c);
-  const { results } = await c.env.DB.prepare("SELECT u.email FROM memberships m JOIN users u ON u.id = m.user_id WHERE m.org_id = ? LIMIT 20").bind(orgId).all<{ email: string }>();
-  const text = `${title}\n\n${body}\n\n${c.env.APP_URL}${link}`;
-  const html = `<p><b>${title.replace(/</g, "&lt;")}</b></p><p>${body.replace(/</g, "&lt;")}</p><p><a href="${c.env.APP_URL}${link}">Open it on Kakushin</a></p>`;
-  c.executionCtx.waitUntil(Promise.all(results.map((r) => sendEmail(c.env, r.email, subject, html, text).catch((e) => console.error(`review email failed: ${e instanceof Error ? e.message : e}`)))));
 }
 
 platform.post("/challenges/:id/approve", async (c) => {
@@ -160,6 +149,8 @@ platform.put("/users/:id", async (c) => {
   }
   return c.json({ ok: true });
 });
+
+addModeration(platform);
 
 platform.post("/news", postNews);
 platform.get("/news", async (c) => {

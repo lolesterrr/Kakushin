@@ -23,6 +23,7 @@ export function Layout({ children }: { children: React.ReactNode }) {
           <Link to="/" className="brand"><span className="sun" aria-hidden />Kakushin</Link>
           <nav aria-label="Main">
             <NavLink to="/challenges" className={judging ? "hide-sm" : undefined}>Challenges</NavLink>
+            <NavLink to="/events" className={judging ? "hide-sm" : undefined}>Global</NavLink>
             {!me && <Link to="/#how" className="hide-sm">How it works</Link>}
             <NavLink to="/admin" className="hide-sm">{me ? "Organise" : "For organisers"}</NavLink>
             {judging && <NavLink to="/judge">Judge</NavLink>}
@@ -34,7 +35,7 @@ export function Layout({ children }: { children: React.ReactNode }) {
         </div>
       </header>
       <main className={admin ? "page admin" : "page"}>{children}</main>
-      <footer className="foot"><span><b>Kakushin</b> <span className="muted">Innovation challenges, end to end</span></span><span className="muted"><Link to="/challenges">Challenges</Link> · <Link to="/admin">For organisers</Link> · <Link to="/credits">Photo credits</Link> · <Link to="/privacy">Privacy</Link> · <Link to="/terms">Terms</Link></span></footer>
+      <footer className="foot"><span><b>Kakushin</b> <span className="muted">Innovation challenges, end to end</span></span><span className="muted"><Link to="/challenges">Challenges</Link> · <Link to="/events">Global events</Link> · <Link to="/admin">For organisers</Link> · <Link to="/credits">Photo credits</Link> · <Link to="/privacy">Privacy</Link> · <Link to="/terms">Terms</Link></span></footer>
     </>
   );
 }

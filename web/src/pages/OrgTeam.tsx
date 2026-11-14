@@ -115,9 +115,9 @@ export function OrgMembers({ slug }: { slug: string }) {
 
 /** Phone push on or off. Everything still lands in the inbox either way. */
 export function PushSetting() {
-  const [s, setS] = useState<{ push: boolean; devices: number } | null>(null);
+  const [s, setS] = useState<{ push: boolean; devices: number; global_events?: boolean } | null>(null);
   const [msg, setMsg] = useState<Msg>(null);
-  useEffect(() => { api<{ push: boolean; devices: number }>("/inbox/settings").then(setS).catch(() => {}); }, []);
+  useEffect(() => { api<{ push: boolean; devices: number; global_events?: boolean }>("/inbox/settings").then(setS).catch(() => {}); }, []);
   if (!s) return null;
   async function flip(push: boolean) {
     setMsg(null);
@@ -129,6 +129,12 @@ export function PushSetting() {
       <p className="muted">Everything lands in your <a href="/inbox">inbox</a>. Push sends a ping to the Kakushin phone app too{s.devices === 0 ? " (no phone is signed in yet)" : ` (${s.devices} ${s.devices === 1 ? "phone" : "phones"} signed in)`}.</p>
       <label style={{ display: "flex", gap: 8, alignItems: "center", fontWeight: 600 }}>
         <input type="checkbox" checked={s.push} onChange={(e) => void flip(e.target.checked)} style={{ width: "auto" }} /> Send me push notifications
+      </label>
+      <label style={{ display: "flex", gap: 8, alignItems: "center", fontWeight: 600, marginTop: 10 }}>
+        <input type="checkbox" checked={s.global_events ?? true} onChange={async (e) => {
+          const on = e.target.checked; setMsg(null);
+          try { await api("/inbox/settings", { method: "PUT", json: { global_events: on } }); setS({ ...s, global_events: on }); } catch (err) { setMsg({ kind: "err", text: (err as Error).message }); }
+        }} style={{ width: "auto" }} /> Tell me about new global events in my topics
       </label>
       {msg && <Notice kind={msg.kind}>{msg.text}</Notice>}
     </div>

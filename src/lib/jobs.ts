@@ -1,5 +1,6 @@
 import type { Env } from "../types";
 import { pushPending } from "./push";
+import { fetchDueSources } from "./events";
 
 /**
  * The hourly job (wrangler.jsonc "triggers"). Each step is on its own, so one failing step never stops the others.
@@ -13,6 +14,8 @@ export async function runHourly(env: Env, now = Date.now()): Promise<Record<stri
   await step("closed", () => closeApplications(env, now));
   await step("closing_reminders", () => closingReminders(env, now));
   await step("pitch_reminders", () => pitchReminders(env, now));
+  await step("saved_reminders", () => savedReminders(env, now));
+  await step("global_events", () => fetchDueSources(env, now));
   await step("cleaned", () => cleanUp(env, now));
   await step("pushed", () => retryPushes(env, now));
   console.log(`cron: ${JSON.stringify(out)}`);
@@ -84,6 +87,42 @@ export async function pitchReminders(env: Env, now: number): Promise<number> {
   const r = await env.DB.batch([
     remind("pitch.3d", now + DAY, now + 3 * DAY, "in 3 days"),
     remind("pitch.1d", now, now + DAY, "tomorrow"),
+  ]);
+  return r.reduce((a, x) => a + (x.meta.changes ?? 0), 0);
+}
+
+/**
+ * "Closes in 3 days" and "closes tomorrow" for things people saved: a global event, or a challenge they have not
+ * joined a team for yet (people in a team get the team reminders above instead).
+ */
+export async function savedReminders(env: Env, now: number): Promise<number> {
+  const eventLink = "'/events/' || e.slug";
+  const forEvents = (kind: string, lo: number, hi: number, when: string) => env.DB.prepare(
+    `INSERT INTO notifications (id, user_id, kind, title, body, link, created_at)
+     SELECT lower(hex(randomblob(12))), s.user_id, ?1,
+            CASE WHEN e.deadline_at IS NOT NULL THEN 'Closes ' ELSE 'Starts ' END || ?2 || ': ' || e.title,
+            'You saved this global event. Open it for the official link.', ${eventLink}, ?3
+     FROM saved_items s
+     JOIN external_events e ON e.id = s.item_id AND e.state = 'published'
+     JOIN users u ON u.id = s.user_id AND u.suspended = 0
+     WHERE s.kind = 'event' AND COALESCE(e.deadline_at, e.starts_at) > ?4 AND COALESCE(e.deadline_at, e.starts_at) <= ?5
+       AND NOT EXISTS (SELECT 1 FROM notifications n WHERE n.user_id = s.user_id AND n.kind = ?1 AND n.link = ${eventLink})`,
+  ).bind(kind, when, now, lo, hi);
+  const forChallenges = (kind: string, lo: number, hi: number, when: string) => env.DB.prepare(
+    `INSERT INTO notifications (id, user_id, kind, title, body, link, created_at)
+     SELECT lower(hex(randomblob(12))), s.user_id, ?1, 'Applications close ' || ?2 || ': ' || ch.title,
+            'You saved this challenge but are not in a team for it yet.', ${link}, ?3
+     FROM saved_items s
+     JOIN challenges ch ON ch.id = s.item_id AND ch.status = 'open'
+     JOIN organizations o ON o.id = ch.org_id AND o.suspended = 0
+     JOIN users u ON u.id = s.user_id AND u.suspended = 0
+     WHERE s.kind = 'challenge' AND ch.applications_close_at > ?4 AND ch.applications_close_at <= ?5
+       AND NOT EXISTS (SELECT 1 FROM team_members m JOIN teams t ON t.id = m.team_id WHERE m.user_id = s.user_id AND t.challenge_id = ch.id)
+       AND NOT EXISTS (SELECT 1 FROM notifications n WHERE n.user_id = s.user_id AND n.kind = ?1 AND n.link = ${link})`,
+  ).bind(kind, when, now, lo, hi);
+  const r = await env.DB.batch([
+    forEvents("saved.3d", now + DAY, now + 3 * DAY, "in 3 days"), forEvents("saved.1d", now, now + DAY, "tomorrow"),
+    forChallenges("saved.3d", now + DAY, now + 3 * DAY, "in 3 days"), forChallenges("saved.1d", now, now + DAY, "tomorrow"),
   ]);
   return r.reduce((a, x) => a + (x.meta.changes ?? 0), 0);
 }

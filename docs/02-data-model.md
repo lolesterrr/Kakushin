@@ -254,6 +254,15 @@ In-app inbox, also the source for push and email.
 | meta | text (JSON) | |
 | created_at | integer | |
 
+### external_sources, external_events (day 9)
+Global events are listings from outside Kakushin. `external_sources` holds where they are read from (`kind` rss or hackclub, `url`, default `topics`, `keywords` an item must mention, `auto_publish`, `enabled`, last read status). `external_events` holds each listing: `slug`, `title`, `summary`, plain-text `description`, the official `url` (unique), optional `image_url`, `organizer`, `location`, `is_online`, `starts_at`, `ends_at`, `deadline_at`, `topics`, and `state` (pending, published, rejected, removed). A row comes from a source (`source_id`, `external_key`) or from a person (`submitted_by`). Rejected and removed rows are kept so the next read of a source does not bring them back.
+
+### saved_items (day 9)
+Bookmarks: `user_id`, `kind` (challenge or event), `item_id`, `created_at`.
+
+### reports (day 9)
+`kind` (challenge or event), `item_id`, `reporter_user_id`, `reason` (spam, scam, offensive, wrong, other), `details`, `state` (open, dismissed, actioned). One report per person per item.
+
 ## Scoring formula
 
 For each team, per judge:

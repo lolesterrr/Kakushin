@@ -10,6 +10,7 @@ import { Banner, ChallengeCard, type ChallengeCardData, DeadlineStamp, Logo, Not
 import { Markdown } from "../markdown";
 import { Gallery, ShowProject, WhosComing } from "./People";
 import { Recap } from "../media";
+import { EventCard, type EventCardData, ReportLink, SaveButton } from "./Events";
 
 /**
  * Banner bulb: grows in once per page load, then loops a gentle turn. Reduced motion gets the still.
@@ -45,6 +46,8 @@ export function Home() {
   const { me } = useAuth();
   const [items, setItems] = useState<ChallengeCardData[] | null>(null);
   useEffect(() => { api<{ challenges: ChallengeCardData[] }>("/challenges?limit=3").then((r) => setItems(r.challenges.slice(0, 3))).catch(() => setItems([])); }, []);
+  const [world, setWorld] = useState<EventCardData[]>([]);
+  useEffect(() => { api<{ events: EventCardData[] }>("/events?limit=3").then((r) => setWorld(r.events.slice(0, 3))).catch(() => {}); }, []);
   useEffect(() => { if (window.location.hash === "#how") document.getElementById("how")?.scrollIntoView(); }, []);
   const steps: [string, string, string][] = [
     ["01", "Pick", "Browse open challenges. Each one shows its deadline, team size and prize up front."],
@@ -79,6 +82,15 @@ export function Home() {
         {items && items.length > 0 && <div className="grid" style={{ borderTop: "1px solid var(--line)" }}>{items.map((c) => <ChallengeCard key={`${c.org.slug}/${c.slug}`} c={c} />)}</div>}
         {items && items.length === 0 && <div className="empty" style={{ borderTop: "1px solid var(--line)" }}><p className="hand">No open challenges right now</p><p className="muted">Check back soon, or run your own.</p></div>}
       </section>
+      {world.length > 0 && (
+        <section style={{ borderBottom: "1px solid var(--line)" }}>
+          <div className="section" style={{ borderBottom: 0, paddingBottom: 20, display: "flex", justifyContent: "space-between", alignItems: "flex-end", flexWrap: "wrap", gap: 12 }}>
+            <div><p className="label" style={{ margin: 0 }}>Around the world</p><h2 style={{ marginTop: 6, fontSize: 28 }}>Global events worth a look</h2></div>
+            <Link to="/events" style={{ fontWeight: 600 }}>See all global events</Link>
+          </div>
+          <div className="grid" style={{ borderTop: "1px solid var(--line)" }}>{world.map((e) => <EventCard key={e.slug} e={e} />)}</div>
+        </section>
+      )}
       <section className="split">
         <div><p className="hand" style={{ margin: 0 }}>For participants</p><h2 style={{ margin: "6px 0 10px", fontSize: 26 }}>One profile for every event</h2><p>Keep your skills, teams and certificates in one place.</p>{me ? <Link to="/profile" style={{ fontWeight: 600 }}>Go to your profile</Link> : <Link to="/login" style={{ fontWeight: 600 }}>Sign in with your email</Link>}</div>
         <div><p className="hand" style={{ margin: 0 }}>For organisers</p><h2 style={{ margin: "6px 0 10px", fontSize: 26 }}>Run the whole challenge here</h2><p>Post a challenge, review applications, invite judges, score pitches and issue certificates.</p><Link className="btn" to="/admin">Set up your organisation</Link></div>
@@ -135,7 +147,7 @@ export function Explore() {
       <div className="hero">
         <p className="hand">Open now</p>
         <h1>Challenges</h1>
-        <p>Hackathons and innovation challenges from universities, hubs and companies. Find one, form a team, apply. <Link to="/challenges/winners">See past winners</Link>.</p>
+        <p>Hackathons and innovation challenges from universities, hubs and companies. Find one, form a team, apply. <Link to="/challenges/winners">See past winners</Link>, or look further afield in <Link to="/events">global events</Link>.</p>
         <div className="search-row">
           <input type="search" aria-label="Search challenges" placeholder="Search by name, summary or organiser" value={q} onChange={(e) => setQ(e.target.value)} maxLength={80} />
           <select aria-label="Team size" value={size} onChange={(e) => setSize(e.target.value)}>
@@ -272,11 +284,11 @@ function Rubric({ criteria }: { criteria: NonNullable<ChallengeFull["criteria"]>
 export function ChallengePublic() {
   const { slug, cslug } = useParams();
   const { me } = useAuth();
-  const [data, setData] = useState<{ challenge: ChallengeFull; role: string | null } | null>(null);
+  const [data, setData] = useState<{ challenge: ChallengeFull; role: string | null; saved?: boolean } | null>(null);
   const [err, setErr] = useState("");
   const [copied, setCopied] = useState(false);
   const { team, reload } = useMyTeam(slug ?? "", cslug ?? "");
-  useEffect(() => { api<{ challenge: ChallengeFull; role: string | null }>(`/orgs/${slug}/challenges/${cslug}`).then(setData).catch((e: Error) => setErr(e.message)); }, [slug, cslug]);
+  useEffect(() => { api<{ challenge: ChallengeFull; role: string | null; saved?: boolean }>(`/orgs/${slug}/challenges/${cslug}`).then(setData).catch((e: Error) => setErr(e.message)); }, [slug, cslug]);
   useEffect(() => { if (data) document.title = `${data.challenge.title} · Kakushin`; }, [data]);
   if (err) return <div className="section"><Notice kind="err">{err === "Not found" ? "We could not find that challenge." : err}</Notice></div>;
   if (!data) return null;
@@ -311,6 +323,8 @@ export function ChallengePublic() {
             <div style={{ marginTop: 16, display: "flex", gap: 10, alignItems: "center", flexWrap: "wrap" }}><StatusPill status={c.status} /><TopicPills topics={c.topics} /></div>
             <div className="actions">
           <button className="ghost" onClick={copy}>{copied ? "Link copied" : "Copy link"}</button>
+          {c.status !== "draft" && <SaveButton path={`challenges/${c.org.slug}/${c.slug}`} saved={!!data.saved} back={`/o/${c.org.slug}/c/${c.slug}`} onChange={(on) => setData({ ...data, saved: on })} />}
+          {c.status !== "draft" && c.status !== "completed" && (c.applications_close_at || c.pitch_due_at || (c.agenda?.length ?? 0) > 0) ? <a className="btn ghost" href={`/api/orgs/${c.org.slug}/challenges/${c.slug}/calendar.ics`}>Add to calendar</a> : null}
           {role && <Link className="btn ghost" to={`/admin/o/${c.org.slug}/c/${c.slug}`}>Manage challenge</Link>}
         </div>
           </div>
@@ -364,6 +378,7 @@ export function ChallengePublic() {
       {team && c.checkin_enabled && team.status !== "rejected" && <CheckinPass orgSlug={c.org.slug} cslug={c.slug} />}
       {c.status !== "draft" && <div id="apply"><TeamPanel orgSlug={c.org.slug} cslug={c.slug} challenge={c} team={team} reload={reload} /></div>}
       {team && ["finalist", "winner"].includes(team.status) && <ShowProject team={team} onChange={reload} />}
+      {c.status !== "draft" && !role && <ReportLink kind="challenge" org={c.org.slug} slug={c.slug} back={`/o/${c.org.slug}/c/${c.slug}`} />}
     </>
   );
 }

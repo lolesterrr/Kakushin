@@ -108,6 +108,10 @@ export default function Explore() {
             <RedLight size={12} />
             <Text style={{ color: t.ink, fontSize: 18, fontWeight: "700" }}>Kakushin</Text>
           </View>
+          <View style={{ flexDirection: "row", alignItems: "center", gap: 10 }}>
+          <Pressable onPress={() => router.push("/saved")} accessibilityRole="button" accessibilityLabel="Saved challenges and events" style={{ width: 44, height: 44, borderRadius: 22, borderWidth: 1.5, borderColor: t.ink, alignItems: "center", justifyContent: "center" }}>
+            <Svg width={14} height={18} viewBox="0 0 16 20" fill="none" stroke={t.ink} strokeWidth={2.4} strokeLinejoin="round"><Path d="M2 2h12v16l-6-4.5L2 18z" /></Svg>
+          </Pressable>
           {me ? (
             <Pressable onPress={() => router.push("/profile")} accessibilityRole="button" accessibilityLabel="Your profile">
               {me.avatar_url ? <Avatar name={me.name || me.email} url={me.avatar_url} size={44} /> : (
@@ -121,6 +125,7 @@ export default function Explore() {
               <Text style={{ color: t.ink, fontSize: 15, fontWeight: "700" }}>Sign in</Text>
             </Pressable>
           )}
+          </View>
         </View>
         <View style={{ marginTop: 10 }}><Hand>{first ? `Hi ${first},` : me ? "Hi," : "Welcome,"}</Hand></View>
         <Text accessibilityRole="header" style={{ color: t.ink, fontFamily: F.display, fontSize: 36, lineHeight: 37, letterSpacing: -0.8 }}>Find your next{"\n"}hackathon.</Text>

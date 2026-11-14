@@ -12,6 +12,7 @@ import { certificates } from "./routes/certificates";
 import { inbox, follows } from "./routes/inbox";
 import { platform } from "./routes/platform";
 import { people, teamFinder } from "./routes/people";
+import { events, reports, saved } from "./routes/events";
 import { readToken, userFromToken } from "./lib/session";
 import { withMeta } from "./lib/meta";
 import { runHourly } from "./lib/jobs";
@@ -52,6 +53,9 @@ app.route("/api/certificates", certificates);
 app.route("/api/inbox", inbox);
 app.route("/api/follows", follows);
 app.route("/api/platform", platform);
+app.route("/api/events", events);
+app.route("/api/saved", saved);
+app.route("/api/reports", reports);
 
 // Everything outside /api is the web app. Pages come through here (see run_worker_first) so their link-preview tags can be filled in.
 app.notFound(async (c) => (c.req.path.startsWith("/api/") ? c.json({ error: "Not found" }, 404) : withMeta(c, await c.env.ASSETS.fetch(c.req.raw))));
