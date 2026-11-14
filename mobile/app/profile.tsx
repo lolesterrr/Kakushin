@@ -57,7 +57,14 @@ export default function Profile() {
     } catch (e) { setMsg({ kind: "err", text: (e as Error).message }); }
     finally { setBusy(false); }
   }
-  const settings = useLoad(() => api<{ push: boolean; devices: number }>("/inbox/settings"), []);
+  const settings = useLoad(() => api<{ push: boolean; devices: number; global_events?: boolean }>("/inbox/settings"), []);
+  const [globalOn, setGlobalOn] = useState<boolean | null>(null);
+  const globalNow = globalOn ?? settings.data?.global_events ?? true;
+  async function setGlobal(on: boolean) {
+    setGlobalOn(on); setMsg(null);
+    try { await api("/inbox/settings", { method: "PUT", json: { global_events: on } }); }
+    catch (e) { setGlobalOn(!on); setMsg({ kind: "err", text: (e as Error).message }); }
+  }
   const [pushOn, setPushOn] = useState<boolean | null>(null);
   const [pushState, setPushState] = useState<PushState | null>(null);
   const pushNow = pushOn ?? settings.data?.push ?? true;
@@ -147,6 +154,13 @@ export default function Profile() {
             </View>
             {pushNow && pushState === "denied" ? <Notice kind="err">Notifications are blocked for Kakushin on this phone. Turn them on in your phone settings.</Notice> : null}
             {pushNow && pushState === "unsupported" ? <Notice kind="err">This phone could not register for push. It needs a real device, not a simulator or browser.</Notice> : null}
+            <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between", gap: 12 }}>
+              <View style={{ flex: 1 }}>
+                <Text style={{ color: t.ink, fontSize: 16, fontWeight: "700" }}>Global events</Text>
+                <Body muted>Tell me when a hackathon from outside Kakushin is listed in one of my topics.</Body>
+              </View>
+              <Switch value={globalNow} onValueChange={(v) => void setGlobal(v)} accessibilityLabel="Global events" />
+            </View>
             <H2>What you want to hear about</H2>
             <Body muted>Pick topics and you get a note in your inbox when a new challenge matches.</Body>
             <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 8 }}>

@@ -35,6 +35,7 @@ export const challengeDetail = z.object({
     checkin_enabled: z.boolean().default(false),
   }),
   role: z.string().nullable().optional(),
+  saved: z.boolean().optional(),
 });
 export type ChallengeDetail = z.infer<typeof challengeDetail>["challenge"];
 
@@ -165,3 +166,19 @@ export const photos = z.object({
   photos: z.array(z.object({ id: z.string(), url: z.string(), caption: z.string(), approved: z.boolean(), by: z.string(), created_at: z.number() })),
   can_add: z.boolean(), can_manage: z.boolean(), open: z.boolean(), per_person: z.number(),
 });
+
+// ---- Day 9: global events (listed from outside Kakushin), saved items ----
+export const eventCard = z.object({
+  slug: z.string(), title: z.string(), summary: z.string().default(""), image_url: z.string().nullable().optional(), topics: z.array(z.string()).default([]),
+  organizer: z.string().default(""), location: z.string().default(""), is_online: z.boolean().default(false),
+  starts_at: z.number().nullable(), ends_at: z.number().nullable(), deadline_at: z.number().nullable(),
+  source: z.string().default(""), host: z.string().default(""), over: z.boolean().optional(),
+});
+export type EventCard = z.infer<typeof eventCard>;
+export const eventList = z.object({ events: z.array(eventCard), next: z.string().nullable().optional() });
+export const eventDetail = z.object({
+  event: eventCard.extend({ description: z.string().default(""), url: z.string(), state: z.string(), over: z.boolean().default(false) }),
+  saved: z.boolean().default(false),
+});
+export const savedList = z.object({ challenges: z.array(challengeCard.extend({ results_published: z.number().nullable().optional() })), events: z.array(eventCard) });
+export const myEvents = z.object({ events: z.array(eventCard.extend({ state: z.string(), review_note: z.string().default("") })) });

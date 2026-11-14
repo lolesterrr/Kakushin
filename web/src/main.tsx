@@ -13,7 +13,8 @@ import { AdminMessages } from "./pages/Messages";
 import { AdminResults } from "./pages/Results";
 import { Verify as VerifyCert } from "./pages/Certificates";
 import { Inbox } from "./pages/Inbox";
-import { PlatformAudit, PlatformNews, PlatformOrgs, PlatformOverview, PlatformReview, PlatformUsers } from "./pages/Platform";
+import { PlatformAudit, PlatformEvents, PlatformNews, PlatformOrgs, PlatformOverview, PlatformReports, PlatformReview, PlatformUsers } from "./pages/Platform";
+import { EventPage, Events, Saved, SuggestEvent } from "./pages/Events";
 import { JudgeChallenge, JudgeHome, JudgeTeam } from "./pages/Judge";
 import { AdminOverview } from "./pages/Overview";
 import { AdminApplications } from "./pages/Applications";
@@ -53,6 +54,10 @@ function App() {
         <Route path="/" element={<Home />} />
         <Route path="/challenges" element={<Explore />} />
         <Route path="/challenges/winners" element={<Winners />} />
+        <Route path="/events" element={<Events />} />
+        <Route path="/events/suggest" element={<SignedInOnly><SuggestEvent /></SignedInOnly>} />
+        <Route path="/events/:slug" element={<EventPage />} />
+        <Route path="/saved" element={<SignedInOnly><Saved /></SignedInOnly>} />
         <Route path="/u/:handle" element={<PersonPage />} />
         <Route path="/login" element={<Login />} />
         <Route path="/auth/verify" element={<Verify />} />
@@ -78,6 +83,8 @@ function App() {
         <Route path="/inbox" element={<SignedInOnly><Inbox /></SignedInOnly>} />
         <Route path="/platform" element={<SignedInOnly><PlatformOverview /></SignedInOnly>} />
         <Route path="/platform/review" element={<SignedInOnly><PlatformReview /></SignedInOnly>} />
+        <Route path="/platform/events" element={<SignedInOnly><PlatformEvents /></SignedInOnly>} />
+        <Route path="/platform/reports" element={<SignedInOnly><PlatformReports /></SignedInOnly>} />
         <Route path="/platform/orgs" element={<SignedInOnly><PlatformOrgs /></SignedInOnly>} />
         <Route path="/platform/users" element={<SignedInOnly><PlatformUsers /></SignedInOnly>} />
         <Route path="/platform/news" element={<SignedInOnly><PlatformNews /></SignedInOnly>} />
