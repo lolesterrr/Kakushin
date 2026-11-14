@@ -22,6 +22,7 @@ import { Credits } from "./pages/Credits";
 import { AdminLive, LivePage } from "./pages/Live";
 import { Privacy, Terms } from "./pages/Legal";
 import "./styles.css";
+import { AdminImpact } from "./pages/Impact";
 
 /**
  * Browsers draw an animated SVG favicon as a still, so the tab icon blinks by swapping two static frames, in step
@@ -63,6 +64,7 @@ function App() {
         <Route path="/admin/o/:slug/c/:cslug/applications" element={<SignedInOnly><AdminApplications /></SignedInOnly>} />
         <Route path="/admin" element={<SignedInOnly><AdminHome /></SignedInOnly>} />
         <Route path="/admin/o/:slug" element={<SignedInOnly><AdminOrg /></SignedInOnly>} />
+        <Route path="/admin/o/:slug/impact" element={<SignedInOnly><AdminImpact /></SignedInOnly>} />
         <Route path="/admin/o/:slug/c/:cslug" element={<SignedInOnly><AdminOverview /></SignedInOnly>} />
         <Route path="/admin/o/:slug/c/:cslug/judging" element={<SignedInOnly><AdminJudging /></SignedInOnly>} />
         <Route path="/admin/o/:slug/c/:cslug/messages" element={<SignedInOnly><AdminMessages /></SignedInOnly>} />

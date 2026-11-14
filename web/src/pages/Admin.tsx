@@ -118,7 +118,7 @@ export function AdminOrg() {
     <>
       <Band crumb="All organisations" to="/admin" title={org.name} tags={<><span className="tag">{org.type}</span><Link to={`/o/${org.slug}`} style={{ color: "inherit" }}>View public page</Link></>} />
       <div className="section">
-        <div className="head-row"><h2>Challenges</h2></div>
+        <div className="head-row"><h2>Challenges</h2><Link className="btn ghost small" to={`/admin/o/${slug}/impact`}>Impact report</Link></div>
         {challenges.length > 0 && (
           <div className="table-wrap"><table>
             <thead><tr><th>Title</th><th>Status</th><th>Closes</th><th></th></tr></thead>

@@ -159,8 +159,8 @@ th, td { padding: 10px 12px; border-bottom: 1px solid var(--line); }
 .numsec > .nh b { font-family: var(--heavy); font-weight: 400; font-size: 14px; color: var(--red-text); }
 .numsec > .nh h2 { font-family: var(--heavy); font-weight: 400; font-size: 20px; }
 .pipeline { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); border: 1px solid var(--ink); }
-.pipeline a { padding: 18px 20px; text-decoration: none; border-right: 1px solid var(--ink); display: block; }
-.pipeline a:last-child { border-right: 0; }
+.pipeline a, .pipeline > div { padding: 18px 20px; text-decoration: none; border-right: 1px solid var(--ink); display: block; }
+.pipeline a:last-child, .pipeline > div:last-child { border-right: 0; }
 .pipeline b { display: block; font-family: var(--heavy); font-weight: 400; font-size: 64px; line-height: 1; }
 .pipeline span { font-size: 11px; text-transform: uppercase; letter-spacing: .12em; font-weight: 600; }
 .pipeline a.hot { background: var(--f-red); color: #fff; }

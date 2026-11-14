@@ -11,6 +11,7 @@ interface Row {
   rank: number; tied: boolean; normalised: number | null; norm_rank: number | null;
 }
 interface Asg { blind_judging: boolean; judges_per_team: number; has_assignments: boolean; judges: string[]; teams: { id: string; name: string; judges: string[]; conflicts: string[]; finished: number }[] }
+interface Rounds { rounds: string[]; current: number; status: string; teams: { id: string; name: string; round_reached: number }[] }
 interface Cal { judge: string; teams: number; average: number | null; spread: number | null; gap: number | null; flagged: boolean }
 type Msg = { kind: "ok" | "err"; text: string } | null;
 const STAGES = ["open", "reviewing", "judging", "completed"];
@@ -33,19 +34,21 @@ export function AdminJudging() {
   const [link, setLink] = useState("");
   const [err, setErr] = useState("");
   const [rankBy, setRankBy] = useState<"raw" | "normalised">("raw");
+  const [rounds, setRounds] = useState<Rounds | null>(null);
 
   async function loadAll() {
     try {
       const ch = await api<{ challenge: { title: string; status: string }; role: string | null }>(base);
       if (!ch.role) { setErr("You are not an admin of this organisation."); return; }
       setTitle(ch.challenge.title); setStatus(ch.challenge.status);
-      const [j, b, a, k] = await Promise.all([
+      const [j, b, a, k, r] = await Promise.all([
         api<{ judges: { email: string; teams_scored: number }[] }>(`${base}/judges`),
         api<{ judges: string[]; leaderboard: Row[] }>(`${base}/leaderboard`),
         api<Asg>(`${base}/assignments`),
         api<{ judges: Cal[] }>(`${base}/calibration`),
+        api<Rounds>(`${base}/rounds`),
       ]);
-      setJudges(j.judges); setBoard(b); setAsg(a); setPer(a.judges_per_team); setCal(k.judges);
+      setRounds(r); setJudges(j.judges); setBoard(b); setAsg(a); setPer(a.judges_per_team); setCal(k.judges);
     } catch (e) { setErr((e as Error).message); }
   }
   useEffect(() => { if (me) void loadAll(); }, [slug, cslug, me?.id]);
@@ -179,7 +182,9 @@ export function AdminJudging() {
         <div className="actions"><a className="btn ghost" href={`/api${base}/leaderboard.csv`}>Download scores CSV</a><button className="ghost" onClick={loadAll}>Refresh</button></div>
       </NumSection>
 
-      <NumSection n="05" title="Judge calibration">
+      {rounds && <RoundsSection base={base} r={rounds} order={board.leaderboard.map((x) => x.team_id)} onChange={loadAll} />}
+
+      <NumSection n="06" title="Judge calibration">
         <p className="muted" style={{ marginTop: 0, maxWidth: 640 }}>How each judge scores compared with the rest of the panel on the same teams. A judge more than 15 points (out of 100) away from the others is flagged, so you can check whether they read the criteria differently.</p>
         {cal.length === 0 ? <p className="muted">No judges yet.</p> : (
           <div className="table-wrap"><table>
@@ -192,5 +197,68 @@ export function AdminJudging() {
         )}
       </NumSection>
     </>
+  );
+}
+
+/** Day 7: name the rounds, send the strongest teams through to the next one, or undo that. */
+function RoundsSection({ base, r, order, onChange }: { base: string; r: Rounds; order: string[]; onChange: () => Promise<void> }) {
+  const [names, setNames] = useState(r.rounds.join("\n"));
+  const [pick, setPick] = useState<Set<string>>(new Set());
+  const [msg, setMsg] = useState<Msg>(null);
+  useEffect(() => { setNames(r.rounds.join("\n")); setPick(new Set()); }, [r.current, r.rounds.join("|")]);
+  const multi = r.rounds.length >= 2;
+  const next = r.rounds[r.current];
+  const inRound = r.teams.filter((t) => t.round_reached >= r.current)
+    .sort((a, b) => (order.indexOf(a.id) + 1 || 999) - (order.indexOf(b.id) + 1 || 999));
+  async function run(fn: () => Promise<string | void>) {
+    setMsg(null);
+    try { const text = await fn(); await onChange(); if (text) setMsg({ kind: "ok", text }); }
+    catch (e) { setMsg({ kind: "err", text: (e as Error).message }); }
+  }
+  const save = () => run(async () => {
+    const list = names.split("\n").map((x) => x.trim()).filter(Boolean);
+    await api(`${base}/rounds`, { method: "PUT", json: { rounds: list } });
+    return list.length >= 2 ? `Saved ${list.length} rounds.` : "Saved. This challenge has one round.";
+  });
+  const advance = () => run(async () => {
+    if (!confirm(`Send ${pick.size} team${pick.size === 1 ? "" : "s"} to ${next}? The stage goes back to reviewing so you can adjust the rubric and judges for the new round. Judge assignments are cleared.`)) return;
+    await api(`${base}/rounds/advance`, { method: "POST", json: { team_ids: [...pick] } });
+    return `${pick.size} team${pick.size === 1 ? "" : "s"} moved on to ${next}. Check the rubric above, then move the stage to judging.`;
+  });
+  const back = () => run(async () => {
+    if (!confirm("Undo the last round change? Every team goes back to the previous round and its scores come back to the leaderboard.")) return;
+    await api(`${base}/rounds/back`, { method: "POST" });
+    return "Back to the previous round.";
+  });
+  return (
+    <NumSection n="05" title="Rounds">
+      <p className="muted" style={{ marginTop: 0, maxWidth: 640 }}>
+        For a challenge with several rounds, such as an idea round, a build round and a demo day. Each round has its own rubric and scores, and only the teams you send through are judged in the next one. One name or none means a single round.
+      </p>
+      <label htmlFor="rn" style={{ marginTop: 0 }}>Round names, one per line</label>
+      <textarea id="rn" rows={3} value={names} placeholder={"Idea round\nBuild round\nDemo day"} onChange={(e) => setNames(e.target.value)} style={{ maxWidth: 420 }} />
+      <div className="actions"><button className="ghost" onClick={save}>Save rounds</button></div>
+      {multi && (
+        <>
+          <p><b>Now: round {r.current} of {r.rounds.length}, {r.rounds[r.current - 1]}.</b> {inRound.length} team{inRound.length === 1 ? " is" : "s are"} in this round.</p>
+          {next ? (
+            inRound.length === 0 ? <p className="muted">No finalists in this round yet.</p> : (
+              <>
+                <p className="muted" style={{ fontSize: 13 }}>Tick the teams that go through to <b>{next}</b>. They are in leaderboard order.</p>
+                <ul className="todo">{inRound.map((t) => (
+                  <li key={t.id}><label className="check" style={{ margin: 0 }}>
+                    <input type="checkbox" checked={pick.has(t.id)} onChange={(e) => { const n = new Set(pick); if (e.target.checked) n.add(t.id); else n.delete(t.id); setPick(n); }} /> {t.name}
+                  </label></li>
+                ))}</ul>
+                <div className="actions"><button disabled={!pick.size || r.status !== "judging"} onClick={advance}>Send {pick.size || ""} to {next}</button></div>
+                {r.status !== "judging" && <p className="muted" style={{ fontSize: 13 }}>You can send teams through once this round has been judged (stage: judging).</p>}
+              </>
+            )
+          ) : <p className="muted" style={{ fontSize: 13 }}>This is the last round. Its leaderboard decides the results.</p>}
+          {r.current > 1 && <div className="actions"><button className="ghost" onClick={back}>Undo last round change</button></div>}
+        </>
+      )}
+      {msg && <Notice kind={msg.kind}>{msg.text}</Notice>}
+    </NumSection>
   );
 }
