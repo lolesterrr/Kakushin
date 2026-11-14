@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import { Link, Navigate } from "react-router-dom";
 import { api, fmtDate, fromLocalInput, toLocalInput } from "../api";
 import { useAuth } from "../auth";
@@ -322,6 +322,9 @@ export function PlatformEvents() {
   const [f, setF] = useState(blank);
   const [preview, setPreview] = useState<Preview | null>(null);
   const [busy, setBusy] = useState("");
+  const top = useRef<HTMLDivElement>(null);
+  /** The queue and any message sit above the sources, so after acting on a source take the admin back up to them. */
+  const toQueue = () => { setState("pending"); top.current?.scrollIntoView({ behavior: "smooth", block: "start" }); };
   const load = (st = state) => api<{ items: GEvent[] }>(`/platform/events?state=${st}`).then((r) => setItems(r.items)).catch((e: Error) => setMsg({ kind: "err", text: e.message }));
   const loadSources = () => api<{ sources: Source[] }>("/platform/sources").then((r) => setSources(r.sources)).catch((e: Error) => setMsg({ kind: "err", text: e.message }));
   useEffect(() => { setItems(null); void load(state); }, [state]); // eslint-disable-line react-hooks/exhaustive-deps
@@ -340,6 +343,7 @@ export function PlatformEvents() {
   const flip = (s: Source, patch: Partial<Source>) => act(s.id, () => api(`/platform/sources/${s.id}`, { method: "PUT", json: { name: s.name, kind: s.kind, url: s.url, topics: s.topics, keywords: s.keywords, auto_publish: s.auto_publish, enabled: s.enabled, ...patch } }));
   return (
     <Shell title="Global events">
+      <div ref={top} style={{ scrollMarginTop: 80 }} />
       {msg && <div className="section"><Notice kind={msg.kind}>{msg.text}</Notice></div>}
       <div className="section">
         <div className="chips" role="group" aria-label="Show">
@@ -361,10 +365,10 @@ export function PlatformEvents() {
               <tr key={s.id}>
                 <td><b>{s.name}</b><br /><span className="muted" style={{ wordBreak: "break-all" }}>{s.url}</span>{s.keywords && <><br /><span className="muted">Only items mentioning: {s.keywords}</span></>}</td>
                 <td>{s.last_fetched_at ? <>{new Date(s.last_fetched_at).toLocaleString()}<br /><span className="muted">{s.last_status}</span></> : <span className="muted">Not yet</span>}</td>
-                <td className="num">{s.listed}</td><td className="num">{s.waiting}</td>
+                <td className="num">{s.listed}</td><td className="num">{s.waiting > 0 ? <button type="button" className="link" title="Show them in the queue" onClick={toQueue}>{s.waiting}</button> : s.waiting}</td>
                 <td>{!s.enabled ? <span className="tag ink">Paused</span> : s.auto_publish ? <span className="tag moss">Trusted</span> : <span className="tag gold">Reviewed</span>}</td>
                 <td><div className="row-actions">
-                  <button className="ghost small" disabled={busy === s.id} onClick={() => void act(s.id, () => api<{ status: string }>(`/platform/sources/${s.id}/fetch`, { method: "POST" }), (r) => `${s.name}: ${(r as { status: string }).status}`)}>Read now</button>
+                  <button className="ghost small" disabled={busy === s.id} onClick={() => void act(s.id, () => api<{ status: string }>(`/platform/sources/${s.id}/fetch`, { method: "POST" }), (r) => `${s.name}: ${(r as { status: string }).status}. Anything waiting for review is listed below.`).then(toQueue)}>{busy === s.id ? "Reading…" : "Read now"}</button>
                   <button className="ghost small" onClick={() => { if (s.auto_publish || confirm(`Trust ${s.name}? Its events will be listed without review.`)) void flip(s, { auto_publish: !s.auto_publish }); }}>{s.auto_publish ? "Review first" : "Trust"}</button>
                   <button className="ghost small" onClick={() => void flip(s, { enabled: !s.enabled })}>{s.enabled ? "Pause" : "Resume"}</button>
                   <button className="ghost small" onClick={() => { if (confirm(`Remove ${s.name}? The events it already brought stay.`)) void act(s.id, () => api(`/platform/sources/${s.id}`, { method: "DELETE" })); }}>Remove</button>
