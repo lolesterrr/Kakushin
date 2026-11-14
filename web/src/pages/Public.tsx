@@ -6,7 +6,7 @@ import { NextStep, TeamPanel, useMyTeam, type Question } from "./Team";
 import { CheckinPass, type Block } from "./Live";
 import { FollowButton } from "./Inbox";
 import { PublicResults } from "./Results";
-import { Banner, ChallengeCard, type ChallengeCardData, DeadlineStamp, Logo, Notice, Stamp, StatusPill, TopicPills } from "../ui";
+import { Banner, ChallengeCard, type ChallengeCardData, DeadlineStamp, Logo, Notice, Stamp, StatusPill, TopicPills, topicLabel } from "../ui";
 import { Markdown } from "../markdown";
 import { Gallery, ShowProject, WhosComing } from "./People";
 import { Recap } from "../media";
@@ -147,9 +147,12 @@ export function Explore() {
             <option value="newest">Newest</option>
           </select>
         </div>
-        <div className="pills" style={{ marginTop: 16 }} role="group" aria-label="Filter by topic">
-          <button className={`pill ${topic === null ? "on" : ""}`} onClick={() => setTopic(null)}>all</button>
-          {topics.map((t) => <button key={t} className={`pill ${topic === t ? "on" : ""}`} onClick={() => setTopic(t)}>{t}</button>)}
+        <div className="topic-rail" role="group" aria-label="Filter by topic">
+          <span className="label" aria-hidden="true">Topic</span>
+          <div className="chips">
+            <button type="button" className="chip" aria-pressed={topic === null} onClick={() => setTopic(null)}>All</button>
+            {topics.map((t) => <button type="button" key={t} className="chip" aria-pressed={topic === t} onClick={() => setTopic(topic === t ? null : t)}>{topicLabel(t)}</button>)}
+          </div>
         </div>
       </div>
       {err && <div className="section"><Notice kind="err">{err}</Notice></div>}
