@@ -9,6 +9,7 @@ import { PublicResults } from "./Results";
 import { Banner, ChallengeCard, type ChallengeCardData, DeadlineStamp, Logo, Notice, Stamp, StatusPill, TopicPills } from "../ui";
 import { Markdown } from "../markdown";
 import { Gallery, ShowProject, WhosComing } from "./People";
+import { Recap } from "../media";
 
 /**
  * Banner bulb: grows in once per page load, then loops a gentle turn. Reduced motion gets the still.
@@ -323,6 +324,7 @@ export function ChallengePublic() {
         {sections.map(([id, label]) => <a key={id} href={`#${id}`}>{label}</a>)}
       </nav>
       {c.results_published ? <><PublicResults orgSlug={c.org.slug} cslug={c.slug} /><Gallery path={`/orgs/${c.org.slug}/challenges/${c.slug}/gallery`} /></> : null}
+      {(c.status === "judging" || c.status === "completed") && <Recap orgSlug={c.org.slug} cslug={c.slug} />}
       {c.description && <div className="section" id="overview"><p className="label" style={{ marginTop: 0 }}>Overview</p><Markdown text={c.description} /></div>}
       {c.rules && <div className="section" id="rules"><p className="label" style={{ marginTop: 0 }}>Rules</p><Markdown text={c.rules} /></div>}
       {tl.length > 0 && (

@@ -10,7 +10,7 @@ me.get("/", async (c) => {
   const u = c.get("user");
   if (!u) return c.json({ user: null });
   const full = await c.env.DB.prepare(
-    "SELECT id, email, name, bio, institution, location, skills, links, gender, is_platform_admin, handle, public_profile FROM users WHERE id = ?",
+    "SELECT id, email, name, bio, institution, location, skills, links, gender, is_platform_admin, is_super_admin, handle, public_profile FROM users WHERE id = ?",
   ).bind(u.id).first<Record<string, unknown>>();
   return c.json({
     user: { ...full, public_profile: !!full?.public_profile, skills: JSON.parse(String(full?.skills ?? "[]")), links: JSON.parse(String(full?.links ?? "{}")) },
@@ -142,6 +142,10 @@ me.delete("/", async (c) => {
     db.prepare("DELETE FROM code_failures WHERE lower(email) = ?").bind(email),
     db.prepare("DELETE FROM users WHERE id = ?").bind(u.id),
   ]);
+  // Screenshots of removed teams sit in a folder per team.
+  if (solo.length) c.executionCtx.waitUntil((async () => {
+    for (const t of solo) { const l = await c.env.FILES.list({ prefix: `shots/${t.id}/` }); if (l.objects.length) await c.env.FILES.delete(l.objects.map((o) => o.key)); }
+  })().catch(() => {}));
   if (files.length) c.executionCtx.waitUntil(c.env.FILES.delete(files).catch((e) => console.error(`account file clean-up failed: ${e instanceof Error ? e.message : e}`)));
   clearSessionCookie(c);
   return c.json({ ok: true });
