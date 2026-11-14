@@ -368,7 +368,7 @@ orgChallenges.delete("/:slug/challenges/:cslug", async (c) => {
   if (row.cover_key) await c.env.FILES.delete(row.cover_key);
   // Sponsor logos and page images live under the challenge's own folders.
   c.executionCtx.waitUntil((async () => {
-    for (const folder of ["sponsors", "pages"]) {
+    for (const folder of ["sponsors", "pages", "photos"]) {
       const list = await c.env.FILES.list({ prefix: `${folder}/${row.id}/` });
       if (list.objects.length) await c.env.FILES.delete(list.objects.map((o) => o.key));
     }

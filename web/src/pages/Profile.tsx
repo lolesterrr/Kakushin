@@ -16,6 +16,8 @@ export function Profile() {
   });
   const [isPublic, setIsPublic] = useState(!!me?.public_profile);
   const [msg, setMsg] = useState<{ kind: "ok" | "err"; text: string } | null>(null);
+  const [tab, setTab] = useState(0);
+  const [certCount, setCertCount] = useState(0);
   const [teams, setTeams] = useState<{ id: string; name: string; status: string; title: string; cslug: string; oslug: string; oname: string }[]>([]);
   useEffect(() => { if (me) api<{ teams: typeof teams }>("/teams/mine").then((r) => setTeams(r.teams)).catch(() => {}); }, [me?.id]);
   if (!me) return <Navigate to="/login?next=/profile" replace />;
@@ -31,27 +33,54 @@ export function Profile() {
       await reload(); setMsg({ kind: "ok", text: "Saved" });
     } catch (err) { setMsg({ kind: "err", text: (err as Error).message }); }
   }
+  const pad = (n: number) => String(n).padStart(2, "0");
+  const finals = teams.filter((t) => t.status === "finalist" || t.status === "winner").length;
+  const TABS = ["About you", "Teams and certificates", "Notifications", "Account"];
   return (
     <>
-    {teams.length > 0 && (
-      <div className="section">
-        <h2>Your teams</h2>
-        <div className="grid" style={{ marginTop: 16 }}>
-          {teams.map((t) => (
-            <Link key={t.id} to={`/o/${t.oslug}/c/${t.cslug}`} className="cell card-link"><div className="cell-body"><span className="muted">{t.oname}</span><h3>{t.title}</h3><p>{t.name}</p></div>
-              <div className="corner"><StatusStamp status={t.status} /></div></Link>
-          ))}
+    <div className="me-hero">
+      <span className="me-sun" aria-hidden="true" /><span className="me-ring" aria-hidden="true" />
+      <div className="me-card">
+        <div style={{ display: "flex", flexDirection: "column", gap: 18 }}>
+          <p className="label">{me.public_profile && me.handle ? "Public profile" : "Private profile"}</p>
+          <h1 className="boxed">{me.name || "Your name"}</h1>
+          {(me.institution || me.location) && <div className="facts">{me.institution && <span>{me.institution}</span>}{me.location && <span>{me.location}</span>}</div>}
+          {me.skills.length > 0 && <div className="pills">{me.skills.slice(0, 8).map((k) => <span className="pill" key={k}>{k}</span>)}</div>}
+          {me.public_profile && me.handle ? <Link to={`/u/${me.handle}`} style={{ fontFamily: "var(--mono)", fontSize: 14, color: "#f6f4ee" }}>{window.location.host}/u/{me.handle}</Link>
+            : <button type="button" className="link" style={{ color: "#dcd8cf", alignSelf: "flex-start" }} onClick={() => setTab(0)}>Make your profile public below</button>}
         </div>
       </div>
-    )}
-    <CertificatesList />
-    <div className="section form">
-      <h1>Your profile</h1><p className="muted">{me.email}</p>
+      <div className="me-stats">
+        <div><b>{pad(teams.length)}</b><span>Challenges joined</span></div>
+        <div><b>{pad(certCount)}</b><span>Certificates</span></div>
+        <div><b>{pad(finals)}</b><span>Finals</span></div>
+      </div>
+    </div>
+    <nav className="folders" role="tablist" aria-label="Profile sections">
+      {TABS.map((label, i) => <button key={label} type="button" role="tab" id={`ptab-${i}`} aria-controls={`psec-${i}`} aria-selected={tab === i} onClick={() => setTab(i)}>{label}</button>)}
+    </nav>
+    <div role="tabpanel" id="psec-1" aria-labelledby="ptab-1" hidden={tab !== 1}>
+      {teams.length > 0 ? (
+        <div className="section">
+          <h2>Your teams</h2>
+          <div className="grid" style={{ marginTop: 16 }}>
+            {teams.map((t) => (
+              <Link key={t.id} to={`/o/${t.oslug}/c/${t.cslug}`} className="cell card-link"><div className="cell-body"><span className="muted">{t.oname}</span><h3>{t.title}</h3><p>{t.name}</p></div>
+                <div className="corner"><StatusStamp status={t.status} /></div></Link>
+            ))}
+          </div>
+        </div>
+      ) : <div className="empty"><p className="hand">No teams yet</p><p className="muted"><Link to="/challenges">Find a challenge</Link> to join.</p></div>}
+      <CertificatesList onCount={setCertCount} />
+    </div>
+    <div className="section form" role="tabpanel" id="psec-0" aria-labelledby="ptab-0" hidden={tab !== 0}>
+      <h2>About you</h2><p className="muted">Organisers see this when you apply. Only your name is required. Signed in as {me.email}.</p>
       <form onSubmit={save}>
         <label htmlFor="n">Name</label><input id="n" required value={form.name} onChange={set("name")} />
         <label htmlFor="i">Institution</label><input id="i" value={form.institution} onChange={set("institution")} />
         <label htmlFor="l">Location</label><input id="l" value={form.location} onChange={set("location")} />
         <label htmlFor="s">Skills (comma separated)</label><input id="s" value={form.skills} onChange={set("skills")} />
+        <p className="note-box" style={{ margin: "6px 0 0" }}>teams search by skills, so add a few</p>
         <label htmlFor="b">Bio</label><textarea id="b" rows={4} value={form.bio} onChange={set("bio")} />
         <div className="row">
           <div><label htmlFor="lg">GitHub</label><input id="lg" type="url" placeholder="https://github.com/…" value={form.github} onChange={set("github")} /></div>
@@ -61,16 +90,20 @@ export function Profile() {
         <h2 style={{ marginTop: 28 }}>Public profile</h2>
         <p className="muted" style={{ marginTop: 0 }}>Off unless you turn it on. It shows your name, bio, institution, location, skills, links, teams and certificates, never your email. People with a public profile are also named in "Who's coming" on challenges they join.</p>
         <label htmlFor="h">Profile address</label>
-        <div style={{ display: "flex", gap: 6, alignItems: "center" }}><span className="muted">{window.location.host}/u/</span><input id="h" maxLength={30} pattern="[a-z0-9][a-z0-9\-]{1,28}[a-z0-9]" title="3 to 30 lowercase letters, numbers or dashes" placeholder="your-name" value={form.handle} onChange={(e) => setForm({ ...form, handle: e.target.value.toLowerCase() })} /></div>
+        <div style={{ display: "flex", gap: 6, alignItems: "center" }}><span className="muted" style={{ fontFamily: "var(--mono)", fontSize: 14 }}>{window.location.host}/u/</span><input id="h" maxLength={30} pattern="[a-z0-9][a-z0-9\-]{1,28}[a-z0-9]" title="3 to 30 lowercase letters, numbers or dashes" placeholder="your-name" value={form.handle} onChange={(e) => setForm({ ...form, handle: e.target.value.toLowerCase() })} /></div>
         <label className="check"><input type="checkbox" checked={isPublic} onChange={(e) => setIsPublic(e.target.checked)} />Make my profile public</label>
         {me.public_profile && me.handle && <p style={{ fontSize: 14 }}>Live at <Link to={`/u/${me.handle}`}>/u/{me.handle}</Link></p>}
-        <div className="actions"><button type="submit">Save</button></div>
+        <div className="actions"><button type="submit">Save changes</button></div>
         {msg && <Notice kind={msg.kind}>{msg.text}</Notice>}
       </form>
     </div>
-    <TopicPicker />
-    <PushSetting />
-    <DeleteAccount email={me.email} />
+    <div role="tabpanel" id="psec-2" aria-labelledby="ptab-2" hidden={tab !== 2}>
+      <TopicPicker />
+      <PushSetting />
+    </div>
+    <div role="tabpanel" id="psec-3" aria-labelledby="ptab-3" hidden={tab !== 3}>
+      <DeleteAccount email={me.email} />
+    </div>
     </>
   );
 }

@@ -4,9 +4,9 @@ import { api, fmtDate } from "../api";
 
 interface Cert { code: string; kind: string; title: string; challenge: string; org: string; issued_at: number; link: string }
 
-export function CertificatesList() {
+export function CertificatesList({ onCount }: { onCount?: (n: number) => void } = {}) {
   const [certs, setCerts] = useState<Cert[]>([]);
-  useEffect(() => { api<{ certificates: Cert[] }>("/certificates/mine").then((r) => setCerts(r.certificates)).catch(() => {}); }, []);
+  useEffect(() => { api<{ certificates: Cert[] }>("/certificates/mine").then((r) => { setCerts(r.certificates); onCount?.(r.certificates.length); }).catch(() => {}); }, []);
   if (certs.length === 0) return null;
   return (
     <div className="section" id="certificates">

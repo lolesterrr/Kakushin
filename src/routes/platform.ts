@@ -115,6 +115,10 @@ platform.put("/orgs/:id", async (c) => {
   const o = await c.env.DB.prepare("SELECT id, name FROM organizations WHERE id = ?").bind(c.req.param("id")).first<{ id: string; name: string }>();
   if (!o) return c.json({ error: "Not found" }, 404);
   const { verified, suspended } = parsed.data;
+  if (suspended && !c.get("user")!.is_super_admin) {
+    const ownerOrg = await c.env.DB.prepare("SELECT 1 AS x FROM memberships m JOIN users u ON u.id = m.user_id WHERE m.org_id = ? AND m.role = 'owner' AND u.is_super_admin = 1").bind(o.id).first();
+    if (ownerOrg) return c.json({ error: "This organisation belongs to the platform owner. Only the owner can suspend it." }, 403);
+  }
   if (verified !== undefined) { await c.env.DB.prepare("UPDATE organizations SET verified = ? WHERE id = ?").bind(verified ? 1 : 0, o.id).run(); await audit(c, verified ? "org.verified" : "org.unverified", "organization", o.id, o.name); }
   if (suspended !== undefined) { await c.env.DB.prepare("UPDATE organizations SET suspended = ? WHERE id = ?").bind(suspended ? 1 : 0, o.id).run(); await audit(c, suspended ? "org.suspended" : "org.restored", "organization", o.id, o.name); }
   return c.json({ ok: true });
@@ -124,7 +128,7 @@ platform.put("/orgs/:id", async (c) => {
 platform.get("/users", async (c) => {
   const q = (c.req.query("q") ?? "").trim().toLowerCase();
   const { results } = await c.env.DB.prepare(
-    `SELECT u.id, u.email, u.name, u.is_platform_admin, u.suspended, u.created_at,
+    `SELECT u.id, u.email, u.name, u.is_platform_admin, u.is_super_admin, u.suspended, u.created_at,
        (SELECT COUNT(*) FROM memberships m WHERE m.user_id = u.id) AS orgs,
        (SELECT COUNT(*) FROM team_members t WHERE t.user_id = u.id) AS teams
      FROM users u WHERE (? = '' OR lower(u.email) LIKE ? OR lower(COALESCE(u.name, '')) LIKE ?) ORDER BY u.created_at DESC LIMIT 100`,
@@ -136,10 +140,13 @@ platform.put("/users/:id", async (c) => {
   const parsed = z.object({ suspended: z.boolean().optional(), is_platform_admin: z.boolean().optional() }).safeParse(await c.req.json().catch(() => null));
   if (!parsed.success) return c.json({ error: "Check the request" }, 400);
   const me = c.get("user")!;
-  const u = await c.env.DB.prepare("SELECT id, email FROM users WHERE id = ?").bind(c.req.param("id")).first<{ id: string; email: string }>();
+  const u = await c.env.DB.prepare("SELECT id, email, is_super_admin FROM users WHERE id = ?").bind(c.req.param("id")).first<{ id: string; email: string; is_super_admin: number }>();
   if (!u) return c.json({ error: "Not found" }, 404);
   if (u.id === me.id) return c.json({ error: "You cannot change your own access. Ask another platform admin." }, 409);
+  // The platform owner cannot be suspended or demoted by anyone, and only the owner hands out or takes away the admin role.
+  if (u.is_super_admin) return c.json({ error: "This is the platform owner's account. Nobody can change its access here." }, 403);
   const { suspended, is_platform_admin } = parsed.data;
+  if (is_platform_admin !== undefined && !me.is_super_admin) return c.json({ error: "Only the platform owner can add or remove platform admins" }, 403);
   if (suspended !== undefined) {
     await c.env.DB.batch([
       c.env.DB.prepare("UPDATE users SET suspended = ? WHERE id = ?").bind(suspended ? 1 : 0, u.id),
