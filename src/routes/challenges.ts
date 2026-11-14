@@ -16,7 +16,7 @@ interface ChallengeRow {
   applications_open_at: number | null; applications_close_at: number | null; pitch_due_at: number | null;
   topics: string; questions: string; results_published: number; created_at: number;
   review_state: string; review_note: string; cover_credit: string | null;
-  rules: string; faq: string; sponsors: string; timeline: string; show_judges: number;
+  rules: string; faq: string; sponsors: string; timeline: string; show_judges: number; round_names: string; current_round: number;
 }
 
 export interface Faq { q: string; a: string }
@@ -37,6 +37,7 @@ export function challengeOut(r: ChallengeRow, org: Pick<OrgRow, "slug" | "name" 
     results_published: r.results_published, created_at: r.created_at,
     review_state: r.review_state, review_note: r.review_note,
     rules: r.rules ?? "", faq: jsonList<Faq>(r.faq), timeline: jsonList<TimelineItem>(r.timeline), show_judges: !!r.show_judges,
+    rounds: jsonList<string>(r.round_names ?? "[]"), current_round: r.current_round ?? 1,
     sponsors: jsonList<Sponsor>(r.sponsors).map((x) => ({ name: x.name, url: x.url, logo_key: x.logo_key, logo_url: fileUrl(x.logo_key) })),
     org: { slug: org.slug, name: org.name, logo_url: fileUrl(org.logo_key) },
   };
@@ -161,8 +162,8 @@ orgChallenges.get("/:slug/challenges/:cslug", async (c) => {
   // Drafts are only visible to the organisation's own admins.
   if (!row || (row.status === "draft" && !access.role)) return c.json({ error: "Not found" }, 404);
   // The rubric is public so people know how they will be scored before they apply. Weights go out as percentages.
-  const { results: rubric } = await c.env.DB.prepare("SELECT name, description, weight, max_score FROM criteria WHERE challenge_id = ? AND stage = 'pitch' ORDER BY position, rowid")
-    .bind(row.id).all<{ name: string; description: string; weight: number; max_score: number }>();
+  const { results: rubric } = await c.env.DB.prepare("SELECT name, description, weight, max_score FROM criteria WHERE challenge_id = ? AND stage = 'pitch' AND round_no = ? ORDER BY position, rowid")
+    .bind(row.id, row.current_round).all<{ name: string; description: string; weight: number; max_score: number }>();
   const criteria = rubric.map((r) => ({ name: r.name, description: r.description, weight: Math.round(r.weight * 10000) / 100, max_score: r.max_score }));
   // Judges are listed only when the organiser chose to, and only those who gave a name to show. Never their email.
   const judges = row.show_judges

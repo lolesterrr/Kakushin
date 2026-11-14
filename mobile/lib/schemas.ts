@@ -121,7 +121,7 @@ export const judgeChallenges = z.object({ challenges: z.array(z.object({ slug: z
 export const criterion = z.object({ id: z.string(), name: z.string(), description: z.string().default(""), weight: z.number(), max_score: z.number() });
 export type Criterion = z.infer<typeof criterion>;
 export const judgeChallenge = z.object({
-  challenge: z.object({ title: z.string(), status: z.string(), org: z.string(), scoring_open: z.boolean(), blind: z.boolean().optional() }),
+  challenge: z.object({ title: z.string(), status: z.string(), org: z.string(), scoring_open: z.boolean(), blind: z.boolean().optional(), round: z.string().nullable().optional() }),
   criteria: z.array(criterion),
   teams: z.array(z.object({ id: z.string(), name: z.string(), has_pitch: z.boolean(), own_team: z.boolean(), done: z.boolean(), partial: z.boolean() })),
 });
