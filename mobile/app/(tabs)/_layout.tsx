@@ -13,6 +13,7 @@ export default function TabsLayout() {
     <Tabs tabBar={(p) => <TabBar {...(p as unknown as React.ComponentProps<typeof TabBar>)} />}
       screenOptions={{ headerStyle: { backgroundColor: t.bg }, headerShadowVisible: false, headerTintColor: t.ink, headerTitleStyle: { fontWeight: "800" } }}>
       <Tabs.Screen name="index" options={{ title: "Explore", headerShown: false }} />
+      <Tabs.Screen name="global" options={{ title: "Global events", headerShown: false }} />
       <Tabs.Screen name="teams" options={{ title: "My teams" }} />
       <Tabs.Screen name="judge" options={{ title: "Judging" }} />
       <Tabs.Screen name="inbox" options={{ title: "Inbox" }} />

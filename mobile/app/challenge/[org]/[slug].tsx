@@ -18,6 +18,8 @@ import { F, topicLabel } from "../../../lib/fonts";
 import { shadow } from "../../../lib/theme";
 import { Body, Button, Card, DaysStamp, H2, Label, Loading, Notice, Offline, Pill, Screen, StatusStamp } from "../../../components/ui";
 import { Recap } from "../../../components/projects";
+import { SaveFab } from "../../../components/events";
+import { addToCalendar, setSaved } from "../../../lib/saved";
 
 export default function ChallengeScreen() {
   const { org, slug } = useLocalSearchParams<{ org: string; slug: string }>();
@@ -26,7 +28,7 @@ export default function ChallengeScreen() {
   const { me } = useAuth();
   const base = `/orgs/${org}/challenges/${slug}`;
   const here = `/challenge/${org}/${slug}`;
-  const ch = useLoad(async () => { const r = await api(base, { schema: challengeDetail }); return { ...r.challenge, role: r.role ?? null }; }, [base, me?.id], { cache: `challenge.${org}.${slug}` });
+  const ch = useLoad(async () => { const r = await api(base, { schema: challengeDetail }); return { ...r.challenge, role: r.role ?? null, saved: !!r.saved }; }, [base, me?.id], { cache: `challenge.${org}.${slug}` });
   // Signed out, there is no team or follow to load: the screen still shows everything else.
   const tm = useLoad(async () => (me ? (await api(`${base}/team`, { schema: teamResponse })).team : null), [base, me?.id]);
   const fol = useLoad(async () => (me ? await api("/follows", { schema: followsSchema }) : null), [me?.id]);
@@ -40,6 +42,15 @@ export default function ChallengeScreen() {
     catch (e) { setMsg({ kind: "err", text: (e as Error).message }); }
   }
   const refresh = async () => { await Promise.all([ch.refresh(), tm.refresh()]); };
+  const insets = useSafeAreaInsets();
+  const [mine, setMine] = useState<boolean | null>(null);
+  const saved = mine ?? !!ch.data?.saved;
+  async function toggleSave() {
+    if (!me) { toSignIn(router, here); return; }
+    const next = !saved;
+    setMine(next); setMsg(null);
+    try { await setSaved(`challenges/${org}/${slug}`, next); } catch (e) { setMine(!next); setMsg({ kind: "err", text: (e as Error).message }); }
+  }
 
   if (!c) return <Screen><Stack.Screen options={{ headerShown: false }} />{ch.err ? <Notice kind="err">{ch.err === "Not found" ? "We could not find that challenge." : ch.err}</Notice> : <Loading />}</Screen>;
   const d = daysLeft(c.applications_close_at);
@@ -129,9 +140,17 @@ export default function ChallengeScreen() {
         </>
       ) : null}
       <TeamPanel org={org} slug={slug} c={c} team={tm.data} loaded={teamLoaded} signedIn={!!me} onChange={refresh} />
+      {c.status !== "draft" && c.status !== "completed" && (c.applications_close_at || c.pitch_due_at || c.agenda.length > 0) ? (
+        <Button title="Add the dates to my calendar" kind="ghost" onPress={() => void addToCalendar(`orgs/${org}/challenges/${slug}`).catch(() => setMsg({ kind: "err", text: "Could not open the calendar." }))} />
+      ) : null}
+      {c.status !== "draft" && !c.role ? (
+        <Text accessibilityRole="button" onPress={() => (me ? router.push({ pathname: "/report", params: { kind: "challenge", org, slug, title: c.title } } as never) : toSignIn(router, here))}
+          style={{ color: t.muted, fontSize: 14, textDecorationLine: "underline", paddingVertical: 10 }}>Something wrong? Report this challenge</Text>
+      ) : null}
         </View>
       </Screen>
       <BackButton />
+      {c.status !== "draft" ? <SaveFab saved={saved} onPress={() => void toggleSave()} top={insets.top + 8} /> : null}
     </View>
   );
 }
