@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from "react";
 import { Link, useParams } from "react-router-dom";
+import { ProjectCards, type ProjectCard } from "../media";
 import { api, fmtDate } from "../api";
 import { useAuth } from "../auth";
 import { Notice } from "../ui";
@@ -86,30 +87,15 @@ export function WhosComing({ orgSlug, cslug, open, teamMax, team }: { orgSlug: s
   );
 }
 
-export interface Project { team: string; status: string; placement: number | null; challenge: string; cslug: string; oslug: string; video_url: string; demo_url: string; notes: string; members: string }
-
-/** Finalist and winning projects whose teams chose to show them. */
+/** Finalist and winning projects whose teams chose to show them. Each card opens the project's own page. */
 export function Gallery({ path, heading = "Project gallery", showChallenge = false }: { path: string; heading?: string; showChallenge?: boolean }) {
-  const [items, setItems] = useState<Project[] | null>(null);
-  useEffect(() => { api<{ projects: Project[] }>(path).then((r) => setItems(r.projects)).catch(() => setItems([])); }, [path]);
+  const [items, setItems] = useState<ProjectCard[] | null>(null);
+  useEffect(() => { api<{ projects: ProjectCard[] }>(path).then((r) => setItems(r.projects)).catch(() => setItems([])); }, [path]);
   if (!items || items.length === 0) return null;
   return (
     <div className="section" id="gallery">
       <h2>{heading}</h2>
-      <div className="gallery">
-        {items.map((p) => (
-          <article key={`${p.oslug}/${p.cslug}/${p.team}`} className="gcard">
-            <p className="label" style={{ margin: 0 }}>{p.status === "winner" && p.placement ? `${p.placement === 1 ? "1st" : p.placement === 2 ? "2nd" : p.placement === 3 ? "3rd" : `${p.placement}th`} place` : "Finalist"}{showChallenge && <> · <Link to={`/o/${p.oslug}/c/${p.cslug}`}>{p.challenge}</Link></>}</p>
-            <h3 style={{ margin: "6px 0" }}>{p.team}</h3>
-            {p.members && <p className="muted" style={{ margin: 0, fontSize: 14 }}>{p.members}</p>}
-            {p.notes && <p style={{ whiteSpace: "pre-wrap" }}>{p.notes.length > 400 ? `${p.notes.slice(0, 399)}…` : p.notes}</p>}
-            <div className="actions" style={{ marginTop: 8 }}>
-              {p.video_url && <a className="btn small ghost" href={p.video_url} target="_blank" rel="noopener noreferrer nofollow">Video</a>}
-              {p.demo_url && <a className="btn small ghost" href={p.demo_url} target="_blank" rel="noopener noreferrer nofollow">Demo</a>}
-            </div>
-          </article>
-        ))}
-      </div>
+      <ProjectCards items={items} showChallenge={showChallenge} />
     </div>
   );
 }

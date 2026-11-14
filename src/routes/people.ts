@@ -4,6 +4,10 @@ import type { AppEnv } from "../types";
 import { loadOrg } from "../lib/access";
 import { applyWindow } from "./teams";
 import { pushLater } from "../lib/push";
+import { MAX_PHOTOS_PER_PERSON, MAX_RECAP_PHOTOS, MEDIA_BYTES, fileUrl, headerCaption, youtubeEmbed } from "../lib/media";
+import { saveImage } from "../lib/upload";
+import { newId } from "../lib/crypto";
+import { pitchImages } from "./pitch";
 
 /**
  * Day 5B: public profiles, who's coming, the team finder and the project gallery.
@@ -135,14 +139,17 @@ orgPeople.delete("/:slug/challenges/:cslug/looking", async (c) => {
 });
 
 const GALLERY = `SELECT t.id, t.name, t.status, t.placement, ch.title AS challenge, ch.slug AS cslug, o.slug AS oslug,
-    s.video_url, s.demo_url, s.notes,
+    s.video_url, s.demo_url, s.notes, s.repo_url,
+    (SELECT pi.key FROM pitch_images pi WHERE pi.team_id = t.id ORDER BY pi.position, pi.created_at LIMIT 1) AS cover_key,
     (SELECT group_concat(COALESCE(NULLIF(u.name, ''), 'Participant'), ', ') FROM team_members m JOIN users u ON u.id = m.user_id WHERE m.team_id = t.id) AS members
   FROM teams t JOIN challenges ch ON ch.id = t.challenge_id JOIN organizations o ON o.id = ch.org_id LEFT JOIN submissions s ON s.team_id = t.id
   WHERE t.show_project = 1 AND t.status IN ('finalist','winner') AND ch.status = 'completed' AND ch.results_published = 1 AND o.suspended = 0`;
-type G = { id: string; name: string; status: string; placement: number | null; challenge: string; cslug: string; oslug: string; video_url: string | null; demo_url: string | null; notes: string | null; members: string | null };
+type G = { id: string; name: string; status: string; placement: number | null; challenge: string; cslug: string; oslug: string; video_url: string | null; demo_url: string | null; repo_url: string | null; notes: string | null; cover_key: string | null; members: string | null };
+// Every media field may be missing: a project with no video, images or links still gets a card and a page.
 const galleryOut = (g: G) => ({
-  team: g.name, status: g.status, placement: g.placement, challenge: g.challenge, cslug: g.cslug, oslug: g.oslug,
-  video_url: g.video_url ?? "", demo_url: g.demo_url ?? "", notes: g.notes ?? "", members: g.members ?? "",
+  id: g.id, team: g.name, status: g.status, placement: g.placement, challenge: g.challenge, cslug: g.cslug, oslug: g.oslug,
+  video_url: g.video_url ?? "", video_embed: youtubeEmbed(g.video_url), demo_url: g.demo_url ?? "", repo_url: g.repo_url ?? "", notes: g.notes ?? "",
+  cover_url: g.cover_key ? fileUrl(g.cover_key) : null, members: g.members ?? "",
 });
 
 /** Projects from one completed challenge whose teams chose to show them (decision D2: opt in). */
@@ -151,6 +158,94 @@ orgPeople.get("/:slug/challenges/:cslug/gallery", async (c) => {
   if (!x) return c.json({ error: "Not found" }, 404);
   const { results } = await c.env.DB.prepare(`${GALLERY} AND ch.id = ? ORDER BY t.placement IS NULL, t.placement, t.name`).bind(x.ch.id).all<G>();
   return c.json({ projects: results.map(galleryOut) });
+});
+
+/** One project's own page: the pitch with its video and screenshots, for teams that chose to show it. */
+orgPeople.get("/:slug/challenges/:cslug/projects/:teamId", async (c) => {
+  const x = await publicChallenge(c);
+  if (!x) return c.json({ error: "Not found" }, 404);
+  const g = await c.env.DB.prepare(`${GALLERY} AND ch.id = ? AND t.id = ?`).bind(x.ch.id, c.req.param("teamId")!).first<G>();
+  if (!g) return c.json({ error: "Not found" }, 404);
+  // Members link to their profile only when they made it public.
+  const { results: members } = await c.env.DB.prepare(
+    `SELECT COALESCE(NULLIF(u.name, ''), 'Participant') AS name, CASE WHEN u.public_profile = 1 THEN u.handle END AS handle, (t.lead_user_id = u.id) AS lead
+     FROM team_members m JOIN users u ON u.id = m.user_id JOIN teams t ON t.id = m.team_id WHERE m.team_id = ? ORDER BY lead DESC, m.joined_at`,
+  ).bind(g.id).all<{ name: string; handle: string | null; lead: number }>();
+  const { results: others } = await c.env.DB.prepare(`${GALLERY} AND ch.id = ? AND t.id != ? ORDER BY t.placement IS NULL, t.placement, t.name LIMIT 6`).bind(x.ch.id, g.id).all<G>();
+  return c.json({
+    project: { ...galleryOut(g), members: members.map((m) => ({ name: m.name, handle: m.handle, lead: !!m.lead })), images: await pitchImages(c, g.id) },
+    org: { slug: x.org.slug, name: x.org.name }, more: others.map(galleryOut),
+  });
+});
+
+// ---- event recap: photos from the day, shown once the challenge is under way ----
+const RECAP_STATUSES = ["judging", "completed"];
+type Photo = { id: string; key: string; caption: string; approved: number; user_id: string | null; created_at: number; by: string | null };
+const photoOut = (p: Photo) => ({ id: p.id, url: fileUrl(p.key), caption: p.caption, approved: !!p.approved, by: p.by ?? "", created_at: p.created_at });
+
+/** Approved photos for everyone. Organisers also get the ones waiting for approval; participants see their own. */
+orgPeople.get("/:slug/challenges/:cslug/photos", async (c) => {
+  const x = await publicChallenge(c);
+  if (!x) return c.json({ error: "Not found" }, 404);
+  const user = c.get("user");
+  const { results } = await c.env.DB.prepare(
+    `SELECT p.id, p.key, p.caption, p.approved, p.user_id, p.created_at, COALESCE(NULLIF(u.name, ''), 'Participant') AS by
+     FROM challenge_photos p LEFT JOIN users u ON u.id = p.user_id
+     WHERE p.challenge_id = ? AND (p.approved = 1 OR ? = 1 OR p.user_id = ?) ORDER BY p.approved DESC, p.created_at`,
+  ).bind(x.ch.id, x.role ? 1 : 0, user?.id ?? "").all<Photo>();
+  const canAdd = !!user && RECAP_STATUSES.includes(x.ch.status) && (!!x.role || !!(await c.env.DB.prepare(
+    "SELECT 1 AS x FROM team_members m JOIN teams t ON t.id = m.team_id WHERE t.challenge_id = ? AND m.user_id = ?").bind(x.ch.id, user.id).first()));
+  return c.json({ photos: results.map(photoOut), can_add: canAdd, can_manage: !!x.role, open: RECAP_STATUSES.includes(x.ch.status), per_person: MAX_PHOTOS_PER_PERSON });
+});
+
+orgPeople.post("/:slug/challenges/:cslug/photos", async (c) => {
+  const user = c.get("user");
+  if (!user) return c.json({ error: "Not signed in" }, 401);
+  const x = await publicChallenge(c);
+  if (!x) return c.json({ error: "Not found" }, 404);
+  if (!RECAP_STATUSES.includes(x.ch.status)) return c.json({ error: "Photos can be added once the event is under way" }, 409);
+  const organiser = !!x.role;
+  if (!organiser) {
+    const inTeam = await c.env.DB.prepare("SELECT 1 AS x FROM team_members m JOIN teams t ON t.id = m.team_id WHERE t.challenge_id = ? AND m.user_id = ?").bind(x.ch.id, user.id).first();
+    if (!inTeam) return c.json({ error: "Only participants and organisers can add photos" }, 403);
+  }
+  const counts = await c.env.DB.prepare("SELECT COUNT(*) AS total, SUM(CASE WHEN user_id = ? THEN 1 ELSE 0 END) AS mine FROM challenge_photos WHERE challenge_id = ?")
+    .bind(user.id, x.ch.id).first<{ total: number; mine: number | null }>();
+  if ((counts?.total ?? 0) >= MAX_RECAP_PHOTOS) return c.json({ error: `This recap already has ${MAX_RECAP_PHOTOS} photos` }, 409);
+  if (!organiser && (counts?.mine ?? 0) >= MAX_PHOTOS_PER_PERSON) return c.json({ error: `You can add up to ${MAX_PHOTOS_PER_PERSON} photos` }, 409);
+  const saved = await saveImage(c, `photos/${x.ch.id}`, MEDIA_BYTES);
+  if (!saved.ok) return c.json({ error: saved.error }, 400);
+  const id = newId();
+  await c.env.DB.prepare("INSERT INTO challenge_photos (id, challenge_id, user_id, key, caption, approved, created_at) VALUES (?, ?, ?, ?, ?, ?, ?)")
+    .bind(id, x.ch.id, user.id, saved.key, headerCaption(c.req.header("X-Caption")), organiser ? 1 : 0, Date.now()).run();
+  return c.json({ ok: true, id, approved: organiser });
+});
+
+/** Organisers approve, re-caption or hide a photo. */
+orgPeople.put("/:slug/challenges/:cslug/photos/:photoId", async (c) => {
+  const x = await publicChallenge(c);
+  if (!x) return c.json({ error: "Not found" }, 404);
+  if (!x.role) return c.json({ error: "Only organisation admins can do that" }, 403);
+  const parsed = z.object({ approved: z.boolean().optional(), caption: z.string().trim().max(120).optional() }).safeParse(await c.req.json().catch(() => null));
+  if (!parsed.success) return c.json({ error: "Check the photo details" }, 400);
+  const { approved, caption } = parsed.data;
+  const r = await c.env.DB.prepare("UPDATE challenge_photos SET approved = COALESCE(?, approved), caption = COALESCE(?, caption) WHERE id = ? AND challenge_id = ?")
+    .bind(approved === undefined ? null : approved ? 1 : 0, caption ?? null, c.req.param("photoId")!, x.ch.id).run();
+  if (!r.meta.changes) return c.json({ error: "Not found" }, 404);
+  return c.json({ ok: true });
+});
+
+/** Organisers remove any photo; participants remove their own. */
+orgPeople.delete("/:slug/challenges/:cslug/photos/:photoId", async (c) => {
+  const user = c.get("user");
+  if (!user) return c.json({ error: "Not signed in" }, 401);
+  const x = await publicChallenge(c);
+  if (!x) return c.json({ error: "Not found" }, 404);
+  const row = await c.env.DB.prepare("SELECT key, user_id FROM challenge_photos WHERE id = ? AND challenge_id = ?").bind(c.req.param("photoId")!, x.ch.id).first<{ key: string; user_id: string | null }>();
+  if (!row || (!x.role && row.user_id !== user.id)) return c.json({ error: "Not found" }, 404);
+  await c.env.DB.prepare("DELETE FROM challenge_photos WHERE id = ?").bind(c.req.param("photoId")!).run();
+  c.executionCtx.waitUntil(c.env.FILES.delete(row.key).catch(() => {}));
+  return c.json({ ok: true });
 });
 
 /** The same across all of an organisation's completed challenges, newest first. */

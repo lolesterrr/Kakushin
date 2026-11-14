@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from "react";
 import { Link, Navigate, useNavigate, useParams } from "react-router-dom";
+import { PitchImagesEditor, Video, type MediaImage } from "../media";
 import { api, fmtDate, uploadFile } from "../api";
 import { useAuth } from "../auth";
 import { Logo, Notice, Stamp } from "../ui";
@@ -100,6 +101,8 @@ export function TeamPanel({ orgSlug, cslug, challenge, team, reload }: Props) {
   }
 
   if (!ready) return null;
+  // Nothing to sign in for once applications have closed (a finished challenge used to still say "Want in?").
+  if (!me && closedWhy) return null;
   if (!me) {
     return (
       <div className="section">
@@ -233,17 +236,19 @@ export function Join() {
   );
 }
 
-interface PitchData { has_deck: boolean; deck_name: string | null; video_url: string; demo_url: string; repo_url?: string; notes: string }
+interface PitchData { has_deck: boolean; deck_name: string | null; video_url: string; video_embed?: string | null; demo_url: string; repo_url?: string; notes: string }
 
 export function PitchSection({ team, dueAt }: { team: TeamData; dueAt: number | null | undefined }) {
   const [pitch, setPitch] = useState<PitchData | null>(null);
+  const [images, setImages] = useState<MediaImage[]>([]);
+  const [maxImages, setMaxImages] = useState(6);
   const [form, setForm] = useState({ video_url: "", demo_url: "", repo_url: "", notes: "" });
   const [msg, setMsg] = useState<Msg>(null);
   const [busy, setBusy] = useState(false);
   const late = !!dueAt && Date.now() > dueAt;
   async function load() {
-    const r = await api<{ pitch: PitchData | null }>(`/teams/${team.id}/pitch`);
-    setPitch(r.pitch); if (r.pitch) setForm({ video_url: r.pitch.video_url, demo_url: r.pitch.demo_url, repo_url: r.pitch.repo_url ?? "", notes: r.pitch.notes });
+    const r = await api<{ pitch: PitchData | null; images?: MediaImage[]; max_images?: number }>(`/teams/${team.id}/pitch`);
+    setPitch(r.pitch); setImages(r.images ?? []); if (r.max_images) setMaxImages(r.max_images); if (r.pitch) setForm({ video_url: r.pitch.video_url, demo_url: r.pitch.demo_url, repo_url: r.pitch.repo_url ?? "", notes: r.pitch.notes });
   }
   useEffect(() => { void load().catch(() => {}); }, [team.id]);
   async function save(e: React.FormEvent) {
@@ -262,13 +267,16 @@ export function PitchSection({ team, dueAt }: { team: TeamData; dueAt: number | 
   return (
     <div className="section form" id="pitch">
       <h2>Your pitch</h2>
-      <p className="muted">Add a deck, a video link, a demo link, or all three. Judges see exactly what you add here.{dueAt ? ` Due ${fmtDate(dueAt)}.` : ""}</p>
+      <p className="muted">Add a deck, a video, screenshots, a demo link, or any mix. Everything is optional, and judges see exactly what you add here.{dueAt ? ` Due ${fmtDate(dueAt)}.` : ""}</p>
       {late && <Notice kind="err">The pitch deadline has passed, so the pitch can no longer be changed.</Notice>}
       <form onSubmit={save}>
         <label htmlFor="pd">Pitch deck (PDF, up to 20 MB)</label>
         <input id="pd" type="file" accept="application/pdf" disabled={busy || late} onChange={deck} />
         {pitch?.has_deck && <p style={{ margin: "8px 0 0", fontSize: 14 }}>Uploaded: <a href={`/api/decks/${team.id}`} target="_blank" rel="noopener noreferrer">{pitch.deck_name ?? "deck.pdf"}</a></p>}
-        <label htmlFor="pv">Video link</label><input id="pv" type="url" placeholder="https://" disabled={late} value={form.video_url} onChange={set("video_url")} />
+        <label htmlFor="pv">Video link</label><input id="pv" type="url" placeholder="https://youtube.com/watch?v=..." disabled={late} value={form.video_url} onChange={set("video_url")} />
+        <p className="muted" style={{ fontSize: 13, margin: "4px 0 0" }}>A YouTube link plays right on the page. Other links open in a new tab. Keep it under 3 minutes.</p>
+        {pitch?.video_embed && form.video_url === pitch.video_url && <div style={{ maxWidth: 420, marginTop: 10 }}><Video embed={pitch.video_embed} title={team.name} /></div>}
+        <PitchImagesEditor teamId={team.id} images={images} max={maxImages} locked={late} onChange={load} />
         <label htmlFor="pm">Demo link</label><input id="pm" type="url" placeholder="https://" disabled={late} value={form.demo_url} onChange={set("demo_url")} />
         <label htmlFor="pr">GitHub repo (public)</label><input id="pr" type="url" placeholder="https://github.com/your-team/project" disabled={late} value={form.repo_url} onChange={set("repo_url")} />
         <p className="muted" style={{ fontSize: 13, margin: "4px 0 0" }}>Judges see who pushed code, matched by the GitHub link on each member's profile. The link itself shows your GitHub name, even in blind review.</p>

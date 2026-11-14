@@ -151,7 +151,7 @@ export function PlatformOrgs() {
   );
 }
 
-interface UserRow { id: string; email: string; name: string | null; is_platform_admin: number; suspended: number; orgs: number; teams: number; created_at: number }
+interface UserRow { id: string; email: string; name: string | null; is_platform_admin: number; is_super_admin?: number; suspended: number; orgs: number; teams: number; created_at: number }
 
 export function PlatformUsers() {
   const { me } = useAuth();
@@ -182,10 +182,10 @@ export function PlatformUsers() {
               <tr key={u.id}>
                 <td><b>{u.name || u.email.split("@")[0]}</b><br /><span className="muted">{u.email}</span></td>
                 <td>{fmtDate(u.created_at)}</td><td>{u.orgs}</td><td>{u.teams}</td>
-                <td>{u.suspended ? <span className="tag ink">Suspended</span> : u.is_platform_admin ? <span className="tag indigo">Admin</span> : <span className="tag sand">Active</span>}</td>
-                <td>{u.id !== me?.id && (<>
+                <td>{u.is_super_admin ? <span className="tag red">Owner</span> : u.suspended ? <span className="tag ink">Suspended</span> : u.is_platform_admin ? <span className="tag indigo">Admin</span> : <span className="tag sand">Active</span>}</td>
+                <td>{u.id !== me?.id && !u.is_super_admin && (<>
                   <button className="ghost small" onClick={() => void set(u, { suspended: !u.suspended })}>{u.suspended ? "Restore" : "Suspend"}</button>{" "}
-                  <button className="ghost small" onClick={() => void set(u, { is_platform_admin: !u.is_platform_admin })}>{u.is_platform_admin ? "Remove admin" : "Make admin"}</button>
+                  {!!me?.is_super_admin && <button className="ghost small" onClick={() => void set(u, { is_platform_admin: !u.is_platform_admin })}>{u.is_platform_admin ? "Remove admin" : "Make admin"}</button>}
                 </>)}</td>
               </tr>
             ))}</tbody>

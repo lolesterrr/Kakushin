@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from "react";
 import { Link, Navigate, useNavigate, useParams } from "react-router-dom";
+import { ImageStrip, Video } from "../media";
 import { api } from "../api";
 import { useAuth } from "../auth";
 import { Band, Notice, NumSection, Tag } from "../ui";
@@ -123,14 +124,22 @@ export function JudgeTeam() {
     <>
       <Band crumb="All teams" to={`/judge/${slug}/${cslug}`} title={d.team.name} tags={d.blind ? <span>Blind review: member names are hidden</span> : <span>{d.team.members.map((m: any) => m.institution ? `${m.name} (${m.institution})` : m.name).join(", ")}</span>} />
       <NumSection n="01" title="Pitch">
-        {!p ? <p className="muted">This team has not added a pitch yet.</p> : (
-          <ul className="todo">
+        {!p && !(d.images?.length) ? <p className="muted">This team has not added a pitch yet.</p> : (
+          <>
+          {(p?.video_embed || d.images?.length > 0) && (
+            <div className="judge-media">
+              <Video embed={p?.video_embed} title={d.team.name} />
+              <ImageStrip images={d.images ?? []} title={d.team.name} />
+            </div>
+          )}
+          {p && <ul className="todo">
             {p.has_deck && <li><span>Pitch deck</span><a className="btn small" href={`/api/decks/${d.team.id}`} target="_blank" rel="noopener noreferrer">Open PDF</a></li>}
             {p.video_url && <li><span>Video</span><a href={p.video_url} target="_blank" rel="noopener noreferrer">{p.video_url}</a></li>}
             {p.demo_url && <li><span>Demo</span><a href={p.demo_url} target="_blank" rel="noopener noreferrer">{p.demo_url}</a></li>}
             {p.repo_url && <li><span>Code</span><a href={p.repo_url} target="_blank" rel="noopener noreferrer">{p.repo_url}</a></li>}
             {p.notes && <li><span style={{ whiteSpace: "pre-wrap" }}>{p.notes}</span></li>}
-          </ul>
+          </ul>}
+          </>
         )}
       </NumSection>
       {p?.repo_url && <RepoStats path={`/judge/${slug}/${cslug}/teams/${teamId}/repo`} />}

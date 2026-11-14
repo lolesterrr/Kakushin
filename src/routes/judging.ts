@@ -8,6 +8,8 @@ import { calibration, leaderboard, type Criterion, type ScoreRow } from "../lib/
 import { autoAssign, judgeSees } from "../lib/assign";
 import { pushLater } from "../lib/push";
 import { loginFromProfile, matchContributors, parseRepo, repoStats } from "../lib/github";
+import { youtubeEmbed } from "../lib/media";
+import { pitchImages } from "./pitch";
 
 /** Organiser side: criteria, judges, leaderboard. Mounted under /api/orgs. */
 export const orgJudging = new Hono<AppEnv>();
@@ -324,7 +326,7 @@ judge.get("/:slug/:cslug", async (c) => {
   const x = await judgeLoad(c); if ("err" in x) return x.err;
   const criteria = await criteriaOf(c, x.ch.id);
   const { results: teams } = await c.env.DB.prepare(
-    `SELECT t.id, t.name, (SELECT COUNT(*) FROM submissions s WHERE s.team_id = t.id AND (s.deck_key IS NOT NULL OR s.video_url != '' OR s.demo_url != '')) AS has_pitch,
+    `SELECT t.id, t.name, (SELECT COUNT(*) FROM submissions s WHERE s.team_id = t.id AND (s.deck_key IS NOT NULL OR s.video_url != '' OR s.demo_url != '')) + (SELECT COUNT(*) FROM pitch_images pi WHERE pi.team_id = t.id) AS has_pitch,
        (SELECT COUNT(*) FROM team_members m WHERE m.team_id = t.id AND m.user_id = ?1) AS mine,
        (SELECT COUNT(*) FROM scores sc JOIN criteria cr ON cr.id = sc.criterion_id WHERE sc.judge_user_id = ?1 AND sc.team_id = t.id AND cr.stage = 'pitch' AND ${CURRENT_ROUND("cr")}) AS scored
      FROM teams t WHERE t.challenge_id = ?2 AND ${FINALIST_NOW("t")} AND ${judgeSees("?2", "?3", "t.id")} ORDER BY t.name`,
@@ -371,7 +373,8 @@ judge.get("/:slug/:cslug/teams/:teamId", async (c) => {
   return c.json({
     team: { id: t.id, name: t.name, members: members.map((m) => ({ name: m.name || m.email.split("@")[0], institution: m.institution })) },
     blind,
-    pitch: p ? { has_deck: !!p.deck_key, deck_name: p.deck_name, video_url: p.video_url, demo_url: p.demo_url, repo_url: p.repo_url ?? "", notes: p.notes } : null,
+    pitch: p ? { has_deck: !!p.deck_key, deck_name: p.deck_name, video_url: p.video_url, video_embed: youtubeEmbed(p.video_url), demo_url: p.demo_url, repo_url: p.repo_url ?? "", notes: p.notes } : null,
+    images: await pitchImages(c, t.id),
     scores: mine, own_team: own, scoring_open: x.ch.status === "judging", criteria: await criteriaOf(c, x.ch.id),
   });
 });
