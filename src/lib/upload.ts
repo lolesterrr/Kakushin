@@ -11,6 +11,18 @@ function looksLike(type: string, b: Uint8Array): boolean {
   return false;
 }
 
+/** Stores image bytes fetched from elsewhere (a Google profile photo). Same type and content checks as an upload. */
+export async function saveImageBytes(files: R2Bucket, prefix: string, type: string, body: ArrayBuffer, maxBytes: number): Promise<string | null> {
+  type = type.split(";")[0]!.trim().toLowerCase();
+  const ext = TYPES[type];
+  if (!ext || body.byteLength === 0 || body.byteLength > maxBytes) return null;
+  if (!looksLike(type, new Uint8Array(body, 0, Math.min(16, body.byteLength)))) return null;
+  const rand = [...crypto.getRandomValues(new Uint8Array(8))].map((x) => x.toString(16).padStart(2, "0")).join("");
+  const key = `${prefix}/${rand}.${ext}`;
+  await files.put(key, body, { httpMetadata: { contentType: type } });
+  return key;
+}
+
 export type UploadResult = { ok: true; key: string } | { ok: false; error: string };
 
 /** Stores a raw image request body in R2 under a random key. SVG is refused on purpose (script risk). */

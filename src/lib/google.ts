@@ -26,7 +26,8 @@ async function keys(env: Env): Promise<Jwk[]> {
 const b64 = (s: string) => Uint8Array.from(atob(s.replace(/-/g, "+").replace(/_/g, "/").padEnd(Math.ceil(s.length / 4) * 4, "=")), (c) => c.charCodeAt(0));
 const json = (s: string) => JSON.parse(new TextDecoder().decode(b64(s))) as Record<string, unknown>;
 
-export interface GoogleIdentity { email: string; name: string | null }
+/** picture is Google's profile photo address; hd is the Google Workspace domain (a school or company), if any. */
+export interface GoogleIdentity { email: string; name: string | null; picture: string | null; hd: string | null }
 
 /** Returns who the token says they are, or null when anything about it does not check out. */
 export async function verifyGoogleToken(env: Env, token: unknown, now = Date.now()): Promise<GoogleIdentity | null> {
@@ -49,9 +50,36 @@ export async function verifyGoogleToken(env: Env, token: unknown, now = Date.now
     if (typeof claims.iat === "number" && claims.iat * 1000 > now + 5 * 60 * 1000) return null;
     if (claims.email_verified !== true && claims.email_verified !== "true") return null;
     if (typeof claims.email !== "string" || !claims.email.includes("@") || claims.email.length > 254) return null;
-    return { email: claims.email.trim().toLowerCase(), name: typeof claims.name === "string" && claims.name.trim() ? claims.name.trim().slice(0, 80) : null };
+    return {
+      email: claims.email.trim().toLowerCase(),
+      name: typeof claims.name === "string" && claims.name.trim() ? claims.name.trim().slice(0, 80) : null,
+      picture: typeof claims.picture === "string" && claims.picture.length <= 500 && /^https?:\/\//.test(claims.picture) ? claims.picture : null, // the host is checked again before fetching
+      hd: typeof claims.hd === "string" && /^[a-z0-9.-]{3,120}$/i.test(claims.hd) ? claims.hd.toLowerCase() : null,
+    };
   } catch (e) {
     console.error(`google token check failed: ${e instanceof Error ? e.message : e}`);
+    return null;
+  }
+}
+
+/**
+ * Fetches a Google profile photo, at 256px. Only Google's photo host is fetched (never an address of the token's
+ * choosing elsewhere), with a short timeout and the usual image checks. Null when anything is off.
+ */
+export async function fetchGooglePicture(env: Env, url: string): Promise<{ type: string; body: ArrayBuffer } | null> {
+  try {
+    const u = new URL(url);
+    const test = env.GOOGLE_PICTURE_TEST_HOST;
+    const allowed = (u.protocol === "https:" && /^[a-z0-9-]+\.googleusercontent\.com$/.test(u.hostname)) || (!!test && u.host === test);
+    if (!allowed || u.username || u.password) return null;
+    // Google photo addresses end in a size option like =s96-c; ask for a sharper one.
+    const sized = /=s\d+(-c)?$/.test(u.href) ? u.href.replace(/=s\d+(-c)?$/, "=s256-c") : u.href;
+    const res = await fetch(sized, { redirect: "manual", signal: AbortSignal.timeout(4000) });
+    if (!res.ok) return null;
+    const len = Number(res.headers.get("content-length") ?? 0);
+    if (len > 2 * 1024 * 1024) return null;
+    return { type: res.headers.get("content-type") ?? "", body: await res.arrayBuffer() };
+  } catch {
     return null;
   }
 }
