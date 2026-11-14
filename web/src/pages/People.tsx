@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from "react";
 import { Link, useParams } from "react-router-dom";
-import { ProjectCards, type ProjectCard } from "../media";
+import { Avatar, ProjectCards, type ProjectCard } from "../media";
 import { api, fmtDate } from "../api";
 import { useAuth } from "../auth";
 import { Notice } from "../ui";
@@ -122,7 +122,7 @@ export function ShowProject({ team, onChange }: { team: { id: string; status: st
 }
 
 interface Profile {
-  handle: string; name: string; bio: string; institution: string; location: string; skills: string[]; links: Record<string, string>;
+  handle: string; name: string; avatar_url: string | null; banner_url: string | null; bio: string; institution: string; location: string; skills: string[]; links: Record<string, string>;
   certificates: { code: string; kind: string; title: string; issued_at: number; challenge: string; cslug: string; oslug: string; org: string }[];
   teams: { team: string; challenge: string; org: string; oslug: string; cslug: string; outcome: string }[];
 }
@@ -139,9 +139,12 @@ export function PersonPage() {
   const links = Object.entries(p.links).filter(([, u]) => /^https?:\/\//i.test(u));
   return (
     <>
-      <div className="hero">
-        <p className="label" style={{ margin: 0 }}>@{p.handle}</p>
-        <h1>{p.name}</h1>
+      {p.banner_url && <div className="person-banner"><img src={p.banner_url} alt="" /></div>}
+      <div className={`hero${p.banner_url ? " under-banner" : ""}`}>
+        <div className="person-head">
+          <Avatar name={p.name} url={p.avatar_url} size={96} />
+          <div><p className="label" style={{ margin: 0 }}>@{p.handle}</p><h1>{p.name}</h1></div>
+        </div>
         {(p.institution || p.location) && <p className="muted" style={{ marginTop: 4 }}>{[p.institution, p.location].filter(Boolean).join(" · ")}</p>}
         {p.bio && <p style={{ whiteSpace: "pre-wrap", maxWidth: 680 }}>{p.bio}</p>}
         {p.skills.length > 0 && <div className="pills" style={{ marginTop: 12 }}>{p.skills.map((s) => <span key={s} className="pill topic">{s}</span>)}</div>}

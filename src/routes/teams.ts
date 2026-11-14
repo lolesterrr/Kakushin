@@ -38,8 +38,8 @@ export function validateAnswers(questions: Question[], raw: Record<string, unkno
 
 async function members(c: { env: AppEnv["Bindings"] }, teamId: string) {
   const { results } = await c.env.DB.prepare(
-    `SELECT u.id, u.name, u.email FROM team_members m JOIN users u ON u.id = m.user_id WHERE m.team_id = ? ORDER BY m.joined_at`,
-  ).bind(teamId).all<{ id: string; name: string | null; email: string }>();
+    `SELECT u.id, u.name, u.email, u.avatar_key FROM team_members m JOIN users u ON u.id = m.user_id WHERE m.team_id = ? ORDER BY m.joined_at`,
+  ).bind(teamId).all<{ id: string; name: string | null; email: string; avatar_key: string | null }>();
   return results;
 }
 
@@ -47,7 +47,7 @@ async function teamOut(c: { env: AppEnv["Bindings"] }, t: TeamRow, viewerId: str
   const app = await c.env.DB.prepare("SELECT answers, submitted_at FROM applications WHERE team_id = ?").bind(t.id).first<{ answers: string; submitted_at: number }>();
   return {
     id: t.id, name: t.name, status: t.status, placement: t.placement, invite_code: t.invite_code, is_lead: t.lead_user_id === viewerId, show_project: !!t.show_project,
-    members: (await members(c, t.id)).map((m) => ({ id: m.id, name: m.name || m.email.split("@")[0], is_lead: m.id === t.lead_user_id })),
+    members: (await members(c, t.id)).map((m) => ({ id: m.id, name: m.name || m.email.split("@")[0], avatar_url: m.avatar_key ? fileUrl(m.avatar_key) : null, is_lead: m.id === t.lead_user_id })),
     application: app ? { answers: JSON.parse(app.answers) as Record<string, string>, submitted_at: app.submitted_at } : null,
   };
 }
