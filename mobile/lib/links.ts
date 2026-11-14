@@ -3,6 +3,10 @@ export function appRoute(link: string | null | undefined): string | null {
   if (!link) return null;
   const m = /^\/o\/([^/#?]+)\/c\/([^/#?]+)/.exec(link);
   if (m) return /#results/.test(link) ? `/results/${m[1]}/${m[2]}` : /^\/o\/[^/]+\/c\/[^/#?]+\/live/.test(link) ? `/live/${m[1]}/${m[2]}` : `/challenge/${m[1]}/${m[2]}`;
+  const ev = /^\/events\/([a-z0-9-]+)/.exec(link);
+  if (ev) return ev[1] === "suggest" ? "/suggest-event" : `/event/${ev[1]}`;
+  if (link === "/events" || link.startsWith("/events?")) return "/global";
+  if (link.startsWith("/saved")) return "/saved";
   const jd = /^\/judge\/([^/#?]+)\/([^/#?]+)/.exec(link);
   if (jd) return `/judge/${jd[1]}/${jd[2]}`;
   const o = /^\/o\/([^/#?]+)\/?$/.exec(link);

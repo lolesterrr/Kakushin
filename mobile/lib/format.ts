@@ -14,3 +14,10 @@ export function countdown(ms: number) {
   const pad = (n: number) => String(n).padStart(2, "0");
   return h ? `${h}:${pad(m)}:${pad(sec)}` : `${pad(m)}:${pad(sec)}`;
 }
+
+/** When a global event happens, in a few words: "3 Feb 2027 to 5 Feb 2027", or its deadline when it has no dates. */
+export function eventWhen(e: { starts_at: number | null; ends_at: number | null; deadline_at: number | null }): string {
+  if (e.starts_at && e.ends_at && fmtDate(e.ends_at) !== fmtDate(e.starts_at)) return `${fmtDate(e.starts_at)} to ${fmtDate(e.ends_at)}`;
+  if (e.starts_at) return fmtDate(e.starts_at);
+  return e.deadline_at ? `Closes ${fmtDate(e.deadline_at)}` : "";
+}

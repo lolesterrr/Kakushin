@@ -43,6 +43,13 @@ export async function pageMeta(c: Context<AppEnv>, path: string): Promise<Partia
     const name = row.name || "A Kakushin participant";
     return { title: `${name} · Kakushin`, description: clip(row.bio || `${name}'s challenges, teams and certificates on Kakushin.`, 200) };
   }
+  const ev = /^\/events\/([a-z0-9-]{3,60})\/?$/.exec(path);
+  if (ev && ev[1] !== "suggest") {
+    const row = await c.env.DB.prepare("SELECT title, summary, organizer FROM external_events WHERE slug = ? AND state = 'published'").bind(ev[1]!).first<{ title: string; summary: string; organizer: string }>();
+    if (!row) return {};
+    return { title: `${row.title} · Global events · Kakushin`, description: clip(row.summary || `${row.organizer ? `${row.organizer}. ` : ""}An event from outside Kakushin, listed so you can find it.`, 200), type: "article" };
+  }
+  if (path === "/events" || path === "/events/") return { title: "Global events · Kakushin", description: "Hackathons and opportunities from around the world, gathered in one place with links to their official pages." };
   if (path === "/challenges/winners") return { title: "Past winners · Kakushin", description: "Winning teams from completed innovation challenges on Kakushin." };
   if (path === "/privacy") return { title: "Privacy policy · Kakushin", description: "What Kakushin keeps about you, who can see it, and how to delete it." };
   if (path === "/terms") return { title: "Terms of use · Kakushin", description: "The rules for using Kakushin as a participant, judge or organiser." };

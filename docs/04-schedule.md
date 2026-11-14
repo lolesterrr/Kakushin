@@ -69,6 +69,16 @@ Each day ends with something deployed. Eight days leaves slack, so no day should
 - Fix whatever the dry run finds
 - **Done when:** the whole flow runs on production with a demo dataset, with no known blockers.
 
+## Day 9: Global events, reports and saved items
+- Global events: hackathons and opportunities from outside Kakushin, with their own pages and a link to the official page. Kakushin lists them and does not run them
+- Sources (RSS and Atom feeds, the Hack Club hackathons list) read about every six hours; a source is either trusted (lists straight away) or reviewed (goes to a queue)
+- Anyone signed in can suggest an event; a platform admin approves it before it is public
+- Report a challenge or a global event; platform admins dismiss the report or take the listing down (a challenge goes back to draft and through review again)
+- Save a challenge or an event, with reminders three days and one day before it closes
+- Calendar files for a challenge's and an event's dates
+- Phone app: Global tab, event pages, saved list, add to calendar, report, suggest
+- **Done when:** an event from a feed or a suggestion shows in the Global tab after review, can be saved and added to the calendar, and a reported listing can be taken down.
+
 ## Stretch (only if ahead)
 - Hourly cron to auto-close applications and send pitch reminders
 - Org admin invites (multiple admins)

@@ -11,6 +11,7 @@ type Props = { state: { index: number; routes: { key: string; name: string }[] }
 
 const TABS = [
   { name: "index", label: "Explore" },
+  { name: "global", label: "Global" },
   { name: "teams", label: "My teams" },
   { name: "judge", label: "Judge" },
   { name: "inbox", label: "Inbox" },
@@ -18,6 +19,7 @@ const TABS = [
 
 function Glyph({ name, color }: { name: string; color: string }) {
   if (name === "index") return <Svg width={22} height={22} viewBox="0 0 20 20" fill="none" stroke={color} strokeWidth={2.6} strokeLinecap="round"><Circle cx={9} cy={9} r={6} /><Path d="M14 14l4 4" /></Svg>;
+  if (name === "global") return <Svg width={22} height={22} viewBox="0 0 20 20" fill="none" stroke={color} strokeWidth={2.2} strokeLinecap="round"><Circle cx={10} cy={10} r={8} /><Path d="M2 10h16M10 2c2.6 2.2 4 5 4 8s-1.4 5.8-4 8c-2.6-2.2-4-5-4-8s1.4-5.8 4-8z" /></Svg>;
   if (name === "judge") return <Svg width={22} height={22} viewBox="0 0 20 20" fill={color}><Path d="M10 1l2.6 5.5 6 .7-4.4 4.1 1.2 5.9L10 14.3 4.6 17.2l1.2-5.9L1.4 7.2l6-.7z" /></Svg>;
   if (name === "teams") return <Svg width={24} height={22} viewBox="0 0 22 20" fill={color}><Circle cx={7} cy={6} r={4} /><Circle cx={16} cy={7} r={3} /><Path d="M0 19c0-4 3-7 7-7s7 3 7 7z" /><Path d="M15 12c3.5 0 6 2.6 6 6v1h-5c0-2.7-.8-5-2.3-6.6.4-.3.8-.4 1.3-.4z" /></Svg>;
   return <Svg width={24} height={20} viewBox="0 0 22 18" fill={color}><Path d="M1 0h20a1 1 0 011 1v1.5l-11 7-11-7V1a1 1 0 011-1z" /><Path d="M0 5l11 7 11-7v12a1 1 0 01-1 1H1a1 1 0 01-1-1z" /></Svg>;

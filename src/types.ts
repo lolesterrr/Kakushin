@@ -23,6 +23,7 @@ export interface Env {
   GOOGLE_PICTURE_TEST_HOST?: string; // only set in tests: a local server allowed to stand in for Google's photo host
   EXPO_PUSH_URL?: string; // only set in tests, to point pushes at a fake server
   GITHUB_TOKEN?: string; // secret; a read-only token so repo lookups get 5,000 calls an hour instead of 60 per address
+  EVENT_FEED_TEST_HOST?: string; // only set in tests: a local server allowed to stand in for a global events source
   GITHUB_API_URL?: string; // only set in tests, to point repo lookups at a fake server
 }
 

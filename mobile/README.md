@@ -19,7 +19,9 @@ To point the app at a local Worker instead, start `wrangler dev` and set `EXPO_P
 - Pitch for shortlisted teams: upload a PDF deck from Files, add video and demo links and notes.
 - My teams with the status stamps, inbox, certificates (opened as a PDF), profile, topic interests.
 
-Judging is web-only for now.
+- Global events: a tab of hackathons and opportunities from outside Kakushin, each with its own page and official link. Anyone signed in can suggest one.
+- Save a challenge or a global event (the bookmark on its banner), see them under the bookmark on Explore, and get a reminder before they close.
+- Add a challenge's or an event's dates to the phone's calendar, and report a listing that looks wrong.
 
 ## Layout
 
