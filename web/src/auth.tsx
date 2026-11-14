@@ -1,7 +1,7 @@
 import React, { createContext, useContext, useEffect, useState } from "react";
 import { api } from "./api";
 
-export interface Me { id: string; email: string; name: string | null; bio: string | null; institution: string | null; location: string | null; skills: string[]; links?: Record<string, string>; handle?: string | null; public_profile?: boolean; is_platform_admin?: number; is_super_admin?: number }
+export interface Me { id: string; email: string; name: string | null; bio: string | null; institution: string | null; location: string | null; skills: string[]; links?: Record<string, string>; handle?: string | null; public_profile?: boolean; is_platform_admin?: number; is_super_admin?: number; avatar_url?: string | null }
 interface Ctx { me: Me | null; ready: boolean; reload: () => Promise<void> }
 
 const AuthCtx = createContext<Ctx>({ me: null, ready: false, reload: async () => {} });

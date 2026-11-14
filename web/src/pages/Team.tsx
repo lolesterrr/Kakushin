@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from "react";
 import { Link, Navigate, useNavigate, useParams } from "react-router-dom";
-import { PitchImagesEditor, Video, type MediaImage } from "../media";
+import { Avatar, PitchImagesEditor, Video, type MediaImage } from "../media";
 import { api, fmtDate, uploadFile } from "../api";
 import { useAuth } from "../auth";
 import { Logo, Notice, Stamp } from "../ui";
@@ -8,7 +8,7 @@ import { Logo, Notice, Stamp } from "../ui";
 export interface Question { id: string; label: string; type: "short_text" | "long_text" | "choice" | "url"; required: boolean; options: string[] }
 interface TeamData {
   id: string; name: string; status: string; invite_code: string; is_lead: boolean;
-  members: { id: string; name: string; is_lead: boolean }[];
+  members: { id: string; name: string; avatar_url?: string | null; is_lead: boolean }[];
   application: { answers: Record<string, string>; submitted_at: number } | null;
 }
 type Msg = { kind: "ok" | "err"; text: string } | null;
@@ -153,7 +153,7 @@ export function TeamPanel({ orgSlug, cslug, challenge, team, reload }: Props) {
           <div>
             <p className="label" style={{ marginTop: 0 }}>Your team</p>
             <h2>{team.name}</h2>
-            <ul className="members">{team.members.map((m) => <li key={m.id}>{m.name}{m.is_lead && <span className="pill" style={{ marginLeft: 8 }}>lead</span>}
+            <ul className="members">{team.members.map((m) => <li key={m.id}><Avatar name={m.name} url={m.avatar_url} size={28} />{m.name}{m.is_lead && <span className="pill" style={{ marginLeft: 8 }}>lead</span>}
               {team.is_lead && !m.is_lead && team.status === "forming" && <button className="link" style={{ marginLeft: 8 }} onClick={() => run(() => api(`/teams/${team.id}/members/${m.id}`, { method: "DELETE" }))}>remove</button>}</li>)}</ul>
           </div>
           <StatusStamp status={team.status} />
