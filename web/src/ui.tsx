@@ -57,8 +57,12 @@ const STATUS_LABEL: Record<string, string> = { draft: "Draft", open: "Open", rev
 const STATUS_TONE: Record<string, string> = { draft: "sand", open: "moss", reviewing: "gold", judging: "indigo", completed: "ink" };
 export const StatusPill = ({ status }: { status: string }) => <span className={`pill ${STATUS_TONE[status] ?? "sand"}`}>{STATUS_LABEL[status] ?? status}</span>;
 
+/** Topic slugs as people read them: "social-impact" becomes "Social impact", "ai" becomes "AI". */
+const TOPIC_NAMES: Record<string, string> = { ai: "AI", fintech: "Fintech", agritech: "Agritech" };
+export const topicLabel = (t: string) => TOPIC_NAMES[t] ?? (t.charAt(0).toUpperCase() + t.slice(1)).replace(/-/g, " ");
+
 export const TopicPills = ({ topics }: { topics: string[] }) => (
-  <div className="pills">{topics.map((t) => <span key={t} className="pill topic">{t}</span>)}</div>
+  <div className="chips">{topics.map((t) => <span key={t} className="chip">{topicLabel(t)}</span>)}</div>
 );
 
 export function Logo({ url, name, size = 40 }: { url: string | null; name: string; size?: number }) {

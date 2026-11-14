@@ -2,7 +2,7 @@ import React, { useEffect, useRef, useState } from "react";
 import { Link, Navigate, useNavigate, useParams } from "react-router-dom";
 import { api, confirmStageMove, fmtDate, fromLocalInput, toLocalInput, uploadImage } from "../api";
 import { useAuth } from "../auth";
-import { Band, Banner, Logo, Notice, Tag } from "../ui";
+import { Band, Banner, Logo, Notice, Tag, topicLabel } from "../ui";
 import { AnnounceBox, OrgMembers } from "./OrgTeam";
 import { MarkdownField } from "../markdown";
 
@@ -283,9 +283,9 @@ export function AdminChallenge() {
         {!f.cover_url && <p className="note-box">No banner yet, so people will see an illustration. Add one to publish.</p>}
         <input id="banner" type="file" accept="image/png,image/jpeg,image/webp" onChange={cover} style={{ marginTop: 10 }} />
         <label>Topics (up to 5)</label>
-        <div className="pills">{allTopics.map((t) => {
+        <div className="chips">{allTopics.map((t) => {
           const on = f.topics.includes(t);
-          return <button type="button" key={t} aria-pressed={on} className={`pill ${on ? "on" : ""}`} onClick={() => set("topics", on ? f.topics.filter((x) => x !== t) : [...f.topics, t].slice(0, 5))}>{t}</button>;
+          return <button type="button" key={t} aria-pressed={on} className="chip" onClick={() => set("topics", on ? f.topics.filter((x) => x !== t) : [...f.topics, t].slice(0, 5))}>{topicLabel(t)}</button>;
         })}</div>
       </div>
 
