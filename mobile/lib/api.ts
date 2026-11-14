@@ -1,3 +1,4 @@
+import { Platform } from "react-native";
 import * as SecureStore from "expo-secure-store";
 import type { z } from "zod";
 import { API_URL } from "./config";
@@ -5,10 +6,17 @@ import { API_URL } from "./config";
 const KEY = "kakushin.session";
 let token: string | null = null;
 
-export const loadToken = async () => { try { token = await SecureStore.getItemAsync(KEY); } catch { token = null; } return token; };
+// Phones keep the session in secure storage. The browser preview has none, so it uses the page's local storage.
+const web = Platform.OS === "web";
+const store = {
+  get: async () => (web ? globalThis.localStorage?.getItem(KEY) ?? null : SecureStore.getItemAsync(KEY)),
+  set: async (v: string) => (web ? globalThis.localStorage?.setItem(KEY, v) : SecureStore.setItemAsync(KEY, v)),
+  del: async () => (web ? globalThis.localStorage?.removeItem(KEY) : SecureStore.deleteItemAsync(KEY)),
+};
+export const loadToken = async () => { try { token = await store.get(); } catch { token = null; } return token; };
 // If secure storage is unavailable the session still works until the app closes.
-export const saveToken = async (t: string) => { token = t; try { await SecureStore.setItemAsync(KEY, t); } catch { /* keep in memory */ } };
-export const clearToken = async () => { token = null; try { await SecureStore.deleteItemAsync(KEY); } catch { /* nothing stored */ } };
+export const saveToken = async (t: string) => { token = t; try { await store.set(t); } catch { /* keep in memory */ } };
+export const clearToken = async () => { token = null; try { await store.del(); } catch { /* nothing stored */ } };
 export const hasToken = () => !!token;
 
 /** Raised when the server says the session is no longer valid, so the app can send the person back to sign in. */

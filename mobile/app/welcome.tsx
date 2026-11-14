@@ -7,7 +7,7 @@ import { useAuth } from "../lib/auth";
 import { markOnboarded, savePrefs } from "../lib/prefs";
 import { suggestOrgs } from "../lib/rank";
 import { challengeList, topics as topicsSchema } from "../lib/schemas";
-import { F } from "../lib/fonts";
+import { F, topicLabel } from "../lib/fonts";
 import { useLoad } from "../lib/useLoad";
 import { shadow, useTheme } from "../lib/theme";
 import { OrgLogo } from "../components/OrgLogo";
@@ -74,7 +74,7 @@ export default function Welcome() {
             <Body muted>Pick a few. We put matching challenges first and tell you when a new one opens.</Body>
             {!all.data ? (all.err ? <Notice kind="err">{all.err}</Notice> : <Loading />) : (
               <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 8 }}>
-                {all.data.topics.map((x) => <Pill key={x} text={x} on={picked.includes(x)} onPress={() => toggleTopic(x)} />)}
+                {all.data.topics.map((x) => <Pill key={x} text={topicLabel(x)} on={picked.includes(x)} onPress={() => toggleTopic(x)} />)}
               </View>
             )}
             <Button title={picked.length ? "Next" : "Pick at least one"} disabled={!picked.length} onPress={() => { setOrgs(null); setStep(1); }} />

@@ -4,7 +4,9 @@ import type { AppEnv } from "../types";
 import { newId, randomCode, randomToken, sha256Hex } from "../lib/crypto";
 import { sendEmail } from "../lib/email";
 import { turnstileOk, turnstileOn } from "../lib/turnstile";
-import { verifyGoogleToken } from "../lib/google";
+import { fetchGooglePicture, verifyGoogleToken, type GoogleIdentity } from "../lib/google";
+import { saveImageBytes } from "../lib/upload";
+import { HANDLE_RE, RESERVED_HANDLES } from "./people";
 import { clearSessionCookie, createSession, readToken, setSessionCookie } from "../lib/session";
 
 export const auth = new Hono<AppEnv>();
@@ -152,15 +154,34 @@ auth.post("/verify", async (c) => {
 
 /**
  * The end of every sign-in, whichever way the person proved their email: find or create the account, turn admin
- * invites into memberships, and start a session. `name` only fills in a name a new account does not have yet.
+ * invites into memberships, and start a session. What Google tells us (name, photo, school or company domain) only
+ * fills in what the account does not have yet, so it never overwrites anything the person wrote themselves.
  */
-async function finishSignIn(c: Context<AppEnv>, email: string, name: string | null) {
-  let user = await c.env.DB.prepare("SELECT id, suspended FROM users WHERE email = ?").bind(email).first<{ id: string; suspended?: number }>();
+async function finishSignIn(c: Context<AppEnv>, email: string, name: string | null, google?: GoogleIdentity) {
+  const db = c.env.DB;
+  let user = await db.prepare("SELECT id, suspended, name, institution, handle, avatar_key FROM users WHERE email = ?").bind(email)
+    .first<{ id: string; suspended?: number; name: string | null; institution: string | null; handle: string | null; avatar_key: string | null }>();
   if (user?.suspended) return c.json({ error: "This account has been suspended. Contact the Kakushin team." }, 403);
+  const institution = google?.hd && !user?.institution ? await orgForDomain(c, google.hd) : null;
   if (!user) {
     const id = newId();
-    await c.env.DB.prepare("INSERT INTO users (id, email, name, created_at) VALUES (?, ?, ?, ?)").bind(id, email, name, Date.now()).run();
-    user = { id };
+    // A profile address is picked from the name so the person can make the profile public in one step. It stays private.
+    const handle = google ? await freeHandle(c, name ?? email.split("@")[0]!) : null;
+    await db.prepare("INSERT INTO users (id, email, name, institution, handle, created_at) VALUES (?, ?, ?, ?, ?, ?)")
+      .bind(id, email, name, institution ?? "", handle, Date.now()).run()
+      .catch(() => db.prepare("INSERT INTO users (id, email, name, created_at) VALUES (?, ?, ?, ?)").bind(id, email, name, Date.now()).run());
+    user = { id, name, institution, handle, avatar_key: null };
+  } else if (google && ((name && !user.name) || institution)) {
+    await db.prepare("UPDATE users SET name = COALESCE(NULLIF(name, ''), ?), institution = CASE WHEN COALESCE(institution, '') = '' AND ? IS NOT NULL THEN ? ELSE institution END WHERE id = ?")
+      .bind(name, institution, institution, user.id).run();
+  }
+  if (google?.picture && !user.avatar_key) {
+    const pic = await fetchGooglePicture(c.env, google.picture);
+    const key = pic ? await saveImageBytes(c.env.FILES, "avatars", pic.type, pic.body, 2 * 1024 * 1024) : null;
+    if (key) {
+      const r = await db.prepare("UPDATE users SET avatar_key = ? WHERE id = ? AND avatar_key IS NULL").bind(key, user.id).run();
+      if (!r.meta.changes) c.executionCtx.waitUntil(c.env.FILES.delete(key).catch(() => {}));
+    }
   }
 
   // Admin invites sent to this address become memberships now.
@@ -183,7 +204,7 @@ auth.post("/google", async (c) => {
   if (await ipLimited(c, c.env.AUTH_VERIFY_LIMIT)) return c.json({ error: "Too many attempts from your network. Wait a minute and try again." }, 429);
   const who = await verifyGoogleToken(c.env, parsed.data.credential);
   if (!who) return c.json({ error: "We could not check your Google sign-in. Try again, or use your email instead." }, 401);
-  return finishSignIn(c, who.email, who.name);
+  return finishSignIn(c, who.email, who.name, who);
 });
 
 auth.post("/logout", async (c) => {
@@ -192,3 +213,29 @@ auth.post("/logout", async (c) => {
   clearSessionCookie(c);
   return c.json({ ok: true });
 });
+
+/** The name of a verified organisation whose website is on this Google Workspace domain (students.mak.ac.ug matches mak.ac.ug). */
+async function orgForDomain(c: Context<AppEnv>, hd: string): Promise<string | null> {
+  const { results } = await c.env.DB.prepare("SELECT name, website FROM organizations WHERE verified = 1 AND suspended = 0 AND website IS NOT NULL AND website != '' LIMIT 1000")
+    .all<{ name: string; website: string }>();
+  let best: { name: string; len: number } | null = null;
+  for (const o of results) {
+    let host = "";
+    try { host = new URL(/^https?:\/\//i.test(o.website) ? o.website : `https://${o.website}`).hostname.toLowerCase().replace(/^www\./, ""); } catch { continue; }
+    if (host.split(".").length < 2) continue;
+    if ((hd === host || hd.endsWith(`.${host}`)) && (!best || host.length > best.len)) best = { name: o.name, len: host.length };
+  }
+  return best ? best.name.slice(0, 120) : null;
+}
+
+/** A free profile address made from a name: "Grace Hopper" becomes grace-hopper, or grace-hopper-2 and so on. */
+async function freeHandle(c: Context<AppEnv>, from: string): Promise<string | null> {
+  let base = from.normalize("NFKD").replace(/[\u0300-\u036f]/g, "").toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "").slice(0, 24).replace(/-+$/, "");
+  if (base.length < 3) base = `${base}${base ? "-" : ""}kk`.padEnd(3, "k");
+  const tries = [base, ...[2, 3, 4, 5].map((n) => `${base}-${n}`), `${base}-${Math.floor(Math.random() * 9000 + 1000)}`];
+  for (const h of tries) {
+    if (!HANDLE_RE.test(h) || RESERVED_HANDLES.has(h)) continue;
+    if (!(await c.env.DB.prepare("SELECT 1 AS x FROM users WHERE handle = ?").bind(h).first())) return h;
+  }
+  return null;
+}

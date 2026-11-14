@@ -1,14 +1,15 @@
-import React from "react";
+import React, { useState } from "react";
 import { Pressable, Text, View } from "react-native";
 import { Stack, useLocalSearchParams, useRouter } from "expo-router";
 import { api } from "../../../lib/api";
 import { useAuth } from "../../../lib/auth";
-import { challengeDetail, publicResults, teamResponse } from "../../../lib/schemas";
+import { challengeDetail, gallery, publicResults, teamResponse } from "../../../lib/schemas";
 import { F } from "../../../lib/fonts";
 import { useLoad } from "../../../lib/useLoad";
 import { FILL, shadow, useTheme } from "../../../lib/theme";
 import { Banner, Scrim } from "../../../components/Banner";
-import { Body, H2, Loading, Notice, Offline, Screen } from "../../../components/ui";
+import { Body, Button, H2, Loading, Notice, Offline, Screen } from "../../../components/ui";
+import { ProjectCards, Recap } from "../../../components/projects";
 
 const place = (n: number) => (n === 1 ? "1st" : n === 2 ? "2nd" : n === 3 ? "3rd" : `${n}th`);
 const MEDAL = [FILL.red, FILL.gold, FILL.indigo];
@@ -23,9 +24,12 @@ export default function Results() {
   const ch = useLoad(async () => (await api(base, { schema: challengeDetail })).challenge, [base], { cache: `challenge.${org}.${slug}` });
   const res = useLoad(() => api(`${base}/public-results`, { schema: publicResults }), [base], { cache: `results.${org}.${slug}` });
   const tm = useLoad(async () => (me ? (await api(`${base}/team`, { schema: teamResponse })).team : null), [base, me?.id]);
+  const gal = useLoad(() => api(`${base}/gallery`, { schema: gallery }), [base], { cache: `gallery.${org}.${slug}` });
+  const [showBusy, setShowBusy] = useState(false);
+  const [showErr, setShowErr] = useState("");
 
   const c = ch.data, r = res.data, team = tm.data;
-  const refresh = async () => { await Promise.all([ch.refresh(), res.refresh(), tm.refresh()]); };
+  const refresh = async () => { await Promise.all([ch.refresh(), res.refresh(), tm.refresh(), gal.refresh()]); };
   if (!c || !r) {
     const err = ch.err || res.err;
     return <Screen><Stack.Screen options={{ title: "Results" }} />{err ? <Notice kind="err">{err}</Notice> : <Loading />}</Screen>;
@@ -68,6 +72,27 @@ export default function Results() {
           <Body muted>{r.finalists.join(", ")}</Body>
         </>
       ) : null}
+
+      {/* Finalist and winning teams choose whether their project is shown. */}
+      {r.published && team && (team.status === "finalist" || team.status === "winner") && team.is_lead ? (() => {
+        const shown = !!gal.data?.projects.some((p) => p.id === team.id);
+        async function toggle() {
+          setShowBusy(true); setShowErr("");
+          try { await api(`/teams/${team!.id}/showcase`, { method: "PUT", json: { show: !shown } }); await gal.reload(); }
+          catch (e) { setShowErr((e as Error).message); } finally { setShowBusy(false); }
+        }
+        return (
+          <View style={{ gap: 6 }}>
+            <Body muted>{shown ? "Your project is shown below and on the organiser's page." : "Show your project here with its video and screenshots, so others can see what you built."}</Body>
+            <Button title={shown ? "Hide our project" : "Show our project"} kind={shown ? "ghost" : "primary"} busy={showBusy} onPress={() => void toggle()} />
+            {showErr ? <Notice kind="err">{showErr}</Notice> : null}
+          </View>
+        );
+      })() : null}
+
+      {gal.data && gal.data.projects.length ? <><H2>Projects</H2><ProjectCards items={gal.data.projects} /></> : null}
+
+      <Recap base={base} />
     </Screen>
   );
 }

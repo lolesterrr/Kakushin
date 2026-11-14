@@ -19,7 +19,14 @@ if (!CLIENT) throw new Error("GOOGLE_CLIENT_ID is not set in wrangler.jsonc vars
 const mk = () => crypto.generateKeyPairSync("rsa", { modulusLength: 2048 });
 const good = mk(), other = mk();
 const jwk = { ...good.publicKey.export({ format: "jwk" }), kid: "test-key", alg: "RS256", use: "sig" };
-const srv = http.createServer((q, r) => { r.setHeader("content-type", "application/json"); r.setHeader("cache-control", "max-age=1"); r.end(JSON.stringify({ keys: [jwk] })); }).listen(9998);
+// The same little server stands in for Google's photo host (GOOGLE_PICTURE_TEST_HOST=localhost:9998 in .dev.vars).
+const PHOTO = (await import("node:fs")).readFileSync("mobile/assets/icon.png");
+let photoAsked = "";
+const srv = http.createServer((q, r) => {
+  if (q.url.startsWith("/photo")) { photoAsked = q.url; r.setHeader("content-type", "image/png"); return r.end(PHOTO); }
+  if (q.url.startsWith("/fake")) { r.setHeader("content-type", "image/png"); return r.end("<svg onload=alert(1)>"); }
+  r.setHeader("content-type", "application/json"); r.setHeader("cache-control", "max-age=1"); r.end(JSON.stringify({ keys: [jwk] }));
+}).listen(9998);
 const b64u = (x) => Buffer.from(typeof x === "string" ? x : JSON.stringify(x)).toString("base64url");
 const now = Math.floor(Date.now() / 1000);
 function token(claims = {}, { key = good.privateKey, kid = "test-key", alg = "RS256" } = {}) {
@@ -35,6 +42,22 @@ const a = await post(token({ email: email("new"), name: "Grace Hopper" }));
 ok("valid token signs a new person in", a.s === 200 && /kk_session=/.test(a.cookie) && !!a.d.token, a);
 const me = await (await fetch(`${U}/api/me`, { headers: { cookie: a.cookie.split(";")[0] } })).json();
 ok("account has the Google email and name", me.user?.email === email("new") && me.user?.name === "Grace Hopper", me);
+
+// First Google sign-in fills the profile: photo, school from the Workspace domain, and a private profile address.
+sql(`INSERT INTO organizations (id, slug, name, type, website, verified, created_at) VALUES ('${P}-uni', '${P}-uni', 'Testville University', 'university', 'https://www.${P}.example.edu', 1, ${Date.now()})`);
+{
+  const f = await post(token({ email: email("fill"), name: "Ada Lovelace-Byron", picture: "http://localhost:9998/photo/a=s96-c", hd: `students.${P}.example.edu` }));
+  const u = (await (await fetch(`${U}/api/me`, { headers: { cookie: f.cookie.split(";")[0] } })).json()).user;
+  ok("first Google sign-in brings the photo", !!u?.avatar_url && (await fetch(`${U}${u.avatar_url}`)).status === 200, u);
+  ok("the photo is asked for at a sharper size", photoAsked.endsWith("=s256-c"), photoAsked);
+  ok("school comes from the Workspace domain", u?.institution === "Testville University", u);
+  ok("a private profile address is picked from the name", /^ada-lovelace-byron(-\d+)?$/.test(u?.handle ?? "") && u?.public_profile === false, u);
+  const g = await post(token({ email: email("fill2"), name: "Ada Lovelace-Byron", picture: "https://evil.example/x.png" }));
+  const u2 = (await (await fetch(`${U}/api/me`, { headers: { cookie: g.cookie.split(";")[0] } })).json()).user;
+  ok("a photo from anywhere but Google is ignored, sign-in still works", g.s === 200 && u2.avatar_url === null && u2.handle !== u.handle, u2);
+  const h = await post(token({ email: email("fill3"), name: "Z", picture: "http://localhost:9998/fake=s96" }));
+  ok("a photo that is not really an image is ignored", h.s === 200 && (await (await fetch(`${U}/api/me`, { headers: { cookie: h.cookie.split(";")[0] } })).json()).user.avatar_url === null);
+}
 
 sql(`INSERT INTO users (id, email, name, created_at) VALUES ('${P}-old', '${email("old")}', 'Already Here', ${Date.now()})`);
 const b = await post(token({ email: email("old").toUpperCase(), name: "Someone Else" }));

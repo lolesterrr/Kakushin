@@ -17,7 +17,8 @@ export function Screen({ children, scroll = true, onRefresh, refreshing = false,
 export const H1 = ({ children }: { children: React.ReactNode }) => { const t = useTheme(); return <Text accessibilityRole="header" style={{ fontSize: 34, lineHeight: 36, fontFamily: F.display, color: t.ink, letterSpacing: -0.6 }}>{children}</Text>; };
 export const H2 = ({ children }: { children: React.ReactNode }) => { const t = useTheme(); return <Text accessibilityRole="header" style={{ fontSize: 22, lineHeight: 26, fontFamily: F.display, color: t.ink, marginTop: 10, letterSpacing: -0.3 }}>{children}</Text>; };
 export const Body = ({ children, muted, style }: { children: React.ReactNode; muted?: boolean; style?: object }) => { const t = useTheme(); return <Text style={[{ fontSize: 16, lineHeight: 23, color: muted ? t.muted : t.ink }, style]}>{children}</Text>; };
-export const Label = ({ children }: { children: React.ReactNode }) => { const t = useTheme(); return <Text style={{ fontSize: 12, fontWeight: "700", letterSpacing: 1, textTransform: "uppercase", color: t.muted, marginTop: 4 }}>{children}</Text>; };
+/** A ledger column head: small mono capitals. */
+export const Label = ({ children }: { children: React.ReactNode }) => { const t = useTheme(); return <Text style={{ fontSize: 11, fontFamily: F.monoMed, letterSpacing: 1.6, textTransform: "uppercase", color: t.muted, marginTop: 4 }}>{children}</Text>; };
 
 export function Button({ title, onPress, kind = "primary", disabled, busy }: { title: string; onPress: () => void; kind?: "primary" | "ghost"; disabled?: boolean; busy?: boolean }) {
   const t = useTheme();
@@ -35,9 +36,10 @@ export function Field({ label, ...rest }: TextInputProps & { label: string }) {
   const [focus, setFocus] = React.useState(false);
   return (
     <View style={{ gap: 6 }}>
-      <Text style={{ fontSize: 15, fontWeight: "700", color: t.ink }}>{label}</Text>
+      <Text style={{ fontSize: 11, fontFamily: F.monoMed, letterSpacing: 1.6, textTransform: "uppercase", color: t.ink }}>{label}</Text>
+      {/* A ruled box with a red margin line, typed in mono, like the website's forms. */}
       <TextInput accessibilityLabel={label} placeholderTextColor={t.muted} {...rest} onFocus={(e) => { setFocus(true); rest.onFocus?.(e); }} onBlur={(e) => { setFocus(false); rest.onBlur?.(e); }}
-        style={[{ borderWidth: focus ? 2 : 1.5, borderColor: focus ? t.ink : t.line, backgroundColor: t.card, color: t.ink, borderRadius: 14, paddingHorizontal: 16, paddingVertical: 15, fontSize: 17, minHeight: 56 }, focus && shadow(0.12), rest.multiline && { minHeight: 112, textAlignVertical: "top" }]} />
+        style={[{ borderWidth: 1.5, borderColor: t.ink, borderLeftWidth: focus ? 7 : 4, borderLeftColor: t.red, backgroundColor: rest.editable === false ? t.sand : t.ledger, color: t.ink, borderRadius: 0, paddingHorizontal: 14, paddingVertical: 14, fontSize: 16, fontFamily: F.mono, minHeight: 52 }, rest.multiline && { minHeight: 112, textAlignVertical: "top" }]} />
     </View>
   );
 }
@@ -49,15 +51,40 @@ export function Notice({ kind, children }: { kind: "ok" | "err"; children: React
 
 export function Card({ children, onPress, style }: { children: React.ReactNode; onPress?: () => void; style?: ViewStyle }) {
   const t = useTheme();
-  const base = [{ backgroundColor: t.card, borderWidth: 1, borderColor: t.line, borderRadius: 16, padding: 16, gap: 6 }, shadow(0.08), style];
+  const base = [{ backgroundColor: t.card, borderWidth: 1.5, borderColor: t.ink, borderRadius: 18, padding: 16, gap: 6 }, style];
   return onPress ? <Pressable accessibilityRole="button" onPress={onPress} style={({ pressed }) => [...base, pressed && { opacity: 0.85 }]}>{children}</Pressable> : <View style={base}>{children}</View>;
 }
 
+/** A chip: mono capitals ruled in ink. The chosen one fills with ink and gets the red dot, like the website. */
 export function Pill({ text, on, onPress }: { text: string; on?: boolean; onPress?: () => void }) {
   const t = useTheme();
-  const style = { paddingHorizontal: 16, minHeight: 40, justifyContent: "center" as const, borderRadius: 999, borderWidth: 1, borderColor: on ? t.ink : t.line, backgroundColor: on ? t.ink : t.card };
-  const label = <Text style={{ fontSize: 14, fontWeight: "600", color: on ? t.bg : t.ink }}>{text}</Text>;
-  return onPress ? <Pressable accessibilityRole="button" accessibilityState={{ selected: !!on }} onPress={onPress} style={style}>{label}</Pressable> : <View style={style}>{label}</View>;
+  const small = !onPress;
+  const style = { flexDirection: "row" as const, alignItems: "center" as const, gap: 7, paddingHorizontal: small ? 11 : 15, minHeight: small ? 28 : 40, borderRadius: 999,
+    borderWidth: small ? 1 : 1.5, borderColor: t.ink, backgroundColor: on ? t.ink : "transparent" };
+  const label = <>
+    {on ? <View style={{ width: 7, height: 7, borderRadius: 4, backgroundColor: FILL.red }} /> : null}
+    <Text style={{ fontSize: small ? 11 : 12, fontFamily: F.monoMed, letterSpacing: 0.8, textTransform: "uppercase", color: on ? t.bg : t.ink }}>{text}</Text>
+  </>;
+  return onPress ? <Pressable accessibilityRole="button" accessibilityState={{ selected: !!on }} onPress={onPress} style={({ pressed }) => [style, pressed && !on && { borderColor: FILL.red }]}>{label}</Pressable> : <View style={style}>{label}</View>;
+}
+
+/** Numbered folder tabs ("01 About you"), for screens with sections. Scrolls sideways on narrow phones. */
+export function Folders({ tabs, value, onChange }: { tabs: string[]; value: number; onChange: (i: number) => void }) {
+  const t = useTheme();
+  return (
+    <ScrollView horizontal showsHorizontalScrollIndicator={false} accessibilityRole="tablist" style={{ flexGrow: 0, borderBottomWidth: 1.5, borderBottomColor: t.ink }} contentContainerStyle={{ gap: 4, paddingHorizontal: 16, alignItems: "flex-end" }}>
+      {tabs.map((label, i) => {
+        const on = value === i;
+        return (
+          <Pressable key={label} accessibilityRole="tab" accessibilityState={{ selected: on }} onPress={() => onChange(i)}
+            style={{ flexDirection: "row", gap: 8, alignItems: "center", paddingHorizontal: 14, paddingVertical: on ? 12 : 9, borderWidth: 1.5, borderBottomWidth: 0, borderColor: t.ink, borderTopLeftRadius: 12, borderTopRightRadius: 12, backgroundColor: on ? t.ink : t.bg }}>
+            <Text style={{ fontFamily: F.mono, fontSize: 11, color: on ? FILL.red : t.muted }}>{String(i + 1).padStart(2, "0")}</Text>
+            <Text style={{ fontFamily: F.monoMed, fontSize: 12, color: on ? t.bg : t.ink }}>{label}</Text>
+          </Pressable>
+        );
+      })}
+    </ScrollView>
+  );
 }
 
 const STAMP: Record<string, { big: string; small: string; fill: string }> = {
@@ -77,7 +104,7 @@ export function StatusStamp({ status }: { status: string }) {
 }
 
 export const Loading = () => <View style={{ padding: 32 }}><ActivityIndicator /></View>;
-const s = StyleSheet.create({ btn: { minHeight: 56, borderRadius: 16, alignItems: "center", justifyContent: "center", paddingHorizontal: 18 } });
+const s = StyleSheet.create({ btn: { minHeight: 52, borderRadius: 999, alignItems: "center", justifyContent: "center", paddingHorizontal: 22 } });
 
 /** Handwritten accent line, used sparingly for warmth. */
 export const Hand = ({ children, size = 26 }: { children: React.ReactNode; size?: number }) => { const t = useTheme(); return <Text style={{ fontFamily: F.hand, fontSize: size, lineHeight: size + 2, color: t.redText }}>{children}</Text>; };

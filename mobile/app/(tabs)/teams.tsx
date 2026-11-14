@@ -8,7 +8,8 @@ import { syncReminders } from "../../lib/reminders";
 import { myTeams } from "../../lib/schemas";
 import { useLoad } from "../../lib/useLoad";
 import { useTheme } from "../../lib/theme";
-import { Body, Card, Loading, Notice, Offline, Screen, SignInCard, StatusStamp } from "../../components/ui";
+import { F } from "../../lib/fonts";
+import { Body, Card, Label, Loading, Notice, Offline, Screen, SignInCard, StatusStamp } from "../../components/ui";
 
 const place = (n: number) => (n === 1 ? "1st" : n === 2 ? "2nd" : n === 3 ? "3rd" : `${n}th`);
 
@@ -41,8 +42,8 @@ function TeamList({ userId }: { userId: string }) {
         <Card key={x.id} onPress={() => router.push(`/challenge/${x.oslug}/${x.cslug}`)}>
           <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center", gap: 12 }}>
             <View style={{ flex: 1, gap: 4 }}>
-              <Text style={{ color: t.muted, fontSize: 13 }}>{x.oname}</Text>
-              <Text style={{ color: t.ink, fontSize: 18, fontWeight: "800" }}>{x.title}</Text>
+              <Label>{x.oname}</Label>
+              <Text style={{ color: t.ink, fontSize: 19, fontFamily: F.display }}>{x.title}</Text>
               <Body muted>{x.name}{x.status === "winner" && x.placement ? ` · ${place(x.placement)} place` : ""}</Body>
             </View>
             <StatusStamp status={x.status} />
