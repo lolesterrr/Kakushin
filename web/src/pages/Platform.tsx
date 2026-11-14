@@ -130,17 +130,17 @@ export function PlatformOrgs() {
         {msg && <Notice kind={msg.kind}>{msg.text}</Notice>}
         {rows && rows.length === 0 && <p className="muted">No organisations found.</p>}
         {rows && rows.length > 0 && (
-          <div className="table-wrap"><table>
-            <thead><tr><th>Organisation</th><th>Owner</th><th>Live</th><th>In review</th><th>Status</th><th></th></tr></thead>
+          <div className="table-wrap wide"><table className="admin-table">
+            <thead><tr><th>Organisation</th><th>Owner</th><th className="num">Live</th><th className="num">In review</th><th>Status</th><th><span className="sr-only">Actions</span></th></tr></thead>
             <tbody>{rows.map((o) => (
               <tr key={o.id}>
                 <td><a href={`/o/${o.slug}`}><b>{o.name}</b></a><br /><span className="muted">{o.type} · {o.members} {o.members === 1 ? "member" : "members"}</span></td>
-                <td>{o.owner_email ?? "-"}</td><td>{o.live_challenges}</td><td>{o.pending}</td>
+                <td className="email">{o.owner_email ?? "-"}</td><td className="num">{o.live_challenges}</td><td className="num">{o.pending}</td>
                 <td>{o.suspended ? <span className="tag ink">Suspended</span> : o.verified ? <span className="tag moss">Verified</span> : <span className="tag sand">Unverified</span>}</td>
-                <td>
-                  <button className="ghost small" onClick={() => void set(o, { verified: !o.verified })}>{o.verified ? "Remove verified" : "Verify"}</button>{" "}
+                <td><div className="row-actions">
+                  <button className="ghost small" onClick={() => void set(o, { verified: !o.verified })}>{o.verified ? "Unverify" : "Verify"}</button>
                   <button className="ghost small" onClick={() => void set(o, { suspended: !o.suspended })}>{o.suspended ? "Restore" : "Suspend"}</button>
-                </td>
+                </div></td>
               </tr>
             ))}</tbody>
           </table></div>
@@ -176,17 +176,17 @@ export function PlatformUsers() {
         {msg && <Notice kind={msg.kind}>{msg.text}</Notice>}
         {rows && rows.length === 0 && <p className="muted">No users found.</p>}
         {rows && rows.length > 0 && (
-          <div className="table-wrap"><table>
-            <thead><tr><th>User</th><th>Joined</th><th>Orgs</th><th>Teams</th><th>Status</th><th></th></tr></thead>
+          <div className="table-wrap wide"><table className="admin-table">
+            <thead><tr><th>User</th><th>Joined</th><th className="num">Orgs</th><th className="num">Teams</th><th>Status</th><th><span className="sr-only">Actions</span></th></tr></thead>
             <tbody>{rows.map((u) => (
               <tr key={u.id}>
-                <td><b>{u.name || u.email.split("@")[0]}</b><br /><span className="muted">{u.email}</span></td>
-                <td>{fmtDate(u.created_at)}</td><td>{u.orgs}</td><td>{u.teams}</td>
+                <td><b>{u.name || u.email.split("@")[0]}</b><br /><span className="muted email">{u.email}</span></td>
+                <td className="nowrap">{fmtDate(u.created_at)}</td><td className="num">{u.orgs}</td><td className="num">{u.teams}</td>
                 <td>{u.is_super_admin ? <span className="tag red">Owner</span> : u.suspended ? <span className="tag ink">Suspended</span> : u.is_platform_admin ? <span className="tag indigo">Admin</span> : <span className="tag sand">Active</span>}</td>
-                <td>{u.id !== me?.id && !u.is_super_admin && (<>
-                  <button className="ghost small" onClick={() => void set(u, { suspended: !u.suspended })}>{u.suspended ? "Restore" : "Suspend"}</button>{" "}
+                <td>{u.id !== me?.id && !u.is_super_admin && (<div className="row-actions">
+                  <button className="ghost small" onClick={() => void set(u, { suspended: !u.suspended })}>{u.suspended ? "Restore" : "Suspend"}</button>
                   {!!me?.is_super_admin && <button className="ghost small" onClick={() => void set(u, { is_platform_admin: !u.is_platform_admin })}>{u.is_platform_admin ? "Remove admin" : "Make admin"}</button>}
-                </>)}</td>
+                </div>)}</td>
               </tr>
             ))}</tbody>
           </table></div>
@@ -206,10 +206,10 @@ export function PlatformAudit() {
         {err && <Notice kind="err">{err}</Notice>}
         {items && items.length === 0 && <p className="muted">No admin actions yet.</p>}
         {items && items.length > 0 && (
-          <div className="table-wrap"><table>
+          <div className="table-wrap wide"><table className="admin-table">
             <thead><tr><th>When</th><th>Who</th><th>Action</th><th>Details</th></tr></thead>
             <tbody>{items.map((a) => (
-              <tr key={a.id}><td style={{ whiteSpace: "nowrap" }}>{new Date(a.created_at).toLocaleString()}</td><td>{a.actor_email}</td><td>{a.action}</td><td>{a.detail}</td></tr>
+              <tr key={a.id}><td style={{ whiteSpace: "nowrap" }}>{new Date(a.created_at).toLocaleString()}</td><td className="email">{a.actor_email}</td><td><code>{a.action}</code></td><td>{a.detail}</td></tr>
             ))}</tbody>
           </table></div>
         )}

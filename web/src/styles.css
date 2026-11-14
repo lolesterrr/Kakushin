@@ -438,3 +438,38 @@ button.ghost, .btn.ghost { border: 1.5px solid var(--ink); }
 .hero.under-banner .avatar { position: relative; z-index: 1; margin-top: -48px; border-width: 3px; border-color: var(--paper); box-shadow: 0 0 0 1.5px var(--ink); }
 .hero.under-banner .person-head { align-items: flex-end; }
 @media (max-width: 640px) { .me-banner { height: 160px; } .banner-pick { top: 10px; right: 10px; } .banner-pick .btn { font-size: 12px; padding: 6px 12px; } .me-hero.has-banner .me-card { margin-top: 120px; margin-left: 0; } }
+
+/* Topic chips: mono, ruled in ink like the forms. The chosen one fills with ink and gets the red dot. */
+.topic-rail { display: flex; align-items: baseline; gap: 14px; margin-top: 18px; flex-wrap: wrap; }
+.topic-rail > .label { font-size: 11px; text-transform: uppercase; margin: 0; flex: none; }
+.chips { display: flex; flex-wrap: wrap; gap: 8px; }
+.chip { display: inline-flex; align-items: center; gap: 7px; font: 500 12px/1 var(--mono); letter-spacing: .06em; text-transform: uppercase; color: var(--ink);
+  border: 1.5px solid var(--ink); border-radius: 999px; padding: 8px 14px; background: transparent; white-space: nowrap; min-height: 0; box-shadow: none; transform: none; }
+span.chip { padding: 5px 11px; font-size: 11px; border-width: 1px; }
+button.chip { cursor: pointer; transition: background .15s, color .15s, border-color .15s; }
+button.chip:hover { border-color: var(--red); color: var(--red-text, var(--red)); background: transparent; }
+button.chip[aria-pressed="true"] { background: var(--ink); color: var(--bg); border-color: var(--ink); }
+button.chip[aria-pressed="true"]::before { content: ""; width: 7px; height: 7px; border-radius: 50%; background: var(--red); }
+button.chip:focus-visible { outline: 2px solid var(--red); outline-offset: 2px; }
+@media (max-width: 640px) {
+  .topic-rail { flex-direction: column; gap: 8px; }
+  .topic-rail .chips { flex-wrap: nowrap; overflow-x: auto; padding: 2px 0 6px; scrollbar-width: none; width: 100%; }
+  .topic-rail .chips::-webkit-scrollbar { display: none; }
+}
+/* Drop-downs lose the browser's grey arrow for a drawn one that matches the ruled fields. */
+select { appearance: none; -webkit-appearance: none; padding-right: 40px !important; cursor: pointer;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8' viewBox='0 0 12 8'%3E%3Cpath d='M1 1.5l5 5 5-5' fill='none' stroke='%23888' stroke-width='1.6'/%3E%3C/svg%3E");
+  background-repeat: no-repeat; background-position: right 14px center; }
+/* Admin tables: full width, ruled like a ledger, numbers on the right, row actions on one line. */
+.section.form > .table-wrap.wide { max-width: none; }
+.table-wrap.wide { margin-top: 20px; border-top: 1.5px solid var(--ink); }
+.admin-table th { font: 500 11px var(--mono); letter-spacing: .12em; color: var(--ink-2); white-space: nowrap; padding: 12px; border-bottom: 1.5px solid var(--ink); vertical-align: bottom; }
+.admin-table td { padding: 14px 12px; vertical-align: middle; }
+.admin-table td:first-child b { font-family: var(--display); font-size: 15px; }
+.admin-table td:first-child a { text-decoration: none; } .admin-table td:first-child a:hover b { text-decoration: underline; }
+.admin-table .num { text-align: right; font-family: var(--mono); font-variant-numeric: tabular-nums; width: 1%; white-space: nowrap; }
+.admin-table .email { font-family: var(--mono); font-size: 13px; overflow-wrap: anywhere; }
+.admin-table .nowrap { white-space: nowrap; }
+.admin-table code { font: 12px var(--mono); }
+.row-actions { display: flex; gap: 6px; justify-content: flex-end; flex-wrap: nowrap; }
+.row-actions button.small { font-size: 13px; padding: 5px 14px; min-height: 32px; white-space: nowrap; }
