@@ -2,7 +2,7 @@ import React, { useEffect, useState } from "react";
 import { Link, Navigate, useNavigate } from "react-router-dom";
 import { api, fmtDate } from "../api";
 import { useAuth } from "../auth";
-import { Notice } from "../ui";
+import { Notice, topicLabel } from "../ui";
 
 interface Item { id: string; kind: string; title: string; body: string; link: string; read_at: number | null; created_at: number }
 interface Page { items: Item[]; unread: number; next: string | null }
@@ -88,7 +88,7 @@ export function TopicPicker() {
     <div className="section" id="interests">
       <h2>What you want to hear about</h2>
       <p className="muted">Pick topics and we tell you in your inbox when a new challenge matches.</p>
-      <div className="pills" role="group" aria-label="Topics">{all.map((t) => <button key={t} className={`pill ${mine.includes(t) ? "on" : ""}`} aria-pressed={mine.includes(t)} onClick={() => void toggle(t)}>{t}</button>)}</div>
+      <div className="chips" role="group" aria-label="Topics">{all.map((t) => <button type="button" key={t} className="chip" aria-pressed={mine.includes(t)} onClick={() => void toggle(t)}>{topicLabel(t)}</button>)}</div>
       {orgs.length > 0 && <p className="muted" style={{ marginTop: 16 }}>Following: {orgs.map((o, i) => <span key={o.slug}>{i > 0 && ", "}<Link to={`/o/${o.slug}`}>{o.name}</Link></span>)}</p>}
       {msg && <Notice kind={msg.kind}>{msg.text}</Notice>}
     </div>
