@@ -90,17 +90,22 @@ follows.put("/topics", async (c) => {
 inbox.get("/settings", async (c) => {
   const user = c.get("user");
   if (!user) return c.json({ error: "Not signed in" }, 401);
-  const s = await c.env.DB.prepare("SELECT push FROM notification_settings WHERE user_id = ?").bind(user.id).first<{ push: number }>();
+  const s = await c.env.DB.prepare("SELECT push, global_events FROM notification_settings WHERE user_id = ?").bind(user.id).first<{ push: number; global_events: number }>();
   const d = await c.env.DB.prepare("SELECT COUNT(*) AS n FROM push_tokens WHERE user_id = ?").bind(user.id).first<{ n: number }>();
-  return c.json({ push: (s?.push ?? 1) === 1, devices: d?.n ?? 0 });
+  return c.json({ push: (s?.push ?? 1) === 1, global_events: (s?.global_events ?? 1) === 1, devices: d?.n ?? 0 });
 });
 
 inbox.put("/settings", async (c) => {
   const user = c.get("user");
   if (!user) return c.json({ error: "Not signed in" }, 401);
-  const parsed = z.object({ push: z.boolean() }).safeParse(await c.req.json().catch(() => null));
+  // Either switch can be sent on its own; the one left out keeps its value.
+  const parsed = z.object({ push: z.boolean().optional(), global_events: z.boolean().optional() }).refine((b) => b.push !== undefined || b.global_events !== undefined).safeParse(await c.req.json().catch(() => null));
   if (!parsed.success) return c.json({ error: "Check the settings" }, 400);
-  await c.env.DB.prepare("INSERT INTO notification_settings (user_id, push) VALUES (?, ?) ON CONFLICT(user_id) DO UPDATE SET push = excluded.push").bind(user.id, parsed.data.push ? 1 : 0).run();
+  const { push, global_events } = parsed.data;
+  await c.env.DB.prepare(
+    `INSERT INTO notification_settings (user_id, push, global_events) VALUES (?1, COALESCE(?2, 1), COALESCE(?3, 1))
+     ON CONFLICT(user_id) DO UPDATE SET push = COALESCE(?2, push), global_events = COALESCE(?3, global_events)`,
+  ).bind(user.id, push === undefined ? null : push ? 1 : 0, global_events === undefined ? null : global_events ? 1 : 0).run();
   return c.json({ ok: true });
 });
 

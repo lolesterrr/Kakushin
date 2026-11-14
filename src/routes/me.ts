@@ -157,11 +157,13 @@ me.delete("/", async (c) => {
     ...solo.flatMap((t) => [byTeam("scores", t.id), byTeam("application_scores", t.id), byTeam("judge_assignments", t.id), byTeam("judge_conflicts", t.id), byTeam("team_finder_invites", t.id), byTeam("certificates", t.id), byTeam("submissions", t.id), byTeam("applications", t.id), byTeam("team_members", t.id),
       db.prepare("DELETE FROM teams WHERE id = ?").bind(t.id)]),
     // Children first, so this works whether or not the database enforces ON DELETE CASCADE.
-    ...["sessions", "memberships", "team_members", "team_seekers", "team_finder_invites", "check_ins", "certificates", "notifications", "follows", "interests", "push_tokens", "notification_settings"]
+    ...["sessions", "memberships", "team_members", "team_seekers", "team_finder_invites", "check_ins", "certificates", "notifications", "follows", "interests", "push_tokens", "notification_settings", "saved_items"]
       .map((table) => db.prepare(`DELETE FROM ${table} WHERE user_id = ?`).bind(u.id)),
     db.prepare("DELETE FROM scores WHERE judge_user_id = ?").bind(u.id),
     db.prepare("UPDATE check_ins SET by_user_id = NULL WHERE by_user_id = ?").bind(u.id),
     db.prepare("DELETE FROM application_scores WHERE reviewer_user_id = ?").bind(u.id),
+    db.prepare("UPDATE reports SET reporter_user_id = NULL WHERE reporter_user_id = ?").bind(u.id),
+    db.prepare("UPDATE external_events SET submitted_by = NULL WHERE submitted_by = ?").bind(u.id),
     db.prepare("DELETE FROM judge_assignments WHERE lower(email) = ?").bind(email),
     db.prepare("DELETE FROM judge_conflicts WHERE lower(email) = ?").bind(email),
     db.prepare("DELETE FROM judges WHERE lower(email) = ?").bind(email),

@@ -9,6 +9,7 @@ import { fileUrl, loadOrg, type OrgRow } from "../lib/access";
 import { saveImage } from "../lib/upload";
 import { notifyFollowersOfChallenge } from "../lib/notify";
 import { pushLater } from "../lib/push";
+import { calendarFile, calendarResponse, type CalEntry } from "../lib/events";
 
 interface ChallengeRow {
   id: string; org_id: string; slug: string; title: string; summary: string; description: string;
@@ -172,7 +173,26 @@ orgChallenges.get("/:slug/challenges/:cslug", async (c) => {
     : [];
   // Day 6: the event-day agenda shows in the timeline, and the app needs to know whether check-in passes exist.
   const { results: agenda } = await c.env.DB.prepare("SELECT id, kind, label, starts_at, ends_at FROM challenge_agenda WHERE challenge_id = ? ORDER BY starts_at").bind(row.id).all();
-  return c.json({ challenge: { ...challengeOut(row, access.org), criteria, judges, agenda, checkin_enabled: !!(row as ChallengeRow & { checkin_enabled?: number }).checkin_enabled }, role: access.role });
+  const user = c.get("user");
+  const saved = user ? !!(await c.env.DB.prepare("SELECT 1 AS x FROM saved_items WHERE user_id = ? AND kind = 'challenge' AND item_id = ?").bind(user.id, row.id).first()) : false;
+  return c.json({ challenge: { ...challengeOut(row, access.org), criteria, judges, agenda, checkin_enabled: !!(row as ChallengeRow & { checkin_enabled?: number }).checkin_enabled }, role: access.role, saved });
+});
+
+/** The challenge's dates as a calendar file: applications closing, the pitch deadline and the event-day agenda. */
+orgChallenges.get("/:slug/challenges/:cslug/calendar.ics", async (c) => {
+  const access = await loadOrg(c, c.req.param("slug"));
+  if (!access) return c.json({ error: "Not found" }, 404);
+  const row = await c.env.DB.prepare("SELECT * FROM challenges WHERE org_id = ? AND slug = ?").bind(access.org.id, c.req.param("cslug")).first<ChallengeRow>();
+  if (!row || row.status === "draft") return c.json({ error: "Not found" }, 404);
+  const page = `${c.env.APP_URL.replace(/\/$/, "")}/o/${access.org.slug}/c/${row.slug}`;
+  const note = `${row.summary ? `${row.summary}\n\n` : ""}${page}`;
+  const entries: CalEntry[] = [];
+  if (row.applications_close_at) entries.push({ uid: `${row.id}-close`, title: `Applications close: ${row.title}`, start: row.applications_close_at - 30 * 60000, end: row.applications_close_at, description: note, url: page, remindDayBefore: true });
+  if (row.pitch_due_at) entries.push({ uid: `${row.id}-pitch`, title: `Pitch due: ${row.title}`, start: row.pitch_due_at - 30 * 60000, end: row.pitch_due_at, description: note, url: page, remindDayBefore: true });
+  const { results: agenda } = await c.env.DB.prepare("SELECT id, label, starts_at, ends_at FROM challenge_agenda WHERE challenge_id = ? ORDER BY starts_at LIMIT 40").bind(row.id).all<{ id: string; label: string; starts_at: number; ends_at: number }>();
+  for (const a of agenda) entries.push({ uid: `${row.id}-${a.id}`, title: `${a.label}: ${row.title}`, start: a.starts_at, end: a.ends_at, description: note, url: page });
+  if (!entries.length) return c.json({ error: "This challenge has no dates to add" }, 404);
+  return calendarResponse(calendarFile(row.title, entries), row.slug);
 });
 
 orgChallenges.put("/:slug/challenges/:cslug", async (c) => {
